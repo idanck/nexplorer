@@ -43,7 +43,7 @@
       "y": 1540,
       "w": 390,
       "h": 844,
-      "title": "מצב בחירה"
+      "title": "בחירה — רשת (כהה)"
     },
     "Transfer.dc.html": {
       "x": 1410,
@@ -114,6 +114,13 @@
       "w": 1024,
       "h": 720,
       "title": "טאבלט — שני חלונות"
+    },
+    "SelectList.dc.html": {
+      "x": 5170,
+      "y": 1540,
+      "w": 390,
+      "h": 844,
+      "title": "בחירת קובץ — רשימה"
     }
   },
   "order": [
@@ -122,6 +129,7 @@
     "Main.dc.html",
     "Drawer.dc.html",
     "Select.dc.html",
+    "SelectList.dc.html",
     "Transfer.dc.html",
     "Analyzer.dc.html",
     "Connect.dc.html",
@@ -146,7 +154,7 @@
       "y": 1280,
       "text": "2 · שפת המבנה — מסכי טלפון (390×844, RTL)",
       "kind": "title1",
-      "maxW": 5090
+      "maxW": 5560
     },
     "t3": {
       "x": 0,
