@@ -20,7 +20,8 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - uses: android-actions/setup-android@v3
+      # ה-runner של ubuntu-latest כבר מגיע עם Android SDK (ANDROID_HOME).
+      # setup-android@v3 נכשל ב-13/10/2026 על החבילה 'tools' שהוסרה, ולכן הוסר.
 
       - uses: gradle/actions/setup-gradle@v4
 
