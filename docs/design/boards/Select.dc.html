@@ -11,70 +11,78 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
 <style>
 body{margin:0}
-a{color:#2B6FEE}a:hover{color:#1E4DA8}
+a{color:#7FB0FF}a:hover{color:#D5E3FE}
 </style>
 </helmet>
-<div style="width: 390px; height: 844px; box-sizing: border-box; direction: rtl; font-family: 'Noto Sans Hebrew', system-ui, sans-serif; color: #16202A; background: #F3F5F7; display: flex; flex-direction: column; overflow: hidden">
+<div style="width: 390px; height: 844px; box-sizing: border-box; direction: rtl; font-family: 'Noto Sans Hebrew', system-ui, sans-serif; color: #E6ECF1; background: #0F1417; position: relative; overflow: hidden">
 
-  <!-- סרגל בחירה -->
-  <div style="display: flex; align-items: center; gap: 8px; padding: 14px 12px 12px 12px; background: #D5E3FE">
-    <button aria-label="בטל בחירה" style="width: 44px; height: 44px; border: 0; background: transparent; border-radius: 22px; display: flex; align-items: center; justify-content: center; color: #1E4DA8">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+  <!-- כותרת בחירה צפה (גלולה) -->
+  <div style="position: absolute; top: 12px; left: 12px; right: 12px; height: 64px; border-radius: 32px; background: #1A2228; display: flex; align-items: center; gap: 2px; padding: 0 8px; z-index: 2">
+    <button aria-label="בחר הכל" style="width: 44px; height: 44px; border: 0; background: transparent; border-radius: 22px; color: #7FB0FF; display: flex; align-items: center; justify-content: center">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="2.4 2.4" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/></svg>
     </button>
-    <div style="flex: 1; font-size: 20px; font-weight: 600; color: #1E4DA8">3 נבחרו</div>
-    <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #1E4DA8; direction: ltr">51.6 MB</div>
-    <button style="height: 36px; padding: 0 12px; border: 0; border-radius: 999px; background: rgba(30,77,168,0.12); color: #1E4DA8; font-family: inherit; font-size: 13px; font-weight: 600">בחר הכל</button>
+    <button aria-label="הפוך בחירה" style="width: 44px; height: 44px; border: 0; background: transparent; border-radius: 22px; color: #7FB0FF; display: flex; align-items: center; justify-content: center">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3" stroke-dasharray="2.4 2.4"/><rect x="8" y="8" width="8" height="8" rx="1.5" fill="currentColor" stroke="none"/></svg>
+    </button>
+    <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; padding: 0 8px">
+      <div style="font-size: 20px; font-weight: 600; line-height: 24px">נבחר פריט 1</div>
+      <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #9AA7B2; direction: ltr; text-align: end">6.36 MB</div>
+    </div>
+    <button aria-label="בטל בחירה" style="width: 44px; height: 44px; border: 0; background: transparent; border-radius: 22px; color: #7FB0FF; display: flex; align-items: center; justify-content: center">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
   </div>
 
-  <div style="flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; background: #FFFFFF; border-radius: 24px 24px 0 0; padding: 12px 0 0 0">
-
-    <div style="display: flex; align-items: center; gap: 14px; padding: 10px 16px; min-height: 64px">
-      <div style="width: 44px; height: 44px; border-radius: 14px; background: #D5E3FE; color: #1E4DA8; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>
-      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px"><div style="font-size: 16px; font-weight: 500; direction: ltr; unicode-bidi: isolate; text-align: start">Download</div><div style="font-size: 13px; color: #52606D">670 פריטים · 12 באוק׳</div></div>
-      <div style="width: 24px; height: 24px; border-radius: 7px; border: 2px solid #C7CED5; flex-shrink: 0"></div>
-    </div>
-
-    <div style="display: flex; align-items: center; gap: 14px; padding: 10px 16px; min-height: 64px; background: #EEF3FF">
-      <div style="width: 44px; height: 44px; border-radius: 14px; background: #FBE7C9; color: #5C3203; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9" cy="9" r="1.5"/><path d="M20 16l-5-5-7 7"/></svg></div>
-      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px"><div style="font-size: 16px; font-weight: 500; direction: ltr; unicode-bidi: isolate; text-align: start; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">IMG_20261012_103455.jpg</div><div style="font-size: 13px; color: #52606D"><span style="font-family: 'JetBrains Mono', monospace; direction: ltr; unicode-bidi: isolate">3.2 MB</span> · 12 באוק׳</div></div>
-      <div style="width: 24px; height: 24px; border-radius: 7px; background: #2B6FEE; color: #FFFFFF; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></div>
-    </div>
-
-    <div style="display: flex; align-items: center; gap: 14px; padding: 10px 16px; min-height: 64px; background: #EEF3FF">
-      <div style="width: 44px; height: 44px; border-radius: 14px; background: #FBE7C9; color: #5C3203; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9" cy="9" r="1.5"/><path d="M20 16l-5-5-7 7"/></svg></div>
-      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px"><div style="font-size: 16px; font-weight: 500; direction: ltr; unicode-bidi: isolate; text-align: start; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">IMG_20261012_103512.jpg</div><div style="font-size: 13px; color: #52606D"><span style="font-family: 'JetBrains Mono', monospace; direction: ltr; unicode-bidi: isolate">2.9 MB</span> · 12 באוק׳</div></div>
-      <div style="width: 24px; height: 24px; border-radius: 7px; background: #2B6FEE; color: #FFFFFF; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></div>
-    </div>
-
-    <div style="display: flex; align-items: center; gap: 14px; padding: 10px 16px; min-height: 64px; background: #EEF3FF">
-      <div style="width: 44px; height: 44px; border-radius: 14px; background: #E6EAEE; color: #16202A; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M10 9l5 3-5 3z"/></svg></div>
-      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px"><div style="font-size: 16px; font-weight: 500; direction: ltr; unicode-bidi: isolate; text-align: start; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">VID_20261011_190210.mp4</div><div style="font-size: 13px; color: #52606D"><span style="font-family: 'JetBrains Mono', monospace; direction: ltr; unicode-bidi: isolate">45.5 MB</span> · 11 באוק׳</div></div>
-      <div style="width: 24px; height: 24px; border-radius: 7px; background: #2B6FEE; color: #FFFFFF; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></div>
-    </div>
-
-    <div style="display: flex; align-items: center; gap: 14px; padding: 10px 16px; min-height: 64px">
-      <div style="width: 44px; height: 44px; border-radius: 14px; background: #E6EAEE; color: #16202A; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 13h6M9 17h6"/></svg></div>
-      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px"><div style="font-size: 16px; font-weight: 500; direction: ltr; unicode-bidi: isolate; text-align: start">router-backup-388.1.cfg</div><div style="font-size: 13px; color: #52606D"><span style="font-family: 'JetBrains Mono', monospace; direction: ltr; unicode-bidi: isolate">48 KB</span> · 17 בספט׳</div></div>
-      <div style="width: 24px; height: 24px; border-radius: 7px; border: 2px solid #C7CED5; flex-shrink: 0"></div>
-    </div>
-
-    <div style="display: flex; align-items: center; gap: 14px; padding: 10px 16px; min-height: 64px">
-      <div style="width: 44px; height: 44px; border-radius: 14px; background: #D5E3FE; color: #1E4DA8; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>
-      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px"><div style="font-size: 16px; font-weight: 500; direction: ltr; unicode-bidi: isolate; text-align: start">Music</div><div style="font-size: 13px; color: #52606D">3 פריטים · 19 באוג׳</div></div>
-      <div style="width: 24px; height: 24px; border-radius: 7px; border: 2px solid #C7CED5; flex-shrink: 0"></div>
-    </div>
-
-    <div style="padding: 16px 20px; font-size: 13px; color: #52606D; line-height: 18px">לחיצה ארוכה על פריט נוסף בוחרת טווח. הקשה על האריח בוחרת בלי להיכנס.</div>
+  <!-- פירורי לחם -->
+  <div style="position: absolute; top: 92px; left: 0; right: 0; display: flex; align-items: center; gap: 10px; padding: 0 22px; font-size: 15px; font-weight: 500; color: #52606D">
+    <span>זיכרון פנימי</span>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+    <span style="direction: ltr">DCIM</span>
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+    <span style="direction: ltr; color: #7FB0FF">Camera</span>
   </div>
 
-  <!-- סרגל פעולות על הבחירה -->
-  <div style="display: flex; align-items: center; justify-content: space-around; padding: 10px 8px 18px 8px; background: #FFFFFF; border-top: 1px solid #E6EAEE">
-    <button style="display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 60px; height: 52px; border: 0; background: transparent; color: #16202A; border-radius: 16px; padding: 0 6px; font-family: inherit; font-size: 12px; font-weight: 500"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></svg><span>העתק</span></button>
-    <button style="display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 60px; height: 52px; border: 0; background: transparent; color: #16202A; border-radius: 16px; padding: 0 6px; font-family: inherit; font-size: 12px; font-weight: 500"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4L8.5 15.5M8.5 8.5L20 20"/></svg><span>גזור</span></button>
-    <button style="display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 60px; height: 52px; border: 0; background: transparent; color: #16202A; border-radius: 16px; padding: 0 6px; font-family: inherit; font-size: 12px; font-weight: 500"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 15V3M8 7l4-4 4 4"/></svg><span>שתף</span></button>
-    <button style="display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 60px; height: 52px; border: 0; background: transparent; color: #16202A; border-radius: 16px; padding: 0 6px; font-family: inherit; font-size: 12px; font-weight: 500"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><span>הצפן</span></button>
-    <button style="display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 60px; height: 52px; border: 0; background: transparent; color: #B3261E; border-radius: 16px; padding: 0 6px; font-family: inherit; font-size: 12px; font-weight: 500"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg><span>מחק</span></button>
-    <button aria-label="עוד פעולות" style="display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 48px; height: 52px; border: 0; background: transparent; color: #16202A; border-radius: 16px; padding: 0 6px; font-family: inherit; font-size: 12px; font-weight: 500"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg><span>עוד</span></button>
+  <div style="position: absolute; top: 134px; right: 20px; font-size: 13px; font-weight: 600; color: #9AA7B2; letter-spacing: 0.04em">היום</div>
+
+  <!-- רשת תמונות -->
+  <div style="position: absolute; top: 162px; left: 8px; right: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px">
+    <div style="position: relative; height: 158px; border-radius: 24px; background: linear-gradient(160deg, #3A5A4E, #1E2E28)"><div style="position: absolute; top: 12px; left: 12px; width: 22px; height: 22px; border-radius: 6px; border: 2px solid rgba(230,236,241,0.75)"></div></div>
+    <div style="position: relative; height: 158px; border-radius: 24px; background: linear-gradient(160deg, #2B4A55, #18282E)"><div style="position: absolute; top: 12px; left: 12px; width: 22px; height: 22px; border-radius: 6px; border: 2px solid rgba(230,236,241,0.75)"></div></div>
+    <div style="position: relative; height: 158px; border-radius: 24px; background: linear-gradient(160deg, #4A3A55, #261E2E)"><div style="position: absolute; top: 12px; left: 12px; width: 22px; height: 22px; border-radius: 6px; border: 2px solid rgba(230,236,241,0.75)"></div></div>
+    <!-- נבחר -->
+    <div style="position: relative; height: 158px; border-radius: 24px; background: linear-gradient(160deg, #2E3F5C, #1A2436); box-shadow: inset 0 0 0 3px #7FB0FF">
+      <div style="position: absolute; inset: 0; border-radius: 24px; background: rgba(127,176,255,0.18)"></div>
+      <div style="position: absolute; top: 12px; left: 12px; width: 26px; height: 26px; border-radius: 7px; background: #7FB0FF; color: #002B6B; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg></div>
+    </div>
+  </div>
+
+  <div style="position: absolute; top: 504px; right: 20px; font-size: 13px; font-weight: 600; color: #9AA7B2; letter-spacing: 0.04em">אתמול</div>
+  <div style="position: absolute; top: 532px; left: 8px; right: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px">
+    <div style="position: relative; height: 158px; border-radius: 24px; background: linear-gradient(160deg, #554A2B, #2E2818)"><div style="position: absolute; top: 12px; left: 12px; width: 22px; height: 22px; border-radius: 6px; border: 2px solid rgba(230,236,241,0.75)"></div></div>
+    <div style="position: relative; height: 158px; border-radius: 24px; background: linear-gradient(160deg, #5A3F3A, #2E201E)"><div style="position: absolute; top: 12px; left: 12px; width: 22px; height: 22px; border-radius: 6px; border: 2px solid rgba(230,236,241,0.75)"></div></div>
+    <div style="height: 158px; border-radius: 24px; background: linear-gradient(160deg, #3F3A5A, #201E2E)"></div>
+    <div style="height: 158px; border-radius: 24px; background: linear-gradient(160deg, #2B5546, #182E26)"></div>
+  </div>
+
+  <!-- תפריט ⋮ של הבחירה -->
+  <div style="position: absolute; right: 18px; bottom: 116px; width: 270px; border-radius: 20px; background: #232C33; box-shadow: 0 10px 30px rgba(0,0,0,0.45); padding: 8px 0; z-index: 3">
+    <div style="display: flex; align-items: center; gap: 16px; height: 52px; padding: 0 20px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7FB0FF" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M12 12v5M9.5 14.5L12 17l2.5-2.5"/></svg><span style="font-size: 16px; font-weight: 500">הוסף לארכיון</span></div>
+    <div style="display: flex; align-items: center; gap: 16px; height: 52px; padding: 0 20px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7FB0FF" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 5-3 8.5-7 10-4-1.5-7-5-7-10V6z"/><circle cx="12" cy="11" r="1.6"/><path d="M12 12.6V15"/></svg><span style="font-size: 16px; font-weight: 500">הצפן</span></div>
+    <div style="display: flex; align-items: center; gap: 16px; height: 52px; padding: 0 20px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7FB0FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M10 14L20 4M14 4h6v6"/></svg><span style="font-size: 16px; font-weight: 500">פתיחה באמצעות</span></div>
+    <div style="display: flex; align-items: center; gap: 16px; height: 52px; padding: 0 20px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7FB0FF" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span style="font-size: 16px; font-weight: 500">הצג בתיקייה</span></div>
+    <div style="display: flex; align-items: center; gap: 16px; height: 52px; padding: 0 20px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7FB0FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="7" width="12" height="13" rx="2"/><path d="M9 4h10a2 2 0 0 1 2 2v10M9 13h6M12 10l3 3-3 3"/></svg><span style="font-size: 16px; font-weight: 500">העבר</span></div>
+    <div style="display: flex; align-items: center; gap: 16px; height: 52px; padding: 0 20px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7FB0FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 5l6 6-6 6M20 11H10a6 6 0 0 0-6 6v1"/></svg><span style="font-size: 16px; font-weight: 500">צור קיצור דרך</span></div>
+    <div style="display: flex; align-items: center; gap: 16px; height: 52px; padding: 0 20px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7FB0FF" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg><span style="font-size: 16px; font-weight: 500">מאפיינים</span></div>
+  </div>
+
+  <!-- סרגל פעולות צף (גלולה) — אייקונים בלבד -->
+  <div style="position: absolute; left: 12px; right: 12px; bottom: 28px; height: 72px; border-radius: 36px; background: #1A2228; box-shadow: 0 8px 24px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: space-around; padding: 0 10px; z-index: 2">
+    <button aria-label="עוד" style="width: 48px; height: 48px; border: 0; border-radius: 24px; background: #1C3F7A; color: #7FB0FF; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button>
+    <button aria-label="שנה שם" style="width: 48px; height: 48px; border: 0; border-radius: 24px; background: transparent; color: #7FB0FF; display: flex; align-items: center; justify-content: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/></svg></button>
+    <button aria-label="שתף" style="width: 48px; height: 48px; border: 0; border-radius: 24px; background: transparent; color: #7FB0FF; display: flex; align-items: center; justify-content: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4"/></svg></button>
+    <button aria-label="מחק" style="width: 48px; height: 48px; border: 0; border-radius: 24px; background: transparent; color: #F2B8B5; display: flex; align-items: center; justify-content: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg></button>
+    <button aria-label="העתק" style="width: 48px; height: 48px; border: 0; border-radius: 24px; background: transparent; color: #7FB0FF; display: flex; align-items: center; justify-content: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h8"/></svg></button>
+    <button aria-label="גזור" style="width: 48px; height: 48px; border: 0; border-radius: 24px; background: transparent; color: #7FB0FF; display: flex; align-items: center; justify-content: center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4L8.5 15.5M8.5 8.5L20 20"/></svg></button>
   </div>
 </div>
 </x-dc>
