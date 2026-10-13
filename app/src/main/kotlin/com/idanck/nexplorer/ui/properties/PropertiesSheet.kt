@@ -36,6 +36,7 @@ import com.idanck.nexplorer.core.Counts
 import com.idanck.nexplorer.core.Entry
 import com.idanck.nexplorer.core.HebrewDates
 import com.idanck.nexplorer.core.SizeFormat
+import com.idanck.nexplorer.core.isolated
 import com.idanck.nexplorer.data.files.LocalFiles
 import com.idanck.nexplorer.ui.components.FileIconTile
 import com.idanck.nexplorer.ui.theme.FileNameTextStyle
@@ -46,6 +47,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
 import java.security.MessageDigest
 import java.time.ZoneId
 import java.util.Locale
@@ -84,10 +87,17 @@ fun PropertiesSheet(entries: List<Entry>, onCopy: (String) -> Unit, onDismiss: (
                     modifier = Modifier.weight(1f),
                 )
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline)
 
             if (single != null) {
-                Detail("סוג", if (single.isDirectory) "תיקייה" else "${single.kind.label} · .${single.extension}".trimEnd('.', ' ', '·'))
+                Detail(
+                    "סוג",
+                    when {
+                        single.isDirectory -> "תיקייה"
+                        single.extension.isEmpty() -> single.kind.label
+                        else -> "${single.kind.label} · ${".${single.extension}".isolated()}"
+                    },
+                )
                 Detail("מיקום", File(single.path).parent ?: "/", mono = true, onCopy = onCopy)
             }
             val s = stats
@@ -96,9 +106,9 @@ fun PropertiesSheet(entries: List<Entry>, onCopy: (String) -> Unit, onDismiss: (
                 when {
                     s == null -> "מחשב…"
                     entries.any { it.isDirectory } ->
-                        "${SizeFormat.short(s.bytes)} · ${Counts.files(s.files)} · ${Counts.folders(s.folders)}"
+                        "${SizeFormat.short(s.bytes).isolated()} · ${Counts.files(s.files)} · ${Counts.folders(s.folders)}"
                     // מספר הבתים המדויק, מקובץ לפי אלפים.
-                    else -> "${SizeFormat.short(s.bytes)} (${String.format(Locale.US, "%,d", s.bytes)} בתים)"
+                    else -> "${SizeFormat.short(s.bytes).isolated()} (${String.format(Locale.US, "%,d", s.bytes)} בתים)"
                 },
             )
             if (single != null) {
@@ -109,7 +119,7 @@ fun PropertiesSheet(entries: List<Entry>, onCopy: (String) -> Unit, onDismiss: (
             }
 
             if (single != null && !single.isDirectory) {
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                 Text("Checksums", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Row(horizontalArrangement = Arrangement.spacedBy(NexplorerDimens.Space2)) {
                     listOf("MD5", "SHA-1", "SHA-256").forEach { algorithm ->
@@ -141,7 +151,8 @@ private fun Detail(label: String, value: String, mono: Boolean = false, onCopy: 
         )
         Text(
             value,
-            style = if (mono) MonoTextStyle else MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Content),
+            // ערך בעברית: פסקה מימין לשמאל, והגדלים בתוכה מבודדים. בלי זה "3.2 MB" בתחילת השורה הופך את כולה ל-LTR.
+            style = if (mono) MonoTextStyle else MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Rtl),
             modifier = Modifier.weight(1f),
         )
         if (onCopy != null) {
@@ -157,17 +168,23 @@ private fun Detail(label: String, value: String, mono: Boolean = false, onCopy: 
     }
 }
 
+/** קובץ של כמה GB: הלולאה בודקת ביטול בכל חוצץ, כך שסגירת הגיליון עוצרת את הקריאה. */
 private suspend fun checksum(path: String, algorithm: String): String = withContext(Dispatchers.IO) {
-    runCatching {
+    try {
         val digest = MessageDigest.getInstance(algorithm)
         File(path).inputStream().use { input ->
             val buffer = ByteArray(256 * 1024)
             while (true) {
+                ensureActive()
                 val read = input.read(buffer)
                 if (read < 0) break
                 digest.update(buffer, 0, read)
             }
         }
         digest.digest().joinToString("") { ((it.toInt() and 0xff) or 0x100).toString(16).substring(1) }
-    }.getOrElse { "שגיאה: ${it.message}" }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        "שגיאה: ${e.message}"
+    }
 }

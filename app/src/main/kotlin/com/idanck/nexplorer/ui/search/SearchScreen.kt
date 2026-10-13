@@ -22,12 +22,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.outlined.DriveFileMove
+import androidx.compose.material.icons.automirrored.outlined.DriveFileMove
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
@@ -39,6 +41,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,7 +52,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -57,6 +62,7 @@ import com.idanck.nexplorer.core.Entry
 import com.idanck.nexplorer.core.FileKind
 import com.idanck.nexplorer.core.SearchQuery
 import com.idanck.nexplorer.core.SizeFormat
+import com.idanck.nexplorer.core.isolated
 import com.idanck.nexplorer.ui.components.FileIconTile
 import com.idanck.nexplorer.ui.components.SectionHeader
 import com.idanck.nexplorer.ui.components.highlighted
@@ -78,6 +84,7 @@ fun SearchScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(root) { viewModel.start(root) }
+    DisposableEffect(viewModel) { onDispose { viewModel.stop() } }
     val query = remember(state.text) { SearchQuery.parse(state.text) }
     val c = NexplorerTheme.colors
     val highlight = SpanStyle(background = c.amberContainer, color = c.onAmberContainer)
@@ -122,6 +129,7 @@ private fun statusLine(state: SearchState): String {
 @Composable
 private fun SearchField(text: String, onChange: (String) -> Unit, onBack: () -> Unit) {
     val focus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
     LaunchedEffect(Unit) { focus.requestFocus() }
     Row(
         modifier = Modifier.padding(start = NexplorerDimens.Space1, end = NexplorerDimens.Space3, top = NexplorerDimens.Space3, bottom = NexplorerDimens.Space2),
@@ -146,6 +154,9 @@ private fun SearchField(text: String, onChange: (String) -> Unit, onBack: () -> 
                     value = text,
                     onValueChange = onChange,
                     singleLine = true,
+                    // תיקון אוטומטי היה משכתב "router*" ומפעיל סריקה חדשה בכל רווח.
+                    keyboardOptions = KeyboardOptions(autoCorrectEnabled = false, imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
                     textStyle = MonoTextStyle.copy(
                         color = MaterialTheme.colorScheme.onSurface,
                         fontSize = MaterialTheme.typography.bodyLarge.fontSize,
@@ -227,7 +238,6 @@ private fun <T> MenuChip(label: String, selected: Boolean, options: List<Pair<St
     }
 }
 
-@Suppress("DEPRECATION") // DriveFileMove: אותו אייקון בגרסת AutoMirrored.
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ResultRow(
@@ -256,7 +266,7 @@ private fun ResultRow(
                 modifier = Modifier.fillMaxWidth(),
             )
             Text(
-                hit.parentLabel + if (entry.isDirectory) "" else " · ${SizeFormat.short(entry.size)}",
+                hit.parentLabel.isolated() + if (entry.isDirectory) "" else " · ${SizeFormat.short(entry.size).isolated()}",
                 style = MonoTextStyle.copy(fontSize = MaterialTheme.typography.labelSmall.fontSize),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -265,7 +275,7 @@ private fun ResultRow(
             )
         }
         IconButton(onClick = { onShowInFolder(entry) }) {
-            Icon(Icons.Outlined.DriveFileMove, contentDescription = "הצג בתיקייה", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(Icons.AutoMirrored.Outlined.DriveFileMove, contentDescription = "הצג בתיקייה", tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

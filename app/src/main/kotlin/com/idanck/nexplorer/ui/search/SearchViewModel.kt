@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.idanck.nexplorer.NexplorerApp
 import com.idanck.nexplorer.core.Entry
 import com.idanck.nexplorer.core.FileKind
+import com.idanck.nexplorer.core.FileKinds
 import com.idanck.nexplorer.core.SearchQuery
 import com.idanck.nexplorer.data.files.LocalFiles
 import com.idanck.nexplorer.data.files.StorageVolumeInfo
@@ -18,6 +19,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -55,7 +57,8 @@ data class SearchState(
     val elapsedMs: Long = 0,
     val truncated: Boolean = false,
 ) {
-    val hasCriteria: Boolean get() = text.isNotBlank() || kind != null || size != SizeFilter.Any || date != DateFilter.Any
+    /** "!" או "|" לבד הם עוד לא שאילתה — בלי זה הם היו מציגים את 1000 הקבצים הראשונים. */
+    val hasCriteria: Boolean get() = !SearchQuery.parse(text).isEmpty || kind != null || size != SizeFilter.Any || date != DateFilter.Any
     val total: Int get() = groups.sumOf { it.hits.size }
 }
 
@@ -70,11 +73,26 @@ class SearchViewModel(app: Application) : AndroidViewModel(app) {
     val state: StateFlow<SearchState> = _state
     private var job: Job? = null
 
+    /** כל סריקה מקבלת מספר; סריקה שבוטלה לא כותבת למצב גם אם היא מסיימת תיקייה אחרי הביטול. */
+    @Volatile private var generation = 0
+    private var interrupted = false
+
     fun start(root: String?) {
         if (root != null && root != _state.value.root) {
             _state.update { it.copy(root = root) }
             restart()
+        } else if (interrupted) {
+            restart()
         }
+    }
+
+    /** יציאה מהמסך: סריקה של "בכל המקומות" לא ממשיכה דקות ברקע ומתחרה בהעברות. */
+    fun stop() {
+        if (job?.isActive != true) return
+        job?.cancel()
+        generation++
+        interrupted = true
+        _state.update { it.copy(scanning = false) }
     }
 
     fun setText(text: String) = change { it.copy(text = text) }
@@ -90,6 +108,8 @@ class SearchViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun restart() {
         job?.cancel()
+        interrupted = false
+        val gen = ++generation
         val s = _state.value
         if (!s.hasCriteria) {
             _state.update { it.copy(groups = emptyList(), scanning = false, scannedFolders = 0, truncated = false) }
@@ -106,12 +126,13 @@ class SearchViewModel(app: Application) : AndroidViewModel(app) {
             }
             _state.update { it.copy(groups = emptyList(), scanning = true, scannedFolders = 0, truncated = false) }
             val started = System.currentTimeMillis()
-            withContext(Dispatchers.IO) { scan(s, roots, volumes, started) }
-            _state.update { it.copy(scanning = false, elapsedMs = System.currentTimeMillis() - started) }
+            withContext(Dispatchers.IO) { scan(gen, s, roots, volumes, started) }
+            if (gen == generation) _state.update { it.copy(scanning = false, elapsedMs = System.currentTimeMillis() - started) }
         }
     }
 
-    private suspend fun scan(s: SearchState, roots: List<Pair<String, String>>, volumes: List<StorageVolumeInfo>, started: Long) {
+    private suspend fun scan(gen: Int, s: SearchState, roots: List<Pair<String, String>>, volumes: List<StorageVolumeInfo>, started: Long) {
+        val context = currentCoroutineContext()
         val query = SearchQuery.parse(s.text)
         val showHidden = settings.state.value.defaultView.showHidden
         val now = System.currentTimeMillis()
@@ -120,47 +141,54 @@ class SearchViewModel(app: Application) : AndroidViewModel(app) {
         var found = 0
         var lastPublish = 0L
 
-        fun publish(force: Boolean) {
+        fun publish(force: Boolean, truncated: Boolean = false) {
             val t = System.currentTimeMillis()
             if (!force && t - lastPublish < PUBLISH_MS) return
             lastPublish = t
             val snapshot = groups.map { (label, hits) -> SearchGroup(label, hits.toList()) }
-            _state.update { it.copy(groups = snapshot, scannedFolders = scanned, elapsedMs = t - started) }
+            _state.update {
+                if (gen != generation || !context.isActive) it
+                else it.copy(groups = snapshot, scannedFolders = scanned, elapsedMs = t - started, truncated = truncated || it.truncated)
+            }
         }
 
-        fun accepts(file: File, entry: Entry): Boolean {
-            if (!query.isEmpty && !query.matches(file.name)) return false
-            if (s.kind != null && entry.kind != s.kind) return false
-            if (s.size != SizeFilter.Any && (entry.isDirectory || entry.size < s.size.minBytes)) return false
-            if (s.date != DateFilter.Any && now - entry.lastModified > s.date.maxAgeMs) return false
-            return true
+        // השם קודם: הוא לא עולה כלום, ו-stat על כל קובץ באחסון הוא עיקר הזמן של חיפוש עמוק.
+        fun accepts(file: File, isDir: Boolean): Entry? {
+            if (!query.isEmpty && !query.matches(file.name)) return null
+            if (s.kind != null && FileKinds.of(file.name, isDir) != s.kind) return null
+            if (s.size != SizeFilter.Any && isDir) return null
+            val entry = LocalFiles.entryOf(file, countChildren = false)
+            if (s.size != SizeFilter.Any && entry.size < s.size.minBytes) return null
+            if (s.date != DateFilter.Any && now - entry.lastModified > s.date.maxAgeMs) return null
+            return entry
         }
 
         for ((label, rootPath) in roots) {
             val root = File(rootPath)
-            val blocked = setOf("$rootPath/Android/data", "$rootPath/Android/obb")
+            // מהשורש של הנפח, לא של החיפוש: חיפוש מתוך Android/ לא נכנס ל-data/obb.
+            val volumeRoot = StorageVolumes.volumeOf(rootPath, volumes)?.path ?: rootPath
+            val blocked = setOf("$volumeRoot/Android/data", "$volumeRoot/Android/obb")
             val stack = ArrayDeque<File>().apply { add(root) }
             while (stack.isNotEmpty()) {
-                currentCoroutineContext().ensureActive()
+                context.ensureActive()
                 val dir = stack.removeLast()
                 val children = dir.listFiles() ?: continue
                 scanned++
                 for (child in children) {
+                    context.ensureActive()
                     val hidden = child.name.startsWith(".")
                     if (hidden && !showHidden) continue
                     val isDir = child.isDirectory
-                    if (isDir && child.absolutePath !in blocked) stack.add(child)
-                    val entry = LocalFiles.entryOf(child, countChildren = false)
-                    if (accepts(child, entry)) {
-                        val volume = StorageVolumes.volumeOf(child.absolutePath, volumes)
-                        val parent = child.parent.orEmpty().removePrefix(volume?.path ?: "").trimStart('/')
-                        groups.getOrPut(label) { mutableListOf() } += SearchHit(entry, parent.ifEmpty { "/" })
-                        found++
-                        if (found >= LIMIT) {
-                            _state.update { it.copy(truncated = true) }
-                            publish(force = true)
-                            return
-                        }
+                    // קישור לתיקייה (‎/storage/self‎) — לולאה, או אותו אחסון פעמיים.
+                    if (isDir && child.absolutePath !in blocked && !LocalFiles.isLink(child)) stack.add(child)
+                    val entry = accepts(child, isDir) ?: continue
+                    val volume = StorageVolumes.volumeOf(child.absolutePath, volumes)
+                    val parent = child.parent.orEmpty().removePrefix(volume?.path ?: "").trimStart('/')
+                    groups.getOrPut(label) { mutableListOf() } += SearchHit(entry, parent.ifEmpty { "/" })
+                    found++
+                    if (found >= LIMIT) {
+                        publish(force = true, truncated = true)
+                        return
                     }
                 }
                 publish(force = false)
