@@ -47,10 +47,8 @@ adb shell am start -W -n "$pkg/com.idanck.nexplorer.MainActivity" \
   done ) > "$out/monkey-focus.txt" 2>&1 &
 watch=$!
 # תקרת זמן: monkey שנתקע לא שורף את כל ה-job, ו-logcat וצילומי המסך עדיין נאספים.
-# --pct-anyevent 0: מקשים שרירותיים כוללים מקשי מערכת (ALL_APPS, SEARCH, ASSIST) שפותחים אפליקציות אחרות;
-# ב-API 29 ALL_APPS השאיר את WindowManager ואת InputDispatcher חלוקים על הפוקוס, וכל קלט אחריו נכשל.
-# זה לא באג של האפליקציה, ו-monkey כאן בודק את האפליקציה בלבד — כמו --pct-syskeys 0.
-timeout 600 adb shell monkey -p "$pkg" -s 4242 --throttle 100 --pct-syskeys 0 --pct-anyevent 0 -v -v 2000 > "$out/monkey.txt" 2>&1
+# -v -v: גם המקשים נרשמים — כך נמצא שמקש MENU תקע את הקלט ב-API 29.
+timeout 600 adb shell monkey -p "$pkg" -s 4242 --throttle 100 --pct-syskeys 0 -v -v 2000 > "$out/monkey.txt" 2>&1
 monkey_exit=$?
 kill $watch 2>/dev/null
 tail -n 5 "$out/monkey.txt"

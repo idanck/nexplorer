@@ -3,6 +3,8 @@ package com.idanck.nexplorer
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
+import android.view.Menu
+import android.view.Window
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
@@ -57,6 +59,13 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    /**
+     * אין תפריט אפשרויות (הכל ב-⋮). ComponentActivity מחזירה כאן true, ומקש MENU פותח חלון תפריט ריק:
+     * ב-Android 10 הוא מקבל את הפוקוס בלי להצטייר, וכל קלט אחריו נתקע (נמצא ב-monkey על API 29).
+     */
+    override fun onCreatePanelMenu(featureId: Int, menu: Menu): Boolean =
+        if (featureId == Window.FEATURE_OPTIONS_PANEL) false else super.onCreatePanelMenu(featureId, menu)
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
