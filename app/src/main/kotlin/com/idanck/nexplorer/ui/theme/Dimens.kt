@@ -37,4 +37,42 @@ object NexplorerDimens {
 
     /** גובה הבאנר בראש המגירה. */
     val DrawerBannerHeight = 168.dp
+
+    /** ריפוד אנכי של שורת קובץ (ברמת צפיפות רגילה). */
+    val RowPaddingVertical = 10.dp
+
+    /** רווח בין האריח לטקסט בשורה. */
+    val RowGap = 14.dp
+
+    /** שורה בתצוגה קומפקטית. */
+    val CompactRowHeight = 48.dp
+    val CompactIconTile = 32.dp
+
+    /** אריח האייקון בתצוגת רשת. */
+    val GridIconTile = 56.dp
+
+    /** אריח של מקום אחסון במגירה. */
+    val PlaceTile = 40.dp
+
+    /** פס התפוסה מתחת למקום אחסון. */
+    val UsageBar = 5.dp
+
+    /** פס התקדמות של העברה. */
+    val ProgressBar = 6.dp
+
+    /** תיבת הסימון במצב בחירה. */
+    val Checkbox = 24.dp
+
+    /** כותרת הבחירה וסרגל הפעולות הצפים. */
+    val FloatingBarHeight = 64.dp
+
+    /** פריט ורוחב בתפריט צף (⋮ לפריט). */
+    val MenuItemHeight = 50.dp
+    val MenuWidth = 268.dp
+
+    /** חלון "אפשרויות תצוגה". */
+    val PopoverWidth = 300.dp
+
+    /** כפתורי סרגל ההדבקה. */
+    val BottomBarButton = 48.dp
 }
