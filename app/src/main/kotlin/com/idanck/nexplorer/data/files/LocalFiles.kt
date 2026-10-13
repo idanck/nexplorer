@@ -4,15 +4,23 @@ import com.idanck.nexplorer.core.Entry
 import com.idanck.nexplorer.core.FileKinds
 import com.idanck.nexplorer.core.FileNames
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
+import java.nio.file.Files
 
 /**
  * גישה ישירה למערכת הקבצים (java.io). עובד כשיש "גישה לכל הקבצים" (D2, ערך זמני).
  * כל הפעולות כאן קצרות; העתקה, העברה ומחיקה רצות דרך TransferManager.
  */
 object LocalFiles {
+
+    /**
+     * קישור סימבולי (‎/storage/self/primary‎, ‎/sdcard‎). פעולות על עץ לא עוקבות אחריו:
+     * מחיקה דרכו מרוקנת את היעד האמיתי, והעתקה דרכו יכולה להיכנס ללולאה.
+     */
+    fun isLink(file: File): Boolean = runCatching { Files.isSymbolicLink(file.toPath()) }.getOrDefault(false)
 
     fun entryOf(file: File, countChildren: Boolean = true): Entry {
         val isDir = file.isDirectory
@@ -37,7 +45,11 @@ object LocalFiles {
         Result.success(
             children.asSequence()
                 .filter { showHidden || !it.name.startsWith(".") }
-                .map { entryOf(it) }
+                .map {
+                    // תיקייה של עשרות אלפי קבצים: ניווט הלאה מבטל את הרישום הישן.
+                    ensureActive()
+                    entryOf(it)
+                }
                 .toList(),
         )
     }
@@ -77,19 +89,32 @@ object LocalFiles {
     /** גודל ומספר פריטים של עץ — לחלון המאפיינים. */
     data class TreeStats(val bytes: Long, val files: Int, val folders: Int)
 
+    /** בלי לעקוב אחרי קישורים, ועם בדיקת ביטול — סגירת חלון המאפיינים עוצרת סריקה של כל האחסון. */
     suspend fun treeStats(paths: List<String>): TreeStats = withContext(Dispatchers.IO) {
         var bytes = 0L
         var files = 0
         var folders = 0
-        paths.forEach { root ->
-            File(root).walkTopDown().forEach { f ->
-                if (f.isDirectory) folders++ else {
-                    files++
-                    bytes += f.length()
+        val stack = ArrayDeque<File>()
+        for (path in paths) {
+            val root = File(path)
+            // השורש עצמו לא נספר כ"תיקייה בתוך".
+            if (root.isDirectory && !isLink(root)) stack.addLast(root) else {
+                files++
+                bytes += root.length()
+            }
+            while (stack.isNotEmpty()) {
+                ensureActive()
+                for (child in stack.removeLast().listFiles().orEmpty()) {
+                    if (child.isDirectory && !isLink(child)) {
+                        folders++
+                        stack.addLast(child)
+                    } else {
+                        files++
+                        if (!isLink(child)) bytes += child.length()
+                    }
                 }
             }
         }
-        // השורש עצמו לא נספר כ"תיקייה בתוך".
-        TreeStats(bytes, files, (folders - paths.count { File(it).isDirectory }).coerceAtLeast(0))
+        TreeStats(bytes, files, folders)
     }
 }

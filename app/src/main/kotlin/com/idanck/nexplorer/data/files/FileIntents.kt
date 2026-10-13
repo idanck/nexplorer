@@ -20,6 +20,9 @@ object FileIntents {
     const val ACTION_OPEN_FOLDER = "com.idanck.nexplorer.action.OPEN_FOLDER"
     const val EXTRA_PATH = "path"
 
+    /** כל URI עובר ב-Intent שלוש פעמים (EXTRA_STREAM, ClipData, ה-chooser); מעבר לזה — חריגה ממגבלת ה-Binder. */
+    const val MAX_SHARE = 500
+
     fun mimeType(name: String): String {
         val ext = name.substringAfterLast('.', "").lowercase()
         return MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext)
@@ -86,6 +89,9 @@ object FileIntents {
     } catch (e: ActivityNotFoundException) {
         false
     } catch (e: SecurityException) {
+        false
+    } catch (e: RuntimeException) {
+        // TransactionTooLargeException מגיע עטוף ב-RuntimeException — הודעה, לא קריסה.
         false
     }
 }

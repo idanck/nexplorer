@@ -15,6 +15,8 @@ data class StorageVolumeInfo(
     val isRemovable: Boolean,
     val totalBytes: Long,
     val freeBytes: Long,
+    /** עד Android 10 כרטיס SD נגיש דרך java.io לקריאה בלבד (כתיבה רק דרך SAF). */
+    val writable: Boolean = true,
 ) {
     val usedBytes: Long get() = (totalBytes - freeBytes).coerceAtLeast(0)
     val usedFraction: Float get() = if (totalBytes <= 0) 0f else usedBytes.toFloat() / totalBytes
@@ -51,6 +53,7 @@ object StorageVolumes {
                     isRemovable = volume.isRemovable,
                     totalBytes = stat?.totalBytes ?: 0,
                     freeBytes = stat?.availableBytes ?: 0,
+                    writable = dir.canWrite(),
                 )
             }
             .sortedByDescending { it.isPrimary }

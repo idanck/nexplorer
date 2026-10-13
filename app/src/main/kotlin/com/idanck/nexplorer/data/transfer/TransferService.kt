@@ -35,26 +35,39 @@ class TransferService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var watcher: Job? = null
+    private var lastStartId = 0
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        lastStartId = startId
         val manager = (application as NexplorerApp).container.transfers
         ensureChannel()
         promote(buildNotification(manager.transfers.value))
         if (watcher == null) {
             watcher = scope.launch {
                 manager.transfers.sample(500).collectLatest { list ->
-                    if (list.none { it.isActive }) {
-                        ServiceCompat.stopForeground(this@TransferService, ServiceCompat.STOP_FOREGROUND_REMOVE)
-                        stopSelf()
-                    } else {
-                        notify(buildNotification(list))
-                    }
+                    // הרשימה כאן בת עד חצי שנייה — בודקים שוב מול המצב החי לפני עצירה.
+                    if (!manager.needsService) stop() else notify(buildNotification(list))
                 }
             }
         }
         return START_NOT_STICKY
+    }
+
+    /**
+     * Android 15: ל-dataSync יש מכסה של 6 שעות ביום. כשהיא נגמרת חייבים לעצור תוך שניות,
+     * אחרת המערכת מפילה את האפליקציה — ההעברות מושהות (ולא נקטעות), והמשתמש ימשיך אותן.
+     */
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        (application as NexplorerApp).container.transfers.pauseAll()
+        stop()
+    }
+
+    private fun stop() {
+        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+        // עם ה-startId האחרון: אם enqueue התחיל את השירות שוב בינתיים, הבקשה הזו לא עוצרת אותו.
+        stopSelfResult(lastStartId)
     }
 
     override fun onDestroy() {
