@@ -45,6 +45,10 @@ object Qa {
             shell("pm grant $packageName android.permission.READ_EXTERNAL_STORAGE")
             shell("pm grant $packageName android.permission.WRITE_EXTERNAL_STORAGE")
         }
+        // העברה ראשונה מבקשת הרשאת התראות; הדיאלוג של המערכת משהה את הפעילות והבדיקה מאבדת את המסך.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            shell("pm grant $packageName android.permission.POST_NOTIFICATIONS")
+        }
     }
 
     fun screenshot(compose: ComposeTestRule, name: String) {

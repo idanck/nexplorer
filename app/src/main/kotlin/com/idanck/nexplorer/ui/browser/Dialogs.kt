@@ -226,7 +226,6 @@ fun NameDialog(
     var value by remember { mutableStateOf(TextFieldValue(initial, TextRange(0, selectionEnd))) }
     val error = if (value.text.isEmpty()) null else FileNames.validate(value.text)
     val focus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { focus.requestFocus() }
     val submit = { if (value.text.isNotBlank() && error == null) onConfirm(value.text.trim()) }
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -243,6 +242,9 @@ fun NameDialog(
                 keyboardActions = KeyboardActions(onDone = { submit() }),
                 modifier = Modifier.fillMaxWidth().focusRequester(focus),
             )
+            // בתוך הדיאלוג ולא לפניו: לדיאלוג קומפוזיציה (וחלון) משלו שנבנית אחר כך, ובקשת פוקוס
+            // מבחוץ רצה לפני שהשדה קיים — IllegalStateException וקריסה.
+            LaunchedEffect(Unit) { focus.requestFocus() }
         },
         confirmButton = {
             TextButton(onClick = submit, enabled = value.text.isNotBlank() && error == null) { Text(confirmLabel) }
