@@ -27,6 +27,7 @@ import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.PhoneAndroid
+import androidx.compose.material.icons.outlined.DonutLarge
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SdCard
 import androidx.compose.material.icons.outlined.SwapVert
@@ -68,6 +69,7 @@ class DrawerModel(
     val onAddPlace: () -> Unit,
     val onTransfers: () -> Unit,
     val onSettings: () -> Unit,
+    val onAnalyzer: () -> Unit,
 )
 
 /** מגירת המקומות (לוח "מגירת מקומות"): באנר, מקומות, מועדפים, אוספים, כלים. */
@@ -112,6 +114,7 @@ fun PlacesDrawer(model: DrawerModel) {
             ToolRow("העברות", Icons.Outlined.SwapVert, model.onTransfers) {
                 if (model.activeTransfers > 0) AmberBadge("${model.activeTransfers} פעילות")
             }
+            ToolRow("מנתח אחסון", Icons.Outlined.DonutLarge, model.onAnalyzer)
             ToolRow("הגדרות", Icons.Outlined.Settings, model.onSettings)
         }
     }

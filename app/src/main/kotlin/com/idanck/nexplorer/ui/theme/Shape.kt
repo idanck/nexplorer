@@ -46,6 +46,10 @@ object NexplorerShape {
     val PlaceTile = RoundedCornerShape(12.dp)
     val Checkbox = RoundedCornerShape(7.dp)
 
+    /** כרטיסי "מה אפשר לפנות" ו"תיקיות גדולות" במנתח, ונקודת המקרא של הפילוח. */
+    val FindingCard = RoundedCornerShape(20.dp)
+    val LegendDot = RoundedCornerShape(3.dp)
+
     val Pill = CircleShape
     val Fab = CircleShape
 }

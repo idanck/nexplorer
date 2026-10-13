@@ -81,5 +81,11 @@ val BannerTitleTextStyle = NexplorerTypography.headlineLarge.copy(
     textDirection = TextDirection.Ltr,
 )
 
+/**
+ * המספר הגדול בכרטיס הסיכום של מנתח האחסון ("133"): mono 700 · 32/36, LTR.
+ * JetBrains Mono ארוז רק ב-400/500 — ה-700 מסונתז (FontSynthesis), וזה מה שהלוח מראה.
+ */
+val UsageFigureTextStyle = MonoTextStyle.copy(fontSize = 32.sp, lineHeight = 36.sp, fontWeight = FontWeight.Bold)
+
 /** שם קובץ בשורת רשימה: פונט הממשק, כיוון LTR. */
 val FileNameTextStyle = NexplorerTypography.bodyLarge.copy(textDirection = TextDirection.Ltr)

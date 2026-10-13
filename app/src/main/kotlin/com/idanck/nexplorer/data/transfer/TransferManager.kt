@@ -3,6 +3,7 @@ package com.idanck.nexplorer.data.transfer
 import android.content.Context
 import android.os.Build
 import com.idanck.nexplorer.core.FileNames
+import com.idanck.nexplorer.data.archive.ZipArchives
 import com.idanck.nexplorer.data.files.LocalFiles
 import com.idanck.nexplorer.data.files.MediaScan
 import kotlinx.coroutines.CoroutineScope
@@ -22,7 +23,17 @@ import java.nio.file.Files
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
-enum class TransferKind(val verb: String) { Copy("העתקה"), Move("העברה"), Delete("מחיקה") }
+/** [feminine] — להתאמת הפועל: "ההעתקה נכשלה" אבל "החילוץ נכשל". */
+enum class TransferKind(val verb: String, val feminine: Boolean) {
+    Copy("העתקה", true),
+    Move("העברה", true),
+    Delete("מחיקה", true),
+    Compress("דחיסה", true),
+    Extract("חילוץ", false),
+    ;
+
+    fun past(masculine: String, feminine: String): String = if (this.feminine) feminine else masculine
+}
 
 enum class TransferStatus { Queued, Preparing, Running, Paused, Done, Failed, Cancelled }
 
@@ -42,6 +53,10 @@ data class Transfer(
     val error: String? = null,
     /** העברות שבוצעו (מקור → יעד), כדי שמועדפים ותצוגה לפי תיקייה יעברו איתן. */
     val moved: List<Pair<String, String>> = emptyList(),
+    /** דחיסה: שם ה-ZIP. חילוץ: שם תיקייה חדשה, או null = לתוך [targetDir]. */
+    val archiveName: String? = null,
+    /** הצלחה עם הערה ("2 רשומות דולגו") — מוצגת כהודעה. */
+    val note: String? = null,
 ) {
     val title: String
         get() = if (sources.size == 1) sources.first().substringAfterLast('/') else "${sources.size} פריטים"
@@ -83,6 +98,7 @@ class TransferManager(private val context: Context, private val scope: Coroutine
     private val ids = AtomicLong(0)
     private val cancelled = ConcurrentHashMap.newKeySet<Long>()
     private val paused = ConcurrentHashMap.newKeySet<Long>()
+    private val secrets = ConcurrentHashMap<Long, CharArray>()
 
     init {
         scope.launch(Dispatchers.IO) {
@@ -90,9 +106,17 @@ class TransferManager(private val context: Context, private val scope: Coroutine
         }
     }
 
-    fun enqueue(kind: TransferKind, sources: List<String>, targetDir: String?): Long {
+    /** [password] — לארכיון בלבד. נשמר בזיכרון עד סוף הפעולה, לא במצב שהממשק רואה, ונמחק אחריה. */
+    fun enqueue(
+        kind: TransferKind,
+        sources: List<String>,
+        targetDir: String?,
+        archiveName: String? = null,
+        password: CharArray? = null,
+    ): Long {
         val id = ids.incrementAndGet()
-        _transfers.update { it + Transfer(id, kind, sources, targetDir) }
+        if (password != null && password.isNotEmpty()) secrets[id] = password
+        _transfers.update { it + Transfer(id, kind, sources, targetDir, archiveName = archiveName) }
         queue.trySend(id)
         TransferService.start(context)
         return id
@@ -101,6 +125,8 @@ class TransferManager(private val context: Context, private val scope: Coroutine
     fun cancel(id: Long) {
         cancelled += id
         paused -= id
+        // פעולה שבוטלה עוד בתור לא תגיע ל-run — הסיסמה שלה נמחקת כאן.
+        if (get(id)?.status == TransferStatus.Queued) secrets.remove(id)?.fill('\u0000')
         _transfers.update { list ->
             list.map { if (it.id == id && it.status == TransferStatus.Queued) it.copy(status = TransferStatus.Cancelled) else it }
         }
@@ -132,12 +158,17 @@ class TransferManager(private val context: Context, private val scope: Coroutine
 
     private suspend fun run(id: Long) {
         val job = get(id) ?: return
-        if (job.status != TransferStatus.Queued) return
+        if (job.status != TransferStatus.Queued) {
+            secrets.remove(id)?.fill('\u0000')
+            return
+        }
         set(id) { it.copy(status = TransferStatus.Preparing) }
         val outcome = try {
             when (job.kind) {
                 TransferKind.Delete -> delete(job)
                 TransferKind.Copy, TransferKind.Move -> copyOrMove(job)
+                TransferKind.Compress -> compress(job)
+                TransferKind.Extract -> extract(job)
             }
             set(id) { it.copy(status = TransferStatus.Done, doneBytes = it.totalBytes, doneItems = it.totalItems) }
             null
@@ -150,6 +181,7 @@ class TransferManager(private val context: Context, private val scope: Coroutine
         set(id) { it.copy(finishedAt = System.currentTimeMillis(), currentName = null, bytesPerSecond = 0) }
         cancelled -= id
         paused -= id
+        secrets.remove(id)?.fill('\u0000')
         flushScan()
         get(id)?.let { _finished.tryEmit(it) }
     }
@@ -231,6 +263,43 @@ class TransferManager(private val context: Context, private val scope: Coroutine
             if (move) recordMove(job.id, source, dest)
             doneItems++
             set(job.id) { it.copy(doneItems = doneItems) }
+        }
+    }
+
+    private suspend fun compress(job: Transfer) {
+        val targetDir = File(requireNotNull(job.targetDir))
+        if (!targetDir.canWrite()) throw IOException("אין הרשאת כתיבה בתיקיית היעד")
+        val sources = job.sources.map(::File)
+        var total = 0L
+        for (source in sources) total += sizeOf(job.id, source)
+        val dest = File(targetDir, uniqueIn(targetDir, requireNotNull(job.archiveName)))
+        set(job.id) { it.copy(status = TransferStatus.Running, totalBytes = total, currentName = dest.name) }
+        val progress = Progress(job.id)
+        val created = ZipArchives.compress(sources, dest, secrets[job.id], checkpoint = { checkpoint(job.id) }, onBytes = progress::add)
+        touched(null, created)
+    }
+
+    private suspend fun extract(job: Transfer) {
+        val archive = File(job.sources.single())
+        val parent = File(requireNotNull(job.targetDir))
+        if (!parent.canWrite()) throw IOException("אין הרשאת כתיבה בתיקיית היעד")
+        val info = ZipArchives.inspect(archive)
+        set(job.id) { it.copy(status = TransferStatus.Running, totalBytes = info.totalBytes, currentName = archive.name) }
+        // "חלץ לתיקייה": תיקייה חדשה בשם פנוי — היא שלנו, ולכן בכשל אפשר למחוק אותה כולה.
+        val folder = job.archiveName?.let { name ->
+            File(parent, uniqueIn(parent, name)).also { if (!it.mkdirs()) throw IOException("לא ניתן ליצור את \"${it.name}\"") }
+        }
+        val progress = Progress(job.id)
+        val result = try {
+            ZipArchives.extract(archive, folder ?: parent, secrets[job.id], checkpoint = { checkpoint(job.id) }, onBytes = progress::add)
+        } catch (e: Exception) {
+            folder?.deleteRecursively()
+            throw e
+        }
+        folder?.let { touched(null, it) }
+        result.created.forEach { touched(null, it) }
+        if (result.skipped > 0) {
+            set(job.id) { it.copy(note = "${result.skipped} רשומות בארכיון דולגו — הנתיב שלהן יוצא מתיקיית החילוץ") }
         }
     }
 

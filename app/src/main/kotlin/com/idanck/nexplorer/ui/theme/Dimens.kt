@@ -86,4 +86,14 @@ object NexplorerDimens {
 
     /** כפתורי סרגל ההדבקה. */
     val BottomBarButton = 48.dp
+
+    /** מנתח האחסון: פס הפילוח (pill), נקודת המקרא, ופס ורוחב הגודל בשורת "תיקיות גדולות". */
+    val AnalyzerBar = 14.dp
+    val AnalyzerBarGap = 2.dp
+    val LegendDot = 10.dp
+    val FolderBarWidth = 90.dp
+    val FolderSizeWidth = 64.dp
+
+    /** רשימה מקדימה בתוך חלון (שינוי שם מרובה): גלילה פנימית מעבר לגובה הזה. */
+    val PreviewListMaxHeight = 180.dp
 }

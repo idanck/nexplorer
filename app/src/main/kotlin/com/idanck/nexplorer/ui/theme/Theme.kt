@@ -95,6 +95,13 @@ data class NexplorerColors(
     val bannerGlowSoft: Color,
     val bannerTitle: Color,
     val bannerSubtitle: Color,
+    /** פילוח התפוסה במנתח: וידאו, תמונות, אפליקציות ומערכת, מסמכים, אודיו, אחר. */
+    val chartVideo: Color,
+    val chartImages: Color,
+    val chartApps: Color,
+    val chartDocuments: Color,
+    val chartAudio: Color,
+    val chartOther: Color,
 )
 
 private val LightExtended = NexplorerColors(
@@ -113,6 +120,12 @@ private val LightExtended = NexplorerColors(
     bannerGlowSoft = BannerGlowSoft,
     bannerTitle = BannerTitle,
     bannerSubtitle = BannerSubtitle,
+    chartVideo = LightChartVideo,
+    chartImages = LightChartImages,
+    chartApps = LightChartApps,
+    chartDocuments = LightChartDocuments,
+    chartAudio = LightChartAudio,
+    chartOther = LightChartOther,
 )
 
 private val DarkExtended = LightExtended.copy(
@@ -121,6 +134,12 @@ private val DarkExtended = LightExtended.copy(
     onAmberContainer = DarkOnAmberContainer,
     success = DarkSuccess,
     selectedRow = DarkSelectedRow,
+    chartVideo = DarkChartVideo,
+    chartImages = DarkChartImages,
+    chartApps = DarkChartApps,
+    chartDocuments = DarkChartDocuments,
+    chartAudio = DarkChartAudio,
+    chartOther = DarkChartOther,
 )
 
 private val LocalNexplorerColors = staticCompositionLocalOf { LightExtended }

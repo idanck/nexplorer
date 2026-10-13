@@ -98,6 +98,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.coil.compose)
     implementation(libs.coil.video)
+    implementation(libs.zip4j)
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)

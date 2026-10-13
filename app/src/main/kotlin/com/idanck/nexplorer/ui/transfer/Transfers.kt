@@ -222,9 +222,9 @@ private fun statusLabel(t: Transfer): String = when (t.status) {
     TransferStatus.Preparing -> "מחשב…"
     TransferStatus.Running -> "פעיל"
     TransferStatus.Paused -> "מושהה"
-    TransferStatus.Done -> "הושלם"
-    TransferStatus.Failed -> "נכשל"
-    TransferStatus.Cancelled -> "בוטל"
+    TransferStatus.Done -> t.kind.past("הושלם", "הושלמה")
+    TransferStatus.Failed -> t.kind.past("נכשל", "נכשלה")
+    TransferStatus.Cancelled -> t.kind.past("בוטל", "בוטלה")
 }
 
 @Composable

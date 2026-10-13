@@ -34,6 +34,7 @@ run_class() {
 run_class PermissionGateTest
 run_class BrowserFlowTest
 run_class SearchAndSettingsTest
+run_class Phase2Test
 
 echo "::group::monkey (API $api)"
 adb shell input keyevent KEYCODE_WAKEUP

@@ -68,13 +68,16 @@ import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.idanck.nexplorer.core.ArchivePaths
 import com.idanck.nexplorer.core.Counts
 import com.idanck.nexplorer.core.Entry
+import com.idanck.nexplorer.core.FileKind
 import com.idanck.nexplorer.core.SizeFormat
 import com.idanck.nexplorer.core.isolated
 import com.idanck.nexplorer.data.files.FileIntents
 import com.idanck.nexplorer.data.files.LocalFiles
 import com.idanck.nexplorer.data.files.StorageVolumes
+import com.idanck.nexplorer.data.files.TextFiles
 import com.idanck.nexplorer.data.settings.AppSettings
 import com.idanck.nexplorer.data.transfer.TransferManager
 import com.idanck.nexplorer.data.transfer.TransferStatus
@@ -98,6 +101,9 @@ private sealed interface BrowserDialog {
     data class Delete(val entries: List<Entry>) : BrowserDialog
     data object ViewOptions : BrowserDialog
     data object Clipboard : BrowserDialog
+    data class Compress(val entries: List<Entry>) : BrowserDialog
+    data class Extract(val entry: Entry) : BrowserDialog
+    data class BatchRename(val entries: List<Entry>) : BrowserDialog
 }
 
 /**
@@ -112,7 +118,8 @@ private val BrowserDialogSaver = Saver<BrowserDialog?, String>(
             BrowserDialog.ViewOptions -> "view"
             BrowserDialog.Clipboard -> "clipboard"
             is BrowserDialog.Rename -> "rename:" + dialog.entry.path
-            is BrowserDialog.Delete, null -> null
+            // רשימות (ובחלון החילוץ — סיסמה) לא נשמרות ב-Bundle.
+            is BrowserDialog.Delete, is BrowserDialog.Compress, is BrowserDialog.Extract, is BrowserDialog.BatchRename, null -> null
         }
     },
     restore = { saved ->
@@ -140,6 +147,8 @@ fun BrowserScreen(
     updateActions: UpdateActions,
     onOpenSearch: (String?) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenAnalyzer: (String?) -> Unit,
+    onEditText: (String) -> Unit,
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val transferList by transfers.transfers.collectAsStateWithLifecycle()
@@ -179,8 +188,11 @@ fun BrowserScreen(
                 // showSnackbar ממתין עד שההודעה נעלמת — בלי launch, פתיחת קובץ הייתה מחכה מאחוריה.
                 is BrowserEvent.Message -> launch { snackbar.showSnackbar(event.text) }
                 is BrowserEvent.OpenFile -> if (!FileIntents.open(context, event.entry.path, event.entry.name)) {
-                    launch { snackbar.showSnackbar("אין אפליקציה שפותחת קבצים מסוג זה") }
+                    // אין אפליקציה לטקסט/קוד — העורך המובנה פותח אותו.
+                    if (event.entry.canEditAsText()) onEditText(event.entry.path)
+                    else launch { snackbar.showSnackbar("אין אפליקציה שפותחת קבצים מסוג זה") }
                 }
+                is BrowserEvent.OpenArchive -> dialog = BrowserDialog.Extract(event.entry)
             }
         }
     }
@@ -240,6 +252,7 @@ fun BrowserScreen(
                     onAddPlace = { message("חיבורי רשת וענן יגיעו בשלב הבא (החלטות D3, D4)") },
                     onTransfers = { scope.launch { drawerState.close() }; showTransfers = true },
                     onSettings = { scope.launch { drawerState.close() }; onOpenSettings() },
+                    onAnalyzer = { scope.launch { drawerState.close() }; onOpenAnalyzer(state.folderPath) },
                 ),
             )
         },
@@ -294,6 +307,7 @@ fun BrowserScreen(
                                         },
                                         onTransfers = { showTransfers = true },
                                         onSettings = onOpenSettings,
+                                        onAnalyzer = { onOpenAnalyzer(state.folderPath) },
                                     ),
                                 )
                             },
@@ -344,7 +358,12 @@ fun BrowserScreen(
                     val single = selected.singleOrNull()
                     SelectionActionBar(
                         onMore = { itemMenuOpen = true },
-                        onRename = single?.let { entry -> { dialog = BrowserDialog.Rename(entry) } },
+                        onRename = when {
+                            single != null -> { { dialog = BrowserDialog.Rename(single) } }
+                            // באוסף (תמונות, וידאו) הפריטים מתיקיות שונות — אין "תיקייה" לשנות בה שמות יחד.
+                            selected.size > 1 && state.location is Location.Folder -> { { dialog = BrowserDialog.BatchRename(selected) } }
+                            else -> null
+                        },
                         onShare = {
                             val files = selected.filter { !it.isDirectory }
                             when {
@@ -388,6 +407,12 @@ fun BrowserScreen(
                                     },
                                     onToggleFavorite = { single?.let { vm.toggleFavorite(it.path) } },
                                     onProperties = { properties = selected },
+                                    canEditText = single?.canEditAsText() == true,
+                                    isZip = single?.extension == "zip",
+                                    onEditText = { single?.let { onEditText(it.path) } },
+                                    canCompress = state.location is Location.Folder,
+                                    onCompress = { dialog = BrowserDialog.Compress(selected) },
+                                    onExtract = { single?.let { dialog = BrowserDialog.Extract(it) } },
                                 ),
                             )
                         },
@@ -440,6 +465,39 @@ fun BrowserScreen(
         BrowserDialog.Clipboard -> state.clipboard?.let { clip ->
             ClipboardDialog(clip, onClear = vm::cancelClipboard, onDismiss = { dialog = null })
         }
+        is BrowserDialog.Compress -> CompressDialog(
+            defaultName = ArchivePaths.defaultZipName(d.entries.map { it.name }, state.folderPath?.let { File(it).name }.orEmpty()),
+            count = d.entries.size,
+            onConfirm = { name, password ->
+                beforeTransfer()
+                vm.compress(d.entries.map { it.path }, name, password)
+                dialog = null
+            },
+            onDismiss = { dialog = null },
+        )
+        is BrowserDialog.Extract -> ExtractDialog(
+            entry = d.entry,
+            inspect = { vm.inspectArchive(d.entry.path) },
+            onExtract = { intoFolder, password ->
+                beforeTransfer()
+                vm.extract(d.entry, intoFolder, password)
+                dialog = null
+            },
+            onOpenWith = {
+                if (!FileIntents.openWith(context, d.entry.path, d.entry.name)) message("אין אפליקציה מתאימה")
+                dialog = null
+            },
+            onDismiss = { dialog = null },
+        )
+        is BrowserDialog.BatchRename -> BatchRenameDialog(
+            entries = d.entries,
+            others = { vm.namesBesides(d.entries) },
+            onConfirm = { pattern ->
+                vm.batchRename(d.entries, pattern)
+                dialog = null
+            },
+            onDismiss = { dialog = null },
+        )
     }
 
     if (showTransfers) {
@@ -463,6 +521,10 @@ fun BrowserScreen(
     }
 }
 
+/** "ערוך כטקסט": קובץ טקסט/קוד, או כל קובץ קטן — העורך עצמו מסרב לבינארי. */
+private fun Entry.canEditAsText(): Boolean =
+    !isDirectory && size <= TextFiles.MAX_BYTES && (kind == FileKind.Text || kind == FileKind.Other)
+
 private fun summary(state: BrowserState): String = when (state.location) {
     is Location.Media -> Counts.items(state.listed.size)
     is Location.Folder -> {
@@ -483,6 +545,7 @@ private fun overflowModel(
     onPinShortcut: () -> Unit,
     onTransfers: () -> Unit,
     onSettings: () -> Unit,
+    onAnalyzer: () -> Unit,
 ): OverflowMenuModel {
     val running = activeTransfers.firstOrNull { it.status == TransferStatus.Running }
     return OverflowMenuModel(
@@ -506,6 +569,7 @@ private fun overflowModel(
         onTransfers = onTransfers,
         onRefresh = vm::refresh,
         onSettings = onSettings,
+        onAnalyzer = onAnalyzer,
     )
 }
 
