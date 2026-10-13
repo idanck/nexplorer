@@ -3,6 +3,8 @@ package com.idanck.nexplorer.core
 /**
  * מיון "טבעי": `file2` לפני `file10`, בלי תלות ברישיות.
  * מספרים ארוכים מושווים לפי אורך ואז לקסיקוגרפית, כדי שלא יגלשו מ-Long.
+ * רק ספרות ASCII הן "מספר": עם `isDigit()` ספרה ערבית-הודית (٣) הייתה נכנסת למעגל
+ * ("٣" < "55" < "א" < "٣"), ו-TimSort זורק על הפרת חוזה בתיקייה של 32+ פריטים.
  */
 object NaturalOrder : Comparator<String> {
     override fun compare(a: String, b: String): Int {
@@ -11,11 +13,11 @@ object NaturalOrder : Comparator<String> {
         while (i < a.length && j < b.length) {
             val ca = a[i]
             val cb = b[j]
-            if (ca.isDigit() && cb.isDigit()) {
+            if (ca.isAsciiDigit() && cb.isAsciiDigit()) {
                 val startA = i
                 val startB = j
-                while (i < a.length && a[i].isDigit()) i++
-                while (j < b.length && b[j].isDigit()) j++
+                while (i < a.length && a[i].isAsciiDigit()) i++
+                while (j < b.length && b[j].isAsciiDigit()) j++
                 val numA = a.substring(startA, i).trimStart('0')
                 val numB = b.substring(startB, j).trimStart('0')
                 if (numA.length != numB.length) return numA.length - numB.length
@@ -37,6 +39,8 @@ object NaturalOrder : Comparator<String> {
  * תיקיות קודם בכל מיון חוץ מתאריך: במיון לפי תאריך הלוח "מסך ראשי" מערבב,
  * כי שם השאלה היא "מה השתנה לאחרונה" ולא "איפה התיקיות".
  */
+private fun Char.isAsciiDigit() = this in '0'..'9'
+
 fun SortOrder.foldersFirst(): Boolean = key != SortKey.Date
 
 fun List<Entry>.sortedFor(order: SortOrder): List<Entry> {

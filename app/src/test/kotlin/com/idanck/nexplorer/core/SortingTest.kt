@@ -1,7 +1,9 @@
 package com.idanck.nexplorer.core
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Test
+import kotlin.math.sign
 
 class SortingTest {
     private fun file(name: String, size: Long = 0, modified: Long = 0) =
@@ -14,6 +16,26 @@ class SortingTest {
     fun `natural order puts file2 before file10`() {
         val names = listOf("file10.txt", "File2.txt", "file1.txt").sortedWith(NaturalOrder)
         assertEquals(listOf("file1.txt", "File2.txt", "file10.txt"), names)
+    }
+
+    @Test
+    fun `natural order keeps its contract with non-ASCII digits`() {
+        // המעגל מהסקירה: "٣" < "55" < "א" < "٣" עם isDigit().
+        val a = "٣"
+        val b = "55"
+        val c = "א"
+        val ab = NaturalOrder.compare(a, b).sign
+        val bc = NaturalOrder.compare(b, c).sign
+        val ac = NaturalOrder.compare(a, c).sign
+        assertFalse("לא מעגלי", ab < 0 && bc < 0 && ac > 0)
+
+        // TimSort זורק "Comparison method violates its general contract" על השוואה לא טרנזיטיבית.
+        val alphabet = "0123456789٠١٢٣٤٥٦٧٨٩۰۱۲abcXYZאבג._ -"
+        val random = java.util.Random(7)
+        repeat(300) {
+            val names = List(200) { String(CharArray(1 + random.nextInt(6)) { alphabet[random.nextInt(alphabet.length)] }) }
+            names.sortedWith(NaturalOrder)
+        }
     }
 
     @Test

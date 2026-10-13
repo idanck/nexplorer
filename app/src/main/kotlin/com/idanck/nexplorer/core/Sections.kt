@@ -1,9 +1,11 @@
 package com.idanck.nexplorer.core
 
+import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
+import java.time.temporal.TemporalAdjusters
 
 data class Section(val title: String, val entries: List<Entry>)
 
@@ -41,16 +43,20 @@ private fun sectionTitle(entry: Entry, order: SortOrder, today: LocalDate, zone:
 
 internal fun dateTitle(date: LocalDate, today: LocalDate): String {
     val days = ChronoUnit.DAYS.between(date, today)
+    // השבוע מתחיל ביום ראשון (כמו בלוח השנה בישראל), לא "6 הימים האחרונים".
+    val weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.SUNDAY))
     return when {
-        days == 0L -> "היום"
+        // תאריך עתידי (שעון מצלמה, אזור זמן) — "היום", ולא חודש שמופיע מעל "היום".
+        days <= 0L -> "היום"
         days == 1L -> "אתמול"
-        days in 2..6 -> "השבוע"
+        !date.isBefore(weekStart) -> "השבוע"
         else -> "${HebrewDates.MONTHS[date.monthValue - 1]} ${date.year}"
     }
 }
 
+/** לפי התו הראשון כמו שהוא — אותו מפתח שהמיון משתמש בו, אחרת "B, A, B" כש-"_b" ממוין לפני "a". */
 private fun letterTitle(name: String): String {
-    val first = name.trimStart('.', '_', ' ').firstOrNull() ?: return "#"
+    val first = name.firstOrNull() ?: return "#"
     return if (first.isLetter()) first.uppercaseChar().toString() else "#"
 }
 

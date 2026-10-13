@@ -6,6 +6,8 @@ object FileNames {
         name.isBlank() -> "צריך שם"
         name == "." || name == ".." -> "שם שמור במערכת"
         name.any { it == '/' || it == '\u0000' } -> "השם לא יכול להכיל /"
+        // ירידת שורה או טאב בשם שוברים את רשימת המועדפים בהגדרות, ואין להם ייצוג בשורה.
+        name.any { it.isISOControl() } -> "השם לא יכול להכיל תווי בקרה"
         name.toByteArray(Charsets.UTF_8).size > 255 -> "השם ארוך מדי"
         else -> null
     }
