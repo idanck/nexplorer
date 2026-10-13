@@ -3,10 +3,21 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
+
+# contents: write — לדחיפת ה-APK לענף apk.
+permissions:
+  contents: write
 
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
+
+env:
+  UPDATES_HOST: https://nexplorer-updates.idanck.com
+  # טביעת האצבע של מפתח ה-release (נוצר 13/10/2026, /home/idan/.secrets/nexplorer/ על ה-Pi).
+  # נעוצה כאן כדי ש-secret שהוחלף בטעות לא ינתק התקנות קיימות מעדכונים (הלקח מ-TiviCopy).
+  RELEASE_CERT_SHA256: 301ebd265a5b5d2264a697549bb6d14267ea66f4f21d5fbfb66cdc9298880f6f
 
 jobs:
   ci:
@@ -25,8 +36,19 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Assemble debug
-        run: ./gradlew assembleDebug
+      - name: Set up the release signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE_B64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${KEYSTORE_B64:-}" ]; then
+            echo "::warning::No release keystore — this APK is signed with a debug key, cannot update an installed nexplorer, and is not published."
+            echo "SIGNED=false" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          echo "RELEASE_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+          echo "SIGNED=true" >> "$GITHUB_ENV"
 
       - name: Unit tests
         run: ./gradlew testDebugUnitTest
@@ -34,12 +56,121 @@ jobs:
       - name: Lint
         run: ./gradlew lintDebug
 
-      - name: Upload debug APK
+      - name: Assemble release APK
+        env:
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: ./gradlew assembleRelease
+
+      - name: Name the APK
+        id: apk
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          version="$(grep '^APP_VERSION_NAME=' gradle.properties | cut -d= -f2 | tr -d '[:space:]').${GITHUB_RUN_NUMBER}"
+          name="nexplorer-${version}-${HEAD_SHA:0:8}.apk"
+          mkdir -p dist
+          cp app/build/outputs/apk/release/app-release.apk "dist/$name"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "path=dist/$name" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          ls -la dist
+
+      - name: Confirm the APK carries the release key
+        if: env.SIGNED == 'true'
+        run: |
+          set -euo pipefail
+          apksigner="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner"
+          actual=$("$apksigner" verify --print-certs "${{ steps.apk.outputs.path }}" | grep -m1 'certificate SHA-256 digest' | awk '{print $NF}')
+          echo "apk:    $actual"
+          echo "pinned: $RELEASE_CERT_SHA256"
+          # APK בחתימה אחרת לא יכול להחליף התקנה קיימת — פרסום שלו היה תוקע כל מכשיר על הגרסה שלו.
+          [ "$actual" = "$RELEASE_CERT_SHA256" ]
+
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: nexplorer-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          name: nexplorer-apk
+          path: dist/*.apk
+          if-no-files-found: error
           retention-days: 14
+
+      - name: Publish the APK to the apk branch
+        # כל build חתום (גם של PR) — כך תמיד יש קובץ אחרון להורדה דרך git, בלי ה-API של ה-artifacts.
+        if: env.SIGNED == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          SOURCE_REF: ${{ github.head_ref || github.ref_name }}
+        run: |
+          set -euo pipefail
+          staging=$(mktemp -d)
+          cp "${{ steps.apk.outputs.path }}" "$staging/"
+          cat > "$staging/README.md" <<EOF
+          # nexplorer — APK אחרון
+
+          \`${{ steps.apk.outputs.name }}\` · גרסה \`${{ steps.apk.outputs.version }}\` · מ-\`${HEAD_SHA}\` (\`${SOURCE_REF}\`) · $(date -u '+%Y-%m-%d %H:%M UTC').
+
+          חתום במפתח ה-release, ולכן מתעדכן מתוך האפליקציה. הענף נדחף מחדש בכל build ומחזיק קובץ אחד.
+          EOF
+          cd "$staging"
+          git init -q -b apk
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -qm "build: APK ${{ steps.apk.outputs.version }} (${HEAD_SHA:0:8}, ${SOURCE_REF})"
+          git push -q --force "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" apk
+
+      - name: Publish the update
+        # רק build חתום של main מוצע לאפליקציות המותקנות (D5).
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push' && env.SIGNED == 'true'
+        env:
+          UPLOAD_TOKEN: ${{ secrets.UPDATES_UPLOAD_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${UPLOAD_TOKEN:-}" ]; then
+            echo "::warning::No UPDATES_UPLOAD_TOKEN secret — nothing published."
+            exit 0
+          fi
+          apk="${{ steps.apk.outputs.path }}"
+          name="${{ steps.apk.outputs.name }}"
+          sha=$(sha256sum "$apk" | cut -d' ' -f1)
+          size=$(stat -c%s "$apk")
+          versionCode="$GITHUB_RUN_NUMBER"
+          versionName="${{ steps.apk.outputs.version }}"
+          minSdk=$(grep -m1 'minSdk = ' app/build.gradle.kts | tr -dc '0-9')
+          notes=$(git log -1 --pretty=%s)
+
+          published=$(curl -fsS "$UPDATES_HOST/latest.json" || echo '{}')
+          pubCode=$(jq -r '.versionCode // 0' <<<"$published")
+          if [ "$versionCode" -lt "$pubCode" ]; then
+            echo "::error::versionCode $versionCode is older than the published $pubCode."
+            exit 1
+          fi
+          if [ "$versionCode" -eq "$pubCode" ]; then
+            # אותו מספר ריצה = הרצה חוזרת של אותו commit. המכשירים משווים רק את המספר, אז אין מה לפרסם.
+            echo "versionCode $versionCode is already published; nothing to do."
+            exit 0
+          fi
+
+          # ה-APK עולה קודם, כדי שהמניפסט לעולם לא יצביע על קובץ שלא קיים.
+          curl -fsS -X PUT -H "Authorization: Bearer $UPLOAD_TOKEN" \
+            --data-binary @"$apk" "$UPDATES_HOST/publish/apk/$name" > /dev/null
+
+          jq -n --arg vn "$versionName" --argjson vc "$versionCode" \
+            --arg url "$UPDATES_HOST/apk/$name" --arg sha "$sha" --argjson size "$size" \
+            --argjson min "$minSdk" --arg notes "$notes" \
+            '{versionCode: $vc, versionName: $vn, apkUrl: $url, sha256: $sha,
+              sizeBytes: $size, minSdk: $min, notes: {he: $notes, en: $notes}}' > "$RUNNER_TEMP/latest.json"
+          curl -fsS -X PUT -H "Authorization: Bearer $UPLOAD_TOKEN" \
+            --data-binary @"$RUNNER_TEMP/latest.json" "$UPDATES_HOST/publish/latest.json" > /dev/null
+
+          served=$(curl -fsS "$UPDATES_HOST/latest.json")
+          [ "$(jq -r .sha256 <<<"$served")" = "$sha" ]
+          [ "$(curl -fsS -o /dev/null -w '%{http_code}' -I "$UPDATES_HOST/apk/$name")" = "200" ]
+          echo "Published $versionName ($versionCode) — $name"
 
       - name: Upload reports on failure
         if: failure()
