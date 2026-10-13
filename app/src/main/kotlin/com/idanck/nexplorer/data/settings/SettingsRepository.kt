@@ -1,9 +1,11 @@
 package com.idanck.nexplorer.data.settings
 
 import android.content.Context
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -12,10 +14,12 @@ import com.idanck.nexplorer.core.ViewOptions
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.runBlocking
+import java.io.IOException
 
 enum class ThemeMode(val label: String) { System("מערכת"), Light("בהיר"), Dark("כהה") }
 
@@ -37,7 +41,25 @@ data class AppSettings(
     fun viewFor(path: String?): ViewOptions = path?.let { folderViews[it] } ?: defaultView
 }
 
-private val Context.dataStore by preferencesDataStore(name = "settings")
+/** אחרי שינוי שם או העברה של [from]: כל נתיב שמתחיל בו (מועדף, תצוגה, תיקייה אחרונה) עובר ל-[to]. */
+fun AppSettings.relocated(from: String, to: String): AppSettings {
+    fun move(path: String): String = when {
+        path == from -> to
+        path.startsWith("$from/") -> to + path.substring(from.length)
+        else -> path
+    }
+    return copy(
+        favorites = favorites.map(::move).distinct(),
+        folderViews = folderViews.mapKeys { (path, _) -> move(path) },
+        lastFolder = lastFolder?.let(::move),
+    )
+}
+
+// קובץ פגום (כיבוי באמצע כתיבה) מתחיל מחדש מברירות המחדל — אחרת האפליקציה קורסת בכל הפעלה עד ניקוי נתונים.
+private val Context.dataStore by preferencesDataStore(
+    name = "settings",
+    corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+)
 
 /**
  * ההעדפות. נקראות פעם אחת בסינכרון בהפעלה (קובץ קטן), כדי שהמסך הראשון יצויר
@@ -47,9 +69,12 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
 
     private val store = context.applicationContext.dataStore
 
-    val state: StateFlow<AppSettings> = store.data
+    /** שגיאת קריאה (IO) לא מפילה את ה-scope של האפליקציה — ממשיכים עם ברירות המחדל. */
+    private val data = store.data.catch { e -> if (e is IOException) emit(emptyPreferences()) else throw e }
+
+    val state: StateFlow<AppSettings> = data
         .map(::read)
-        .stateIn(scope, SharingStarted.Eagerly, runBlocking { read(store.data.first()) })
+        .stateIn(scope, SharingStarted.Eagerly, runBlocking { runCatching { read(data.first()) }.getOrDefault(AppSettings()) })
 
     suspend fun update(transform: (AppSettings) -> AppSettings) {
         store.edit { prefs ->
