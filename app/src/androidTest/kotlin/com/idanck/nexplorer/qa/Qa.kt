@@ -1,0 +1,112 @@
+package com.idanck.nexplorer.qa
+
+import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.os.Build
+import android.os.Environment
+import android.os.ParcelFileDescriptor
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.junit4.ComposeTestRule
+import androidx.test.core.app.ActivityScenario
+import androidx.test.core.app.ApplicationProvider
+import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.UiDevice
+import com.idanck.nexplorer.MainActivity
+import com.idanck.nexplorer.data.files.FileIntents
+import java.io.File
+
+/**
+ * כלים משותפים לבדיקות ה-QA על האמולטור: פקודות shell (בהרשאות shell, לא של האפליקציה),
+ * צילומי מסך מלאים (כולל חלונות מערכת ודיאלוגים) ותיקיית נתונים קבועה.
+ */
+object Qa {
+
+    private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
+    val packageName: String get() = instrumentation.targetContext.packageName
+    val device: UiDevice get() = UiDevice.getInstance(instrumentation)
+
+    /** צילומי המסך נאספים מכאן ע"י `.github/qa/instrumented.sh`. */
+    private const val SHOTS = "/sdcard/Download/nexplorer-qa"
+
+    /** `executeShellCommand` לא מריץ shell — אין הפניות ומרכאות, רק פקודה ופרמטרים. */
+    fun shell(command: String): String {
+        val pfd = instrumentation.uiAutomation.executeShellCommand(command)
+        return ParcelFileDescriptor.AutoCloseInputStream(pfd).bufferedReader().use { it.readText() }
+    }
+
+    /** מתן הרשאה לא הורג את התהליך (שלילה כן) — ולכן מותר כאן, באמצע בדיקה. */
+    fun grantStorage() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            shell("appops set --uid $packageName MANAGE_EXTERNAL_STORAGE allow")
+        } else {
+            shell("pm grant $packageName android.permission.READ_EXTERNAL_STORAGE")
+            shell("pm grant $packageName android.permission.WRITE_EXTERNAL_STORAGE")
+        }
+    }
+
+    fun screenshot(compose: ComposeTestRule, name: String) {
+        compose.waitForIdle()
+        // הבהוב הסמן, אדוות ואנימציות כניסה של חלונות — שהצילום לא יתפוס אותם באמצע.
+        Thread.sleep(400)
+        shell("mkdir -p $SHOTS")
+        shell("screencap -p $SHOTS/$name.png")
+    }
+
+    fun launch(path: String? = null): ActivityScenario<MainActivity> {
+        val intent = Intent(ApplicationProvider.getApplicationContext(), MainActivity::class.java)
+        if (path != null) intent.setAction(FileIntents.ACTION_OPEN_FOLDER).putExtra(FileIntents.EXTRA_PATH, path)
+        return ActivityScenario.launch(intent)
+    }
+
+    fun ComposeTestRule.waitFor(matcher: SemanticsMatcher, timeoutMs: Long = 10_000) {
+        waitUntil(timeoutMs) { onAllNodes(matcher, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
+    }
+
+    fun ComposeTestRule.waitGone(matcher: SemanticsMatcher, timeoutMs: Long = 10_000) {
+        waitUntil(timeoutMs) { onAllNodes(matcher, useUnmergedTree = true).fetchSemanticsNodes().isEmpty() }
+    }
+
+    fun ComposeTestRule.exists(matcher: SemanticsMatcher): Boolean =
+        onAllNodes(matcher, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+
+    /** מחכה לתנאי על הדיסק (העברה רצה ברקע, בתור משלה). */
+    fun ComposeTestRule.waitForDisk(timeoutMs: Long = 15_000, condition: () -> Boolean) {
+        waitUntil(timeoutMs) { condition() }
+    }
+}
+
+/** עץ קבוע שכל בדיקה מתחילה ממנו מחדש. */
+object QaData {
+
+    val root: File get() = File(Environment.getExternalStorageDirectory(), "nexplorer-qa")
+
+    fun seed() {
+        root.deleteRecursively()
+        val docs = File(root, "Documents").apply { mkdirs() }
+        File(docs, "notes.txt").writeText("hello from the emulator\n")
+        File(docs, "דוח שנתי 2026.txt").writeText("שלום\n")
+        File(docs, "report.pdf").writeBytes(ByteArray(48 * 1024))
+        val photos = File(root, "Photos").apply { mkdirs() }
+        listOf(Color.rgb(0x1E, 0x63, 0xE9), Color.rgb(0xE9, 0x9A, 0x1E), Color.rgb(0x2E, 0x9E, 0x5B), Color.rgb(0xC8, 0x3B, 0x3B))
+            .forEachIndexed { i, color -> png(File(photos, "shot-$i.png"), color) }
+        File(root, "Music").mkdirs()
+        File(root, "Music/song.mp3").writeBytes(ByteArray(320 * 1024))
+        File(root, "Empty").mkdirs()
+        File(root, "readme.md").writeText("# nexplorer QA\n")
+        File(root, "archive.zip").writeBytes(ByteArray(12 * 1024))
+        File(root, "big.bin").writeBytes(ByteArray(3 * 1024 * 1024))
+        File(root, ".hidden").writeText("hidden\n")
+    }
+
+    private fun png(file: File, color: Int) {
+        val bitmap = Bitmap.createBitmap(320, 240, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        canvas.drawColor(color)
+        canvas.drawCircle(160f, 120f, 70f, Paint().apply { this.color = Color.WHITE; isAntiAlias = true })
+        file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        bitmap.recycle()
+    }
+}

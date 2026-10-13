@@ -4,8 +4,12 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
-/** `versionCode` נגזר ממספר הריצה ב-CI ולכן מונוטוני. בבנייה מקומית הוא 1. */
-val buildNumber: Int = (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toIntOrNull() ?: 1
+/**
+ * `versionCode` נגזר ממספר הריצה ב-CI ולכן מונוטוני. בבנייה מקומית הוא 1.
+ * `-PversionCodeOverride=N` — רק לבדיקת העדכון מקצה לקצה (QA), שמתקינה גרסה ישנה ומעדכנת אותה. לא מתפרסם.
+ */
+val buildNumber: Int = providers.gradleProperty("versionCodeOverride").orNull?.toIntOrNull()
+    ?: (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toIntOrNull() ?: 1
 val appVersionName: String = providers.gradleProperty("APP_VERSION_NAME").get()
 
 /**
@@ -24,6 +28,8 @@ android {
         targetSdk = 35
         versionCode = buildNumber
         versionName = "$appVersionName.$buildNumber"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "UPDATE_MANIFEST_URL", "\"https://nexplorer-updates.idanck.com/latest.json\"")
     }
@@ -104,4 +110,11 @@ dependencies {
     testImplementation(libs.junit)
     // org.json באנדרואיד הוא stub בבדיקות JVM; זה המימוש האמיתי.
     testImplementation(libs.org.json)
+
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.rules)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.uiautomator)
 }

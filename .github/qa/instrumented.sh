@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# QA על אמולטור — רץ בתוך reactivecircus/android-emulator-runner, אחרי שהאמולטור עלה.
+#   1. בדיקת מסך הגישה, על התקנה טרייה (בלי הרשאה).
+#   2. מסלולי מסך הקבצים, חיפוש והגדרות (הבדיקות נותנות לעצמן הרשאה).
+#   3. monkey: אירועים אקראיים בתוך האפליקציה בלבד — קריסה או ANR = כשל.
+# הכל נאסף ל-$1: צילומי מסך, פלט הבדיקות, logcat. היציאה לא 0 אם משהו נכשל.
+set -uo pipefail
+
+out="${1:?usage: instrumented.sh <out-dir>}"
+mkdir -p "$out/screens"
+
+pkg=com.idanck.nexplorer.debug
+runner="$pkg.test/androidx.test.runner.AndroidJUnitRunner"
+api=$(adb shell getprop ro.build.version.sdk | tr -d '\r')
+status=0
+
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+adb shell rm -rf /sdcard/Download/nexplorer-qa
+adb logcat -c
+
+run_class() {
+  local cls="$1"
+  echo "::group::$cls (API $api)"
+  adb shell am instrument -w -e class "com.idanck.nexplorer.qa.$cls" "$runner" 2>&1 | tee "$out/$cls.txt"
+  echo "::endgroup::"
+  if ! grep -q '^OK (' "$out/$cls.txt"; then
+    echo "::error::$cls failed on API $api"
+    status=1
+  fi
+}
+
+run_class PermissionGateTest
+run_class BrowserFlowTest
+run_class SearchAndSettingsTest
+
+echo "::group::monkey (API $api)"
+adb shell am start -W -n "$pkg/com.idanck.nexplorer.MainActivity" \
+  -a com.idanck.nexplorer.action.OPEN_FOLDER --es path /sdcard/nexplorer-qa > /dev/null
+adb shell monkey -p "$pkg" -s 4242 --throttle 100 --pct-syskeys 0 -v 2000 > "$out/monkey.txt" 2>&1
+tail -n 5 "$out/monkey.txt"
+echo "::endgroup::"
+if grep -qE 'CRASH|NOT RESPONDING' "$out/monkey.txt" || ! grep -q 'Monkey finished' "$out/monkey.txt"; then
+  echo "::error::monkey found a crash or ANR on API $api"
+  status=1
+fi
+adb exec-out screencap -p > "$out/screens/90-after-monkey.png"
+
+adb pull /sdcard/Download/nexplorer-qa/. "$out/screens/" > /dev/null || true
+adb logcat -d > "$out/logcat.txt"
+adb logcat -d -b crash > "$out/crash.txt" || true
+if grep -q "$pkg" "$out/crash.txt"; then
+  echo "::error::the app crashed on API $api (crash.txt)"
+  status=1
+fi
+
+ls "$out/screens" | sed 's/^/  /'
+exit $status

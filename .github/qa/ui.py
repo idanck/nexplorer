@@ -1,0 +1,43 @@
+#!/usr/bin/env python3
+"""עזר קטן ל-UiAutomator מהמארח, לבדיקה על build ‏release (בלי instrumentation).
+
+    ui.py has <text>   — יציאה 0 אם יש על המסך צומת עם הטקסט / התיאור הזה
+    ui.py tap <text>   — לוחץ על מרכז הצומת
+"""
+import re
+import subprocess
+import sys
+import xml.etree.ElementTree as ET
+
+
+def dump():
+    for _ in range(3):
+        subprocess.run(["adb", "shell", "uiautomator", "dump", "/sdcard/qa-ui.xml"], capture_output=True)
+        raw = subprocess.run(["adb", "exec-out", "cat", "/sdcard/qa-ui.xml"], capture_output=True).stdout
+        try:
+            return ET.fromstring(raw)
+        except ET.ParseError:
+            continue
+    return None
+
+
+def find(root, text):
+    for node in root.iter("node"):
+        if node.get("text") == text or node.get("content-desc") == text:
+            return node
+    return None
+
+
+def main():
+    command, text = sys.argv[1], sys.argv[2]
+    root = dump()
+    node = find(root, text) if root is not None else None
+    if node is None:
+        sys.exit(1)
+    if command == "tap":
+        x1, y1, x2, y2 = map(int, re.findall(r"\d+", node.get("bounds")))
+        subprocess.run(["adb", "shell", "input", "tap", str((x1 + x2) // 2), str((y1 + y2) // 2)], check=True)
+
+
+if __name__ == "__main__":
+    main()
