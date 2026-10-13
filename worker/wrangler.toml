@@ -1,0 +1,11 @@
+# Update channel for nexplorer. Deployed by hand from the Pi (see worker/README.md);
+# CI only uploads through PUT /publish/* with UPDATES_UPLOAD_TOKEN.
+name = "nexplorer-updates"
+main = "worker.js"
+compatibility_date = "2026-09-01"
+workers_dev = false
+routes = [{ pattern = "nexplorer-updates.idanck.com", custom_domain = true }]
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "nexplorer-updates"
