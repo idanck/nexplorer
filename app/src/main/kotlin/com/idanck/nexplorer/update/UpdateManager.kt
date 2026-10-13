@@ -1,5 +1,6 @@
 package com.idanck.nexplorer.update
 
+import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
@@ -11,6 +12,7 @@ import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import androidx.core.content.pm.PackageInfoCompat
 import com.idanck.nexplorer.BuildConfig
 import com.idanck.nexplorer.data.settings.SettingsRepository
 import com.idanck.nexplorer.data.transfer.TransferManager
@@ -45,8 +47,11 @@ sealed interface UpdateState {
         val fraction: Float get() = (bytes.toFloat() / manifest.sizeBytes).coerceIn(0f, 1f)
     }
     data class Verifying(val manifest: UpdateManifest) : UpdateState
-    /** הסשן נמסר למערכת; היא אחראית מכאן (כולל חלון האישור). [startedAt] — כדי שמצב תקוע יפוג. */
-    data class Installing(val manifest: UpdateManifest, val startedAt: Long) : UpdateState
+    /**
+     * הסשן נמסר למערכת; היא אחראית מכאן. [startedAt] — כדי שמצב תקוע יפוג.
+     * [awaitingUser] — המערכת ביקשה אישור, והחלון לא בהכרח מוצג (נחסם ברקע, או שהמשתמש יצא ממנו).
+     */
+    data class Installing(val manifest: UpdateManifest, val startedAt: Long, val awaitingUser: Boolean = false) : UpdateState
     data class Failed(val message: String, val manifest: UpdateManifest?) : UpdateState
     data class Blocked(val manifest: UpdateManifest, val blocker: UpdateBlocker) : UpdateState
 }
@@ -77,9 +82,31 @@ class UpdateManager(
     private val updateDir: File get() = File(context.cacheDir, "updates")
     private val installing = AtomicBoolean(false)
 
+    /** הסשן האחרון שנמסר; תוצאות של סשנים ישנים (שננטשו) לא נוגעות במצב. */
+    @Volatile private var sessionId: Int = NO_SESSION
+
+    /** חלון האישור של המערכת לסשן הנוכחי — כדי להציג אותו שוב אם לא הוצג או נסגר. */
+    @Volatile private var confirmIntent: Intent? = null
+
     val enabled: Boolean get() = BuildConfig.UPDATES_ENABLED
 
-    fun refreshInstallPermission(): Boolean = canRequestInstalls().also { _canInstall.value = it }
+    /**
+     * נקרא בכל חזרה לאפליקציה. מאשר שההרשאה ניתנה (אז "צריך לאשר" הופך שוב ל"עדכן"),
+     * ומפקיע התקנה שהמערכת לא השלימה ולא דיווחה עליה.
+     */
+    fun refreshInstallPermission(): Boolean = canRequestInstalls().also { granted ->
+        _canInstall.value = granted
+        when (val s = _state.value) {
+            is UpdateState.Blocked -> if (granted && s.blocker == UpdateBlocker.InstallPermission) {
+                _state.value = UpdateState.Available(s.manifest)
+            }
+            is UpdateState.Installing -> if (System.currentTimeMillis() - s.startedAt >= INSTALL_HANDOFF_TIMEOUT_MS) {
+                abandonCurrentSession()
+                _state.value = UpdateState.Failed("ההתקנה לא הושלמה", s.manifest)
+            }
+            else -> Unit
+        }
+    }
 
     /**
      * [force] = המשתמש לחץ "בדוק עכשיו". בלעדיו — לכל היותר פעם ביום, ושקט בכשל:
@@ -98,13 +125,17 @@ class UpdateManager(
         }
         if (force) _state.value = UpdateState.Checking
         val fetched = withContext(Dispatchers.IO) { fetchManifest() }
+        // בזמן שהבדיקה רצה המשתמש יכול היה ללחוץ "עדכן" — אז ההורדה קובעת, לא הבדיקה.
+        if (installing.get() || inFlight()) return
         fetched.onFailure { e ->
-            _state.value = if (force) UpdateState.Failed(e.message ?: "הבדיקה נכשלה", null) else UpdateState.Idle
+            // בדיקת רקע שנכשלה לא מוחקת באנר "יש גרסה" שכבר מוצג.
+            if (force) _state.value = UpdateState.Failed(e.message ?: "הבדיקה נכשלה", null)
             return
         }
         val (manifest, json) = fetched.getOrThrow()
         settings.update { it.copy(updateLastCheckUtc = now, updateLastManifest = json) }
         val newer = manifest.isNewerThan(BuildConfig.VERSION_CODE)
+        if (installing.get() || inFlight()) return
         withContext(Dispatchers.IO) { prune(keep = manifest.versionCode.takeIf { newer }) }
         _state.value = when {
             newer && (force || !isSkipped(manifest)) -> UpdateState.Available(manifest)
@@ -131,9 +162,14 @@ class UpdateManager(
 
     /** "אחר כך": מסתיר עד הבדיקה הבאה, בלי לדלג על הגרסה. */
     fun dismiss() {
-        when (_state.value) {
+        when (val s = _state.value) {
             is UpdateState.Available, is UpdateState.Failed, is UpdateState.UpToDate, is UpdateState.Blocked ->
                 _state.value = UpdateState.Idle
+            // רק כשהמערכת מחכה למשתמש: ביטול כאן נוטש את הסשן, ו"עדכן" יתחיל מחדש מהקובץ שכבר ירד.
+            is UpdateState.Installing -> if (s.awaitingUser) {
+                abandonCurrentSession()
+                _state.value = UpdateState.Available(s.manifest)
+            }
             else -> Unit
         }
     }
@@ -170,7 +206,7 @@ class UpdateManager(
                 return
             }
             _state.value = UpdateState.Verifying(manifest)
-            withContext(Dispatchers.IO) { verifySignature(file) }.onFailure {
+            withContext(Dispatchers.IO) { verifySignature(file, manifest) }.onFailure {
                 file.delete()
                 _state.value = UpdateState.Failed(it.message ?: "האימות נכשל", manifest)
                 return
@@ -185,9 +221,33 @@ class UpdateManager(
         }
     }
 
+    /** מה-receiver. [session] = ‏EXTRA_SESSION_ID; תוצאה של סשן אחר — ישן, שננטש — לא רלוונטית. */
+    internal fun isCurrentSession(session: Int): Boolean = session != NO_SESSION && session == sessionId
+
+    internal fun onUserActionNeeded(confirm: Intent) {
+        confirmIntent = confirm
+        val s = _state.value as? UpdateState.Installing ?: return
+        _state.value = s.copy(awaitingUser = true)
+    }
+
     internal fun onInstallFailed(message: String) {
+        confirmIntent = null
+        sessionId = NO_SESSION
         val manifest = (_state.value as? UpdateState.Installing)?.manifest
         _state.value = UpdateState.Failed(message, manifest)
+    }
+
+    /** "המשך התקנה": פותח שוב את חלון האישור של המערכת. false — אין חלון כזה, וצריך להתחיל מחדש. */
+    fun continueInstall(launcher: Context): Boolean {
+        val confirm = confirmIntent ?: return false
+        return runCatching { launcher.startActivity(Intent(confirm).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess
+    }
+
+    private fun abandonCurrentSession() {
+        val id = sessionId
+        sessionId = NO_SESSION
+        confirmIntent = null
+        if (id != NO_SESSION) runCatching { context.packageManager.packageInstaller.abandonSession(id) }
     }
 
     fun canRequestInstalls(): Boolean = context.packageManager.canRequestPackageInstalls()
@@ -313,19 +373,30 @@ class UpdateManager(
      * אנדרואיד מחליף חבילה רק כשה-APK החדש חתום באותה תעודה, וכשל בשלב ה-commit הוא קוד סטטוס בלבד.
      * ההשוואה כאן הופכת "נחתם במפתח אחר" למשהו שאפשר להבין ולפעול לפיו.
      */
-    private fun verifySignature(file: File): Result<Unit> = try {
+    @SuppressLint("PackageManagerGetSignatures") // משווים תעודות שלמות, לא סומכים על אחת מהן.
+    private fun verifySignature(file: File, manifest: UpdateManifest): Result<Unit> = try {
         val pm = context.packageManager
         val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             PackageManager.GET_SIGNING_CERTIFICATES
         } else {
             @Suppress("DEPRECATION") PackageManager.GET_SIGNATURES
         }
-        val candidate = pm.getPackageArchiveInfo(file.absolutePath, flags)
+        // ב-API 28–29 ‏getPackageArchiveInfo אוסף תעודות רק עם GET_SIGNATURES (ה-parser החדש תיקן ב-30);
+        // בלעדיו signingInfo ריק, וכל עדכון היה נדחה כ"חתום במפתח אחר".
+        @Suppress("DEPRECATION")
+        val withLegacySignatures = flags or PackageManager.GET_SIGNATURES
+        val archiveFlags = if (Build.VERSION.SDK_INT in Build.VERSION_CODES.P..Build.VERSION_CODES.Q) withLegacySignatures else flags
+        val candidate = pm.getPackageArchiveInfo(file.absolutePath, archiveFlags)
         val installed = pm.getPackageInfo(context.packageName, flags)
+        val candidateCerts = candidate?.let { certificates(it) }.orEmpty()
         when {
             candidate == null -> Result.failure(UpdateException("הקובץ שירד אינו APK תקין"))
             candidate.packageName != context.packageName -> Result.failure(UpdateException("הקובץ שייך לאפליקציה אחרת"))
-            certificates(candidate) != certificates(installed) ->
+            // אחרת המכשיר "מתעדכן" לאותה גרסה בלולאה, או נכשל על הורדת גרסה.
+            PackageInfoCompat.getLongVersionCode(candidate) != manifest.versionCode.toLong() ->
+                Result.failure(UpdateException("גרסת הקובץ לא תואמת למניפסט"))
+            candidateCerts.isEmpty() -> Result.failure(UpdateException("לא נמצאה חתימה בקובץ שירד"))
+            candidateCerts != certificates(installed) ->
                 Result.failure(UpdateException("העדכון חתום במפתח אחר מהגרסה המותקנת"))
             else -> Result.success(Unit)
         }
@@ -346,13 +417,15 @@ class UpdateManager(
     private fun commit(file: File): Result<Unit> {
         val installer = context.packageManager.packageInstaller
         // סשנים שנפתחו ולא נסגרו מחזיקים עותק של ה-APK, ומגבלת הסשנים לאפליקציה קטנה.
+        sessionId = NO_SESSION
+        confirmIntent = null
         runCatching { installer.mySessions.forEach { installer.abandonSession(it.sessionId) } }
         val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
         params.setAppPackageName(context.packageName)
         params.setSize(file.length())
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            // כשהאפליקציה היא המתקינה הרשומה — בלי חלון אישור. בהתקנה הראשונה (מהדפדפן / מנהל קבצים
-            // אחר) המערכת מתעלמת מזה ומציגה אישור, וזו ההתנהגות הנכונה.
+            // עדכון עצמי בלי חלון אישור (דורש UPDATE_PACKAGES_WITHOUT_USER_ACTION במניפסט). באנדרואיד 8–11,
+            // או כשבעלות העדכון שייכת לחנות אחרת (14+), המערכת מציגה אישור — ה-receiver מטפל בזה.
             params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
         }
         val sessionId = try {
@@ -366,6 +439,7 @@ class UpdateManager(
                     file.inputStream().use { it.copyTo(sink) }
                     session.fsync(sink)
                 }
+                this.sessionId = sessionId
                 session.commit(statusIntent(sessionId).intentSender)
             }
             Result.success(Unit)
@@ -389,6 +463,7 @@ class UpdateManager(
     companion object {
         const val CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000L
         const val INSTALL_HANDOFF_TIMEOUT_MS = 15 * 60 * 1000L
+        private const val NO_SESSION = -1
     }
 }
 

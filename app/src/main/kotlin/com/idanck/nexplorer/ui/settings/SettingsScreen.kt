@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import com.idanck.nexplorer.BuildConfig
 import com.idanck.nexplorer.core.HebrewDates
 import com.idanck.nexplorer.core.SizeFormat
+import com.idanck.nexplorer.core.isolated
 import com.idanck.nexplorer.data.settings.AppSettings
 import com.idanck.nexplorer.data.settings.ThemeMode
 import com.idanck.nexplorer.ui.theme.MonoTextStyle
@@ -151,10 +152,10 @@ private fun UpdatesSection(model: SettingsModel) {
         UpdateState.Idle -> if (s.updateLastCheckUtc > 0) "נבדק לאחרונה: ${HebrewDates.short(s.updateLastCheckUtc, System.currentTimeMillis(), ZoneId.systemDefault())}" else "עוד לא נבדק"
         UpdateState.Checking -> "בודק…"
         is UpdateState.UpToDate -> "מעודכן — זו הגרסה האחרונה"
-        is UpdateState.Available -> "גרסה ${u.manifest.versionName} זמינה (${SizeFormat.short(u.manifest.sizeBytes)})"
+        is UpdateState.Available -> "גרסה ${u.manifest.versionName} זמינה (${SizeFormat.short(u.manifest.sizeBytes).isolated()})"
         is UpdateState.Downloading -> "מוריד… ${(u.fraction * 100).toInt()}%"
         is UpdateState.Verifying -> "מאמת…"
-        is UpdateState.Installing -> "מתקין…"
+        is UpdateState.Installing -> if (u.awaitingUser) "ממתין לאישור בחלון של המערכת" else "מתקין…"
         is UpdateState.Failed -> u.message
         is UpdateState.Blocked -> u.blocker.message
     }
@@ -187,7 +188,10 @@ private fun UpdatesSection(model: SettingsModel) {
                     TextButton(onClick = { model.updateActions.onInstall(u.manifest) }) { Text("נסה שוב") }
                 }
             }
-            UpdateState.Checking, is UpdateState.Downloading, is UpdateState.Verifying, is UpdateState.Installing -> Unit
+            is UpdateState.Installing -> if (u.awaitingUser) {
+                TextButton(onClick = model.updateActions.onContinueInstall) { Text("המשך התקנה") }
+            }
+            UpdateState.Checking, is UpdateState.Downloading, is UpdateState.Verifying -> Unit
             else -> TextButton(onClick = model.onCheckUpdates) { Text("בדוק עכשיו") }
         }
     }
@@ -218,7 +222,7 @@ private fun Group(title: String, content: @Composable ColumnScope.() -> Unit) {
 
 @Composable
 private fun Divider() {
-    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, modifier = Modifier.padding(horizontal = NexplorerDimens.Space4))
+    HorizontalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.padding(horizontal = NexplorerDimens.Space4))
 }
 
 @Composable

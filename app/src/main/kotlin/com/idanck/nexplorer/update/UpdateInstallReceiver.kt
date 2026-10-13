@@ -16,6 +16,8 @@ class UpdateInstallReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != ACTION_STATUS) return
         val updates = (context.applicationContext as NexplorerApp).container.updates
+        // סשן קודם שננטש (ניסיון חוזר) מדווח "בוטל" — זה לא הניסיון שעל המסך.
+        if (!updates.isCurrentSession(intent.getIntExtra(PackageInstaller.EXTRA_SESSION_ID, -1))) return
         when (val status = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE)) {
             PackageInstaller.STATUS_PENDING_USER_ACTION -> {
                 val confirm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -26,9 +28,10 @@ class UpdateInstallReceiver : BroadcastReceiver() {
                 if (confirm == null) {
                     updates.onInstallFailed("המערכת לא הציגה את חלון האישור")
                 } else {
-                    // המשתמש לחץ "עדכן" לפני רגע, האפליקציה בחזית ולכן מותר לפתוח מכאן מסך.
-                    runCatching { context.startActivity(confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-                        .onFailure { updates.onInstallFailed("לא ניתן להציג את חלון האישור") }
+                    // נשמר לפני הניסיון: אם האפליקציה ברקע, אנדרואיד 10+ חוסם את הפתיחה בשקט,
+                    // והבאנר יציע "המשך התקנה" כשהמשתמש חוזר.
+                    updates.onUserActionNeeded(confirm)
+                    runCatching { context.startActivity(Intent(confirm).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
                 }
             }
             PackageInstaller.STATUS_SUCCESS -> Unit
@@ -40,8 +43,8 @@ class UpdateInstallReceiver : BroadcastReceiver() {
         PackageInstaller.STATUS_FAILURE_ABORTED -> "ההתקנה בוטלה"
         PackageInstaller.STATUS_FAILURE_STORAGE -> "אין מספיק מקום להתקנה"
         PackageInstaller.STATUS_FAILURE_BLOCKED -> "המערכת חסמה את ההתקנה"
-        PackageInstaller.STATUS_FAILURE_CONFLICT -> "העדכון חתום במפתח אחר מהגרסה המותקנת"
         PackageInstaller.STATUS_FAILURE_INCOMPATIBLE -> "העדכון לא מתאים למכשיר הזה"
+        // CONFLICT כאן הוא לא "מפתח אחר" — זה נבדק לפני ההתקנה. הפירוט של המערכת אומר מה כן.
         else -> "ההתקנה נכשלה" + (detail?.let { " ($it)" } ?: "")
     }
 

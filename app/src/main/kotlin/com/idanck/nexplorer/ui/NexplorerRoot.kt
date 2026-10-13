@@ -76,6 +76,9 @@ fun NexplorerRoot(container: AppContainer, pendingPath: String?, onPendingPathCo
                 runCatching { context.startActivity(container.updates.installPermissionIntent()) }
                     .onFailure { Toast.makeText(context, "פתח: הגדרות ← אפליקציות ← גישה מיוחדת ← התקנת אפליקציות לא מוכרות", Toast.LENGTH_LONG).show() }
             },
+            onContinueInstall = {
+                if (!container.updates.continueInstall(context)) container.updates.dismiss()
+            },
         )
     }
 
