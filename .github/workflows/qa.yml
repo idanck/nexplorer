@@ -59,6 +59,18 @@ jobs:
       - name: Build the app and the tests
         run: ./gradlew assembleDebug assembleDebugAndroidTest
 
+      - name: Free disk space for the emulator
+        # מ-API 24 האמולטור מעגל את מחיצת הנתונים ל-6 GiB לפחות ודורש פי 1.2 פנויים (7373 MB) — disk-size קטן לא עוזר.
+        # אחרי ה-build, כדי לא למחוק משהו שהוא צריך.
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost \
+                      /opt/hostedtoolcache/CodeQL /usr/local/lib/android/sdk/ndk
+          sudo docker image prune --all --force > /dev/null 2>&1 || true
+          df -h /
+          avail=$(df -Pm "$HOME" | awk 'NR==2{print $4}')
+          [ "$avail" -ge 9000 ] || { echo "::error::Only ${avail} MB free; the emulator needs ~7373 MB for userdata"; exit 1; }
+
       - name: Run on the emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -67,8 +79,6 @@ jobs:
           arch: x86_64
           profile: pixel_6
           disable-animations: true
-          # ברירת המחדל (6 GB + מרווח) לא נכנסת לדיסק של ה-runner אחרי ה-build — האמולטור נופל ב-"Not enough space".
-          disk-size: 3G
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot
           script: bash .github/qa/instrumented.sh qa-out
 
@@ -119,6 +129,18 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
+      - name: Free disk space for the emulator
+        # מ-API 24 האמולטור מעגל את מחיצת הנתונים ל-6 GiB לפחות ודורש פי 1.2 פנויים (7373 MB) — disk-size קטן לא עוזר.
+        # אחרי ה-build, כדי לא למחוק משהו שהוא צריך.
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost \
+                      /opt/hostedtoolcache/CodeQL /usr/local/lib/android/sdk/ndk
+          sudo docker image prune --all --force > /dev/null 2>&1 || true
+          df -h /
+          avail=$(df -Pm "$HOME" | awk 'NR==2{print $4}')
+          [ "$avail" -ge 9000 ] || { echo "::error::Only ${avail} MB free; the emulator needs ~7373 MB for userdata"; exit 1; }
+
       - name: Update from inside the app
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -127,8 +149,6 @@ jobs:
           arch: x86_64
           profile: pixel_6
           disable-animations: true
-          # ברירת המחדל (6 GB + מרווח) לא נכנסת לדיסק של ה-runner אחרי ה-build — האמולטור נופל ב-"Not enough space".
-          disk-size: 3G
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot
           script: bash .github/qa/update-e2e.sh app/build/outputs/apk/release/app-release.apk qa-out
 
