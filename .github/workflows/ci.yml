@@ -78,6 +78,26 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           ls -la dist
 
+      - name: Read the version from the APK
+        # המניפסט מתאר את הקובץ עצמו: versionCode ו-minSdk נקראים מה-APK, לא מנוחשים מקוד המקור.
+        # רץ בכל build (גם PR), כדי שתקלה כאן תתגלה לפני שהיא חוסמת פרסום ב-main.
+        id: badging
+        run: |
+          set -euo pipefail
+          aapt2="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)aapt2"
+          badging=$("$aapt2" dump badging "${{ steps.apk.outputs.path }}")
+          versionCode=""
+          minSdk=""
+          if [[ $badging =~ versionCode=\'([0-9]+)\' ]]; then versionCode=${BASH_REMATCH[1]}; fi
+          if [[ $badging =~ (minSdkVersion|sdkVersion):\'([0-9]+)\' ]]; then minSdk=${BASH_REMATCH[2]}; fi
+          echo "versionCode=$versionCode minSdk=$minSdk run=$GITHUB_RUN_NUMBER"
+          if [ "$versionCode" != "$GITHUB_RUN_NUMBER" ] || [ -z "$minSdk" ]; then
+            echo "::error::APK versionCode '$versionCode' (minSdk '$minSdk') does not match run $GITHUB_RUN_NUMBER."
+            exit 1
+          fi
+          echo "versionCode=$versionCode" >> "$GITHUB_OUTPUT"
+          echo "minSdk=$minSdk" >> "$GITHUB_OUTPUT"
+
       - name: Confirm the APK carries the release key
         if: env.SIGNED == 'true'
         run: |
@@ -138,13 +158,18 @@ jobs:
           name="${{ steps.apk.outputs.name }}"
           sha=$(sha256sum "$apk" | cut -d' ' -f1)
           size=$(stat -c%s "$apk")
-          versionCode="$GITHUB_RUN_NUMBER"
+          versionCode="${{ steps.badging.outputs.versionCode }}"
+          minSdk="${{ steps.badging.outputs.minSdk }}"
           versionName="${{ steps.apk.outputs.version }}"
-          minSdk=$(grep -m1 'minSdk = ' app/build.gradle.kts | tr -dc '0-9')
           notes=$(git log -1 --pretty=%s)
 
-          published=$(curl -fsS "$UPDATES_HOST/latest.json" || echo '{}')
-          pubCode=$(jq -r '.versionCode // 0' <<<"$published")
+          # רק 404 אומר "עוד לא פורסם כלום". כל תשובה אחרת שאינה 200 — לא מפרסמים מעל מצב לא ידוע.
+          status=$(curl -sS -o "$RUNNER_TEMP/published.json" -w '%{http_code}' "$UPDATES_HOST/latest.json")
+          case "$status" in
+            200) pubCode=$(jq -r '.versionCode // 0' "$RUNNER_TEMP/published.json") ;;
+            404) pubCode=0 ;;
+            *) echo "::error::The update channel answered $status for latest.json — not publishing."; exit 1 ;;
+          esac
           if [ "$versionCode" -lt "$pubCode" ]; then
             echo "::error::versionCode $versionCode is older than the published $pubCode."
             exit 1

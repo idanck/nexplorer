@@ -67,6 +67,8 @@ jobs:
           arch: x86_64
           profile: pixel_6
           disable-animations: true
+          # ברירת המחדל (6 GB + מרווח) לא נכנסת לדיסק של ה-runner אחרי ה-build — האמולטור נופל ב-"Not enough space".
+          disk-size: 3G
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot
           script: bash .github/qa/instrumented.sh qa-out
 
@@ -125,6 +127,8 @@ jobs:
           arch: x86_64
           profile: pixel_6
           disable-animations: true
+          # ברירת המחדל (6 GB + מרווח) לא נכנסת לדיסק של ה-runner אחרי ה-build — האמולטור נופל ב-"Not enough space".
+          disk-size: 3G
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot
           script: bash .github/qa/update-e2e.sh app/build/outputs/apk/release/app-release.apk qa-out
 
