@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# repo-bootstrap :: pre-push — block direct pushes to main.
+# There is no server-side branch protection on this repo (GitHub Free + private),
+# so this hook plus the rule in CLAUDE.md are the whole guard.
+# Deliberate override:  RB_ALLOW_MAIN_PUSH=1 git push
+set -uo pipefail
+
+[ "${RB_ALLOW_MAIN_PUSH:-0}" = "1" ] && exit 0
+
+red=$'\033[31m'; yel=$'\033[33m'; off=$'\033[0m'
+
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+  case "$remote_ref" in
+    refs/heads/main|refs/heads/master)
+      printf '%s\n' "${red}pre-push: direct push to ${remote_ref#refs/heads/} is blocked.${off}" >&2
+      printf '%s\n' "${yel}Use a feature branch and a PR:${off}" >&2
+      printf '%s\n' "  git switch -c feature/<name>" >&2
+      printf '%s\n' "  git push -u origin feature/<name>" >&2
+      printf '%s\n' "  gh pr create --fill" >&2
+      printf '%s\n' "" >&2
+      printf '%s\n' "If this really is intentional: RB_ALLOW_MAIN_PUSH=1 git push" >&2
+      exit 1 ;;
+  esac
+done
+exit 0

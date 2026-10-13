@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# repo-bootstrap :: pre-commit — refuse to commit obvious secrets.
+# Bypass (only when you are certain): git commit --no-verify
+set -uo pipefail
+
+red=$'\033[31m'; off=$'\033[0m'
+fail() { printf '%s\n' "${red}pre-commit: $*${off}" >&2; }
+
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$staged" ] && exit 0
+
+# 1. never commit a real .env (a .env.example / .env.sample is fine)
+while IFS= read -r f; do
+  case "$(basename "$f")" in
+    .env|.env.*) case "$f" in *.example|*.sample|*.template) ;; *)
+        fail "refusing to commit environment file: $f"
+        fail "put NAMES in .env.example and values in /home/idan/.secrets/credentials.env"
+        exit 1 ;;
+      esac ;;
+  esac
+done <<< "$staged"
+
+# 2. scan the staged content for credential shapes
+diff_body=$(git diff --cached -U0)
+hit=0
+check() {
+  if printf '%s' "$diff_body" | grep -qE -e "$1"; then fail "possible secret in staged diff — $2"; hit=1; fi
+}
+check 'gh[pousr]_[A-Za-z0-9]{20,}'                 "GitHub token"
+check 'github_pat_[A-Za-z0-9_]{20,}'               "GitHub fine-grained token"
+check '-----BEGIN [A-Z ]*PRIVATE KEY-----'         "private key block"
+check 'AKIA[0-9A-Z]{16}'                           "AWS access key id"
+check 'xox[baprs]-[A-Za-z0-9-]{10,}'               "Slack token"
+check 'sk-[A-Za-z0-9]{32,}'                        "API secret key"
+check '(api[_-]?key|secret|password|passwd|token)[[:space:]]*[:=][[:space:]]*["'"'"'][^"'"'"']{12,}["'"'"']' \
+                                                   "hardcoded credential literal"
+
+if [ "$hit" -eq 1 ]; then
+  fail "commit blocked. If this is a false positive, tell Idan before using --no-verify."
+  exit 1
+fi
+exit 0
