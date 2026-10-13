@@ -17,6 +17,7 @@ status=0
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 adb shell rm -rf /sdcard/Download/nexplorer-qa
+adb logcat -G 16M || true
 adb logcat -c
 
 run_class() {
@@ -35,12 +36,27 @@ run_class BrowserFlowTest
 run_class SearchAndSettingsTest
 
 echo "::group::monkey (API $api)"
+adb shell input keyevent KEYCODE_WAKEUP
+adb shell wm dismiss-keyguard || true
 adb shell am start -W -n "$pkg/com.idanck.nexplorer.MainActivity" \
   -a com.idanck.nexplorer.action.OPEN_FOLDER --es path /sdcard/nexplorer-qa > /dev/null
-adb shell monkey -p "$pkg" -s 4242 --throttle 100 --pct-syskeys 0 -v 2000 > "$out/monkey.txt" 2>&1
+# איזה חלון מחזיק את הפוקוס, כל 15 שניות: "Injection Failed" רצוף = אף חלון לא מקבל קלט, וזה מראה מי.
+( while true; do
+    echo "$(date +%T) $(adb shell dumpsys window | grep -E 'mCurrentFocus|mFocusedApp' | tr -s ' ' | tr '\n' ' ')"
+    sleep 15
+  done ) > "$out/monkey-focus.txt" 2>&1 &
+watch=$!
+# תקרת זמן: monkey שנתקע לא שורף את כל ה-job, ו-logcat וצילומי המסך עדיין נאספים.
+timeout 600 adb shell monkey -p "$pkg" -s 4242 --throttle 100 --pct-syskeys 0 -v 2000 > "$out/monkey.txt" 2>&1
+monkey_exit=$?
+kill $watch 2>/dev/null
 tail -n 5 "$out/monkey.txt"
 echo "::endgroup::"
-if grep -qE 'CRASH|NOT RESPONDING' "$out/monkey.txt" || ! grep -q 'Monkey finished' "$out/monkey.txt"; then
+if [ $monkey_exit -eq 124 ]; then
+  echo "::error::monkey did not finish within 10 minutes on API $api (monkey-focus.txt)"
+  adb shell pkill -f com.android.commands.monkey || true
+  status=1
+elif grep -qE 'CRASH|NOT RESPONDING' "$out/monkey.txt" || ! grep -q 'Monkey finished' "$out/monkey.txt"; then
   echo "::error::monkey found a crash or ANR on API $api"
   status=1
 fi
