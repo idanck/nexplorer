@@ -275,10 +275,11 @@ class BrowserFlowTest {
 
         compose.onNodeWithText("Photos").performClick()
         compose.waitFor(hasText("shot-1.png"))
+        // תמונה נפתחת במציג המובנה (שלב 2ב), לא באפליקציה אחרת.
         compose.onNodeWithText("shot-1.png").performClick()
-        Thread.sleep(1_500)
+        compose.waitFor(hasText("/ 4", substring = true), 15_000)
         Qa.screenshot(compose, "34-open-image")
-        if (Qa.device.currentPackageName != Qa.packageName) Qa.device.pressBack()
-        compose.waitFor(hasText("shot-1.png"))
+        Qa.device.pressBack()
+        compose.waitFor(hasText("shot-2.png"))
     }
 }

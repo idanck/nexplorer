@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
  *   20 — תפריט צף (⋮)
  *   12 — אריח מקום במגירה
  *   7  — תיבת סימון במצב בחירה
+ *   20 — חלון בשני חלונות · 18 — פריט במסילה · 12 — יעד שחרור בגרירה
  */
 val NexplorerShapes = Shapes(
     extraSmall = RoundedCornerShape(8.dp),
@@ -49,6 +50,11 @@ object NexplorerShape {
     /** כרטיסי "מה אפשר לפנות" ו"תיקיות גדולות" במנתח, ונקודת המקרא של הפילוח. */
     val FindingCard = RoundedCornerShape(20.dp)
     val LegendDot = RoundedCornerShape(3.dp)
+
+    /** שני חלונות (לוח Tablet). */
+    val Pane = RoundedCornerShape(20.dp)
+    val RailItem = RoundedCornerShape(18.dp)
+    val DropTarget = RoundedCornerShape(12.dp)
 
     val Pill = CircleShape
     val Fab = CircleShape

@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import com.idanck.nexplorer.core.Entry
@@ -74,6 +75,8 @@ class FileListActions(
     /** מיקום הגלילה האחרון בתיקייה (אינדקס, היסט) — כניסה לתיקייה מתחילה בראש, "למעלה" חוזר לשורה. */
     val scrollFor: (Location) -> Pair<Int, Int>,
     val onScrolled: (Location, Int, Int) -> Unit,
+    /** שני חלונות: גרירת הבחירה ותיקיות כיעדי שחרור. בחלון יחיד — null. */
+    val drag: FileDrag? = null,
 )
 
 @Composable
@@ -139,9 +142,20 @@ private fun LazyListScope.header(section: Section, index: Int, sort: String) {
     }
 }
 
+/** פריט נבחר בשני חלונות נגרר בלחיצה ארוכה; כל השאר — הקשה ולחיצה ארוכה (בחירה / טווח). */
 @OptIn(ExperimentalFoundationApi::class)
-private fun Modifier.entryClicks(entry: Entry, actions: FileListActions): Modifier =
-    combinedClickable(onClick = { actions.onClick(entry) }, onLongClick = { actions.onLongClick(entry) })
+private fun Modifier.entryClicks(entry: Entry, selected: Boolean, actions: FileListActions): Modifier {
+    val drag = actions.drag
+    if (drag != null && selected) return dragSource(entry, drag) { actions.onClick(entry) }
+    return combinedClickable(onClick = { actions.onClick(entry) }, onLongClick = { actions.onLongClick(entry) })
+}
+
+/** תיקייה בשורה כיעד שחרור (רק בשני חלונות). */
+@Composable
+private fun folderDropZone(entry: Entry, actions: FileListActions): DropZone =
+    rememberDropZone(entry.path.takeIf { entry.isDirectory }, actions.drag, acceptsInto(entry.path))
+
+private const val DROP_HINT = "שחרר כאן להעתקה"
 
 @Composable
 private fun FileRow(entry: Entry, state: BrowserState, actions: FileListActions, now: Long) {
@@ -157,12 +171,15 @@ private fun FileRow(entry: Entry, state: BrowserState, actions: FileListActions,
         2 -> NexplorerDimens.RowHeight - NexplorerDimens.Space2
         else -> NexplorerDimens.RowHeight
     }
+    val drop = folderDropZone(entry, actions)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = minHeight)
+            .then(drop.modifier)
+            .dropHighlight(drop.hovering, NexplorerTheme.colors)
             .background(if (selected) NexplorerTheme.colors.selectedRow else Color.Transparent)
-            .entryClicks(entry, actions)
+            .entryClicks(entry, selected, actions)
             .padding(horizontal = NexplorerDimens.Space4, vertical = vertical),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -176,15 +193,16 @@ private fun FileRow(entry: Entry, state: BrowserState, actions: FileListActions,
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NexplorerDimens.Space1 / 2)) {
             Text(
                 entry.name,
-                style = FileNameTextStyle,
+                style = if (drop.hovering) FileNameTextStyle.copy(fontWeight = FontWeight.SemiBold) else FileNameTextStyle,
+                color = if (drop.hovering) NexplorerTheme.colors.onAmberContainer else Color.Unspecified,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.fillMaxWidth(),
             )
             Text(
-                metaLine(entry, now),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                if (drop.hovering) DROP_HINT else metaLine(entry, now),
+                style = if (drop.hovering) MaterialTheme.typography.labelMedium else MaterialTheme.typography.bodySmall,
+                color = if (drop.hovering) NexplorerTheme.colors.onAmberContainer else MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -199,12 +217,15 @@ private fun FileRow(entry: Entry, state: BrowserState, actions: FileListActions,
 @Composable
 private fun CompactRow(entry: Entry, state: BrowserState, actions: FileListActions) {
     val selected = entry.path in state.selection
+    val drop = folderDropZone(entry, actions)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = NexplorerDimens.CompactRowHeight)
+            .then(drop.modifier)
+            .dropHighlight(drop.hovering, NexplorerTheme.colors)
             .background(if (selected) NexplorerTheme.colors.selectedRow else Color.Transparent)
-            .entryClicks(entry, actions)
+            .entryClicks(entry, selected, actions)
             .padding(horizontal = NexplorerDimens.Space4, vertical = NexplorerDimens.Space1),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -224,11 +245,15 @@ private fun CompactRow(entry: Entry, state: BrowserState, actions: FileListActio
             modifier = Modifier.weight(1f),
         )
         Spacer(Modifier.width(NexplorerDimens.Space2))
-        Text(
-            if (entry.isDirectory) (entry.childCount.takeIf { it >= 0 }?.toString() ?: "") else SizeFormat.short(entry.size),
-            style = MonoTextStyle,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        if (drop.hovering) {
+            Text(DROP_HINT, style = MaterialTheme.typography.labelMedium, color = NexplorerTheme.colors.onAmberContainer, maxLines = 1)
+        } else {
+            Text(
+                if (entry.isDirectory) (entry.childCount.takeIf { it >= 0 }?.toString() ?: "") else SizeFormat.short(entry.size),
+                style = MonoTextStyle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         if (state.inSelection) {
             Spacer(Modifier.width(NexplorerDimens.Space3))
             SelectionBox(selected)
@@ -285,11 +310,14 @@ private fun LazyGridScope.gridHeader(section: Section, index: Int, sort: String)
 @Composable
 private fun GridTile(entry: Entry, state: BrowserState, actions: FileListActions) {
     val selected = entry.path in state.selection
+    val drop = folderDropZone(entry, actions)
     Column(
         modifier = Modifier
+            .then(drop.modifier)
+            .dropHighlight(drop.hovering, NexplorerTheme.colors, inset = false)
             .clip(NexplorerShape.IconTile)
             .background(if (selected) NexplorerTheme.colors.selectedRow else Color.Transparent)
-            .entryClicks(entry, actions)
+            .entryClicks(entry, selected, actions)
             .padding(NexplorerDimens.Space2),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(NexplorerDimens.Space2),
@@ -330,15 +358,18 @@ private fun GridTile(entry: Entry, state: BrowserState, actions: FileListActions
 @Composable
 private fun GalleryTile(entry: Entry, state: BrowserState, actions: FileListActions) {
     val selected = entry.path in state.selection
+    val drop = folderDropZone(entry, actions)
     Box(
         modifier = Modifier
             .aspectRatio(1f)
+            .then(drop.modifier)
+            .dropHighlight(drop.hovering, NexplorerTheme.colors, inset = false)
             .clip(NexplorerShape.IconTile)
             .then(
                 if (selected) Modifier.border(NexplorerDimens.Space1 / 2, MaterialTheme.colorScheme.primary, NexplorerShape.IconTile)
                 else Modifier,
             )
-            .entryClicks(entry, actions)
+            .entryClicks(entry, selected, actions)
             // לתמונה ולווידאו אין שם על המשבצת — TalkBack צריך אותו.
             .semantics { contentDescription = entry.name },
     ) {

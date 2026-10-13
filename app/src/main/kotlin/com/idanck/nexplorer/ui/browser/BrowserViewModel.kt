@@ -137,6 +137,12 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
     private var selectionAnchor: String? = null
     private var resumedOnce = false
 
+    /**
+     * החלון השני בשני חלונות נפתח בפעם הראשונה בתיקייה של הראשון. כאן ולא ב-Compose: סיבוב לאורך
+     * ובחזרה לרוחב לא מאפס אותו.
+     */
+    var pairedOnce = false
+
     /** מיקום הגלילה של כל תיקייה שביקרנו בה — "למעלה" חוזר לאותה שורה. */
     private val scrollPositions = mutableMapOf<String, Pair<Int, Int>>()
 
@@ -435,6 +441,18 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
     fun delete(paths: List<String>) {
         if (paths.isEmpty()) return
         transfers.enqueue(TransferKind.Delete, paths, null)
+        clearSelection()
+    }
+
+    /** שני חלונות: העתקה או העברה ישר לתיקייה של החלון השני, או לתיקייה שעליה שוחררה גרירה. */
+    fun sendTo(paths: List<String>, targetDir: String, move: Boolean) {
+        if (paths.isEmpty()) return
+        // לאותה תיקייה: העברה היא כלום, והעתקה רק משכפלת בשם אחר — לא מה שהתכוונו בגרירה בין חלונות.
+        if (paths.all { File(it).parent == targetDir }) {
+            emit("הפריטים כבר בתיקייה הזו")
+            return
+        }
+        transfers.enqueue(if (move) TransferKind.Move else TransferKind.Copy, paths, targetDir)
         clearSelection()
     }
 

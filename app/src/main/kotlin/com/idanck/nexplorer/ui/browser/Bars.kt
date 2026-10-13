@@ -131,20 +131,25 @@ fun BrowserTopBar(
 
 /** פירורי לחם כצ'יפים; האחרון (המיקום הנוכחי) מודגש. הקשה עליו = רענון. */
 @Composable
-fun Breadcrumbs(crumbs: List<Crumb>, onCrumb: (Crumb) -> Unit) {
+fun Breadcrumbs(
+    crumbs: List<Crumb>,
+    onCrumb: (Crumb) -> Unit,
+    modifier: Modifier = Modifier.fillMaxWidth(),
+    contentPadding: PaddingValues = PaddingValues(
+        start = NexplorerDimens.Space4,
+        end = NexplorerDimens.Space4,
+        top = NexplorerDimens.Space1,
+        bottom = NexplorerDimens.Space3,
+    ),
+) {
     val listState = rememberLazyListState()
     LaunchedEffect(crumbs.size, crumbs.lastOrNull()?.path) {
         if (crumbs.isNotEmpty()) listState.scrollToItem(crumbs.lastIndex)
     }
     LazyRow(
         state = listState,
-        modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(
-            start = NexplorerDimens.Space4,
-            end = NexplorerDimens.Space4,
-            top = NexplorerDimens.Space1,
-            bottom = NexplorerDimens.Space3,
-        ),
+        modifier = modifier,
+        contentPadding = contentPadding,
         horizontalArrangement = Arrangement.spacedBy(NexplorerDimens.Space1 + NexplorerDimens.Space1 / 2),
         verticalAlignment = Alignment.CenterVertically,
     ) {
