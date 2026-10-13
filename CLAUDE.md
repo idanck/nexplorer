@@ -8,6 +8,14 @@
 
 מנהל קבצים לאנדרואיד בהשראת Solid Explorer — מיפוי יכולות, שפת עיצוב ואפיון כהכנה לבנייה
 
+## מצב ותיעוד
+
+שלב מחקר — אין קוד עדיין. לפני כל עבודה קרא את `docs/README.md`.
+- מפת יכולות Solid Explorer: `docs/research/02-features.md`
+- שפת עיצוב + טוקנים: `docs/research/05-design-language.md`, `docs/design/tokens.json`
+- החלטות פתוחות (אין לבחור במקום עידן): `docs/research/08-open-decisions.md`
+- אין להשתמש בשם, לוגו או נכסים של Solid Explorer / NeatBytes בקוד או במשאבים.
+
 ## Stack
 
 `android-kotlin`
