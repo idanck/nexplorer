@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>nexplorer — חיבור חדש</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#2B6FEE}a:hover{color:#1E4DA8}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; direction: rtl; font-family: 'Noto Sans Hebrew', system-ui, sans-serif; color: #16202A; background: #F3F5F7; display: flex; flex-direction: column; overflow: hidden">
+
+  <div style="display: flex; align-items: center; gap: 8px; padding: 14px 12px 8px 12px">
+    <button aria-label="סגור" style="width: 44px; height: 44px; border: 0; background: transparent; border-radius: 22px; display: flex; align-items: center; justify-content: center; color: #16202A">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+    <div style="flex: 1; font-size: 20px; font-weight: 600; line-height: 24px">הוסף מקום</div>
+  </div>
+
+  <div style="flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 12px; padding: 8px 16px 16px 16px">
+
+    <div style="font-size: 12px; font-weight: 600; color: #52606D; letter-spacing: 0.04em; padding: 4px 4px 0 4px">סוג</div>
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px">
+      <button style="display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 4px; border: 2px solid #2B6FEE; border-radius: 16px; background: #D5E3FE; color: #1E4DA8; font-family: inherit; font-size: 12px; font-weight: 600"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="6" rx="1.5"/><rect x="3" y="13" width="18" height="6" rx="1.5"/></svg><span>SMB</span></button>
+      <button style="display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 4px; border: 1px solid #C7CED5; border-radius: 16px; background: #FFFFFF; color: #16202A; font-family: inherit; font-size: 12px; font-weight: 500"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 17l6-5-6-5M12 19h8"/></svg><span>SFTP</span></button>
+      <button style="display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 4px; border: 1px solid #C7CED5; border-radius: 16px; background: #FFFFFF; color: #16202A; font-family: inherit; font-size: 12px; font-weight: 500"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg><span>WebDAV</span></button>
+      <button style="display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 4px; border: 1px solid #C7CED5; border-radius: 16px; background: #FFFFFF; color: #16202A; font-family: inherit; font-size: 12px; font-weight: 500"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M7 18a4 4 0 0 1-.5-8 6 6 0 0 1 11.5 1.5A3.5 3.5 0 0 1 17.5 18z"/></svg><span>ענן</span></button>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px">
+      <button style="display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 4px; border: 1px solid #C7CED5; border-radius: 16px; background: #FFFFFF; color: #16202A; font-family: inherit; font-size: 12px; font-weight: 500"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 4v12M7 11l5 5 5-5M5 20h14"/></svg><span>FTP/S</span></button>
+      <button style="display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 4px; border: 1px solid #C7CED5; border-radius: 16px; background: #FFFFFF; color: #16202A; font-family: inherit; font-size: 12px; font-weight: 500"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 8c0-1.5 3.6-3 8-3s8 1.5 8 3-3.6 3-8 3-8-1.5-8-3z"/><path d="M4 8v8c0 1.5 3.6 3 8 3s8-1.5 8-3V8"/><path d="M4 12c0 1.5 3.6 3 8 3s8-1.5 8-3"/></svg><span>S3</span></button>
+      <button style="display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 4px; border: 1px solid #C7CED5; border-radius: 16px; background: #FFFFFF; color: #16202A; font-family: inherit; font-size: 12px; font-weight: 500"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><span>כספת</span></button>
+      <button style="display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 4px; border: 1px solid #C7CED5; border-radius: 16px; background: #FFFFFF; color: #16202A; font-family: inherit; font-size: 12px; font-weight: 500"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 3h8l3 7H5zM5 10v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9"/></svg><span>ארכיון</span></button>
+    </div>
+
+    <div style="font-size: 12px; font-weight: 600; color: #52606D; letter-spacing: 0.04em; padding: 8px 4px 0 4px">נמצאו ברשת</div>
+    <div style="background: #FFFFFF; border-radius: 20px; padding: 6px 12px; display: flex; flex-direction: column">
+      <div style="display: flex; align-items: center; gap: 12px; min-height: 52px">
+        <span style="width: 8px; height: 8px; border-radius: 4px; background: #2E7D32"></span>
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px"><span style="font-size: 15px; font-weight: 500">DS220 (Synology)</span><span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #52606D; direction: ltr; text-align: end">192.168.50.171 · SMB 3</span></div>
+        <button style="height: 32px; padding: 0 12px; border: 0; border-radius: 999px; background: #D5E3FE; color: #1E4DA8; font-family: inherit; font-size: 13px; font-weight: 600">בחר</button>
+      </div>
+      <div style="height: 1px; background: #E6EAEE"></div>
+      <div style="display: flex; align-items: center; gap: 12px; min-height: 52px">
+        <span style="width: 8px; height: 8px; border-radius: 4px; background: #2E7D32"></span>
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px"><span style="font-size: 15px; font-weight: 500">raspberrypi</span><span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #52606D; direction: ltr; text-align: end">192.168.50.83 · SSH</span></div>
+        <button style="height: 32px; padding: 0 12px; border: 0; border-radius: 999px; background: #E6EAEE; color: #16202A; font-family: inherit; font-size: 13px; font-weight: 600">בחר</button>
+      </div>
+    </div>
+
+    <div style="font-size: 12px; font-weight: 600; color: #52606D; letter-spacing: 0.04em; padding: 8px 4px 0 4px">פרטי חיבור</div>
+    <div style="background: #FFFFFF; border-radius: 20px; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <label for="host" style="font-size: 12px; font-weight: 600; color: #52606D">שרת</label>
+        <input id="host" type="text" value="192.168.50.171" style="height: 44px; box-sizing: border-box; padding: 0 14px; border: 1px solid #C7CED5; border-radius: 12px; font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #16202A; direction: ltr; background: #FFFFFF">
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+        <div style="display: flex; flex-direction: column; gap: 4px">
+          <label for="share" style="font-size: 12px; font-weight: 600; color: #52606D">שיתוף</label>
+          <input id="share" type="text" value="volume2" style="height: 44px; box-sizing: border-box; padding: 0 14px; border: 1px solid #C7CED5; border-radius: 12px; font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #16202A; direction: ltr; background: #FFFFFF">
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px">
+          <label for="user" style="font-size: 12px; font-weight: 600; color: #52606D">משתמש</label>
+          <input id="user" type="text" value="idanc" style="height: 44px; box-sizing: border-box; padding: 0 14px; border: 1px solid #C7CED5; border-radius: 12px; font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #16202A; direction: ltr; background: #FFFFFF">
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <label for="pw" style="font-size: 12px; font-weight: 600; color: #52606D">סיסמה</label>
+        <input id="pw" type="password" value="••••••••••" style="height: 44px; box-sizing: border-box; padding: 0 14px; border: 1px solid #C7CED5; border-radius: 12px; font-family: 'JetBrains Mono', monospace; font-size: 14px; color: #16202A; direction: ltr; background: #FFFFFF">
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; padding-top: 2px">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2B6FEE" stroke-width="2" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+        <span style="font-size: 12px; color: #52606D; line-height: 16px">נשמר ב-Android Keystore. אפשר לדרוש טביעת אצבע בכל חיבור.</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="display: flex; align-items: center; gap: 10px; padding: 10px 16px 18px 16px; background: #FFFFFF; border-top: 1px solid #E6EAEE">
+    <button style="flex: 1; height: 48px; border: 0; border-radius: 999px; background: #2B6FEE; color: #FFFFFF; font-family: inherit; font-size: 15px; font-weight: 600">בדוק והתחבר</button>
+    <button style="height: 48px; padding: 0 16px; border: 1px solid #C7CED5; border-radius: 999px; background: transparent; color: #16202A; font-family: inherit; font-size: 14px; font-weight: 500">מתקדם</button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

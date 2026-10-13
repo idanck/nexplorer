@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- זהה ל-background הכהה ב-ui/theme/Color.kt -->
+    <color name="window_background">#0F1417</color>
+</resources>

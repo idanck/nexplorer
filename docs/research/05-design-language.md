@@ -4,7 +4,7 @@
 
 מבוסס על 4 צילומי מסך (Light theme, עברית, 1080×2340) + הצהרות NeatBytes/changelog.
 צבעים נדגמו מהפיקסלים (הערך השכיח באזור). JPEG — סטייה אפשרית ±2 לערוץ. מצב כהה לא צולם.
-גרסה מכונת של הערכים: [`design/tokens.json`](../design/tokens.json).
+גרסה מכונת של הערכים: [`solid-tokens.json`](solid-tokens.json).
 
 ## עקרונות שנצפו
 
