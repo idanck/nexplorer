@@ -14,12 +14,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.Android
-import androidx.compose.material.icons.outlined.Article
+import androidx.compose.material.icons.automirrored.outlined.Article
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.FolderZip
 import androidx.compose.material.icons.outlined.Image
-import androidx.compose.material.icons.outlined.InsertDriveFile
+import androidx.compose.material.icons.automirrored.outlined.InsertDriveFile
 import androidx.compose.material.icons.outlined.Movie
 import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.PictureAsPdf
@@ -57,17 +57,16 @@ import com.idanck.nexplorer.ui.theme.NexplorerTheme
 import java.io.File
 import java.time.ZoneId
 
-@Suppress("DEPRECATION") // הגרסאות ה-AutoMirrored של Article/InsertDriveFile זהות ויזואלית; אין כאן חץ שצריך שיקוף.
 fun iconFor(entry: Entry): ImageVector = when (entry.kind) {
     FileKind.Folder -> Icons.Outlined.Folder
     FileKind.Image -> Icons.Outlined.Image
     FileKind.Video -> Icons.Outlined.Movie
     FileKind.Audio -> Icons.Outlined.MusicNote
     FileKind.Document -> if (entry.extension == "pdf") Icons.Outlined.PictureAsPdf else Icons.Outlined.Description
-    FileKind.Text -> Icons.Outlined.Article
+    FileKind.Text -> Icons.AutoMirrored.Outlined.Article
     FileKind.Archive -> Icons.Outlined.FolderZip
     FileKind.Apk -> Icons.Outlined.Android
-    FileKind.Other -> Icons.Outlined.InsertDriveFile
+    FileKind.Other -> Icons.AutoMirrored.Outlined.InsertDriveFile
 }
 
 /** צבעי האריח לפי הלוחות: תיקייה בכחול, תמונה/וידאו בענבר, PDF באדום, השאר אפור. */

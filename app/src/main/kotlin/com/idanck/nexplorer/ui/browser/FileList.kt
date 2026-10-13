@@ -20,9 +20,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridScope
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
@@ -34,11 +36,17 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import com.idanck.nexplorer.core.Entry
@@ -63,6 +71,9 @@ class FileListActions(
     val onLongClick: (Entry) -> Unit,
     /** הקשה על האריח בוחרת (F3), גם כשלא במצב בחירה. */
     val onIconClick: (Entry) -> Unit,
+    /** מיקום הגלילה האחרון בתיקייה (אינדקס, היסט) — כניסה לתיקייה מתחילה בראש, "למעלה" חוזר לשורה. */
+    val scrollFor: (Location) -> Pair<Int, Int>,
+    val onScrolled: (Location, Int, Int) -> Unit,
 )
 
 @Composable
@@ -99,7 +110,15 @@ private fun groups(state: BrowserState): List<Section> =
 private fun FileColumn(state: BrowserState, actions: FileListActions, contentPadding: PaddingValues, modifier: Modifier) {
     val now = remember(state.entries) { System.currentTimeMillis() }
     val compact = state.view.mode == ViewMode.Compact
-    LazyColumn(modifier = modifier.fillMaxSize(), contentPadding = contentPadding) {
+    val listState = rememberSaveable(state.location, saver = LazyListState.Saver) {
+        val (index, offset) = actions.scrollFor(state.location)
+        LazyListState(index, offset)
+    }
+    LaunchedEffect(listState, state.location) {
+        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+            .collect { (index, offset) -> actions.onScrolled(state.location, index, offset) }
+    }
+    LazyColumn(modifier = modifier.fillMaxSize(), state = listState, contentPadding = contentPadding) {
         groups(state).forEachIndexed { index, section ->
             header(section, index, sortLabel(state))
             items(section.entries, key = { it.path }) { entry ->
@@ -151,7 +170,7 @@ private fun FileRow(entry: Entry, state: BrowserState, actions: FileListActions,
             entry,
             modifier = Modifier
                 .clip(NexplorerShape.IconTile)
-                .clickable { actions.onIconClick(entry) },
+                .clickable(onClickLabel = "בחר", role = Role.Checkbox) { actions.onIconClick(entry) },
         )
         Spacer(Modifier.width(NexplorerDimens.RowGap))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NexplorerDimens.Space1 / 2)) {
@@ -194,7 +213,7 @@ private fun CompactRow(entry: Entry, state: BrowserState, actions: FileListActio
             size = NexplorerDimens.CompactIconTile,
             modifier = Modifier
                 .clip(NexplorerShape.IconTile)
-                .clickable { actions.onIconClick(entry) },
+                .clickable(onClickLabel = "בחר", role = Role.Checkbox) { actions.onIconClick(entry) },
         )
         Spacer(Modifier.width(NexplorerDimens.Space3))
         Text(
@@ -226,8 +245,17 @@ private fun FileGrid(state: BrowserState, actions: FileListActions, contentPaddi
         else -> 3
     }
     val gap = if (gallery) NexplorerDimens.Space1 else NexplorerDimens.Space2
+    val gridState = rememberSaveable(state.location, saver = LazyGridState.Saver) {
+        val (index, offset) = actions.scrollFor(state.location)
+        LazyGridState(index, offset)
+    }
+    LaunchedEffect(gridState, state.location) {
+        snapshotFlow { gridState.firstVisibleItemIndex to gridState.firstVisibleItemScrollOffset }
+            .collect { (index, offset) -> actions.onScrolled(state.location, index, offset) }
+    }
     LazyVerticalGrid(
         columns = GridCells.Fixed(columns),
+        state = gridState,
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(
             start = NexplorerDimens.Space3,
@@ -273,7 +301,7 @@ private fun GridTile(entry: Entry, state: BrowserState, actions: FileListActions
                     Modifier
                         .size(NexplorerDimens.GridIconTile)
                         .clip(NexplorerShape.IconTile)
-                        .clickable { actions.onIconClick(entry) },
+                        .clickable(onClickLabel = "בחר", role = Role.Checkbox) { actions.onIconClick(entry) },
                 )
             } else {
                 FileIconTile(
@@ -281,7 +309,7 @@ private fun GridTile(entry: Entry, state: BrowserState, actions: FileListActions
                     size = NexplorerDimens.GridIconTile,
                     modifier = Modifier
                         .clip(NexplorerShape.IconTile)
-                        .clickable { actions.onIconClick(entry) },
+                        .clickable(onClickLabel = "בחר", role = Role.Checkbox) { actions.onIconClick(entry) },
                 )
             }
             if (state.inSelection) {
@@ -290,7 +318,7 @@ private fun GridTile(entry: Entry, state: BrowserState, actions: FileListActions
         }
         Text(
             entry.name,
-            style = MaterialTheme.typography.bodySmall,
+            style = FileNameTextStyle.merge(MaterialTheme.typography.bodySmall),
             textAlign = TextAlign.Center,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
@@ -310,13 +338,15 @@ private fun GalleryTile(entry: Entry, state: BrowserState, actions: FileListActi
                 if (selected) Modifier.border(NexplorerDimens.Space1 / 2, MaterialTheme.colorScheme.primary, NexplorerShape.IconTile)
                 else Modifier,
             )
-            .entryClicks(entry, actions),
+            .entryClicks(entry, actions)
+            // לתמונה ולווידאו אין שם על המשבצת — TalkBack צריך אותו.
+            .semantics { contentDescription = entry.name },
     ) {
         FileThumbnail(entry, Modifier.fillMaxSize())
         if (!(entry.kind == FileKind.Image || entry.kind == FileKind.Video)) {
             Text(
                 entry.name,
-                style = MaterialTheme.typography.labelSmall,
+                style = FileNameTextStyle.merge(MaterialTheme.typography.labelSmall),
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -333,7 +363,7 @@ private fun GalleryTile(entry: Entry, state: BrowserState, actions: FileListActi
                 Modifier
                     .align(Alignment.TopEnd)
                     .padding(NexplorerDimens.Space2)
-                    .clickable { actions.onIconClick(entry) },
+                    .clickable(onClickLabel = "בחר", role = Role.Checkbox) { actions.onIconClick(entry) },
             )
         }
     }

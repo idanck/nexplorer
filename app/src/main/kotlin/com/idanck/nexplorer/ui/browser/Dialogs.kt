@@ -1,5 +1,3 @@
-@file:Suppress("DEPRECATION") // אייקונים שקיבלו גרסת AutoMirrored זהים ויזואלית ואין בהם כיוון שצריך שיקוף.
-
 package com.idanck.nexplorer.ui.browser
 
 import androidx.compose.foundation.background
@@ -23,12 +21,12 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CalendarToday
-import androidx.compose.material.icons.outlined.FormatListBulleted
+import androidx.compose.material.icons.automirrored.outlined.FormatListBulleted
 import androidx.compose.material.icons.outlined.GridView
-import androidx.compose.material.icons.outlined.InsertDriveFile
+import androidx.compose.material.icons.automirrored.outlined.InsertDriveFile
 import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material.icons.outlined.PhotoLibrary
-import androidx.compose.material.icons.outlined.Sort
+import androidx.compose.material.icons.automirrored.outlined.Sort
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
@@ -114,7 +112,7 @@ fun ViewOptionsDialog(
                                 label = mode.label,
                                 selected = view.mode == mode,
                                 icon = when (mode) {
-                                    ViewMode.List -> Icons.Outlined.FormatListBulleted
+                                    ViewMode.List -> Icons.AutoMirrored.Outlined.FormatListBulleted
                                     ViewMode.Grid -> Icons.Outlined.GridView
                                     ViewMode.Gallery -> Icons.Outlined.PhotoLibrary
                                     ViewMode.Compact -> Icons.Outlined.Menu
@@ -123,7 +121,7 @@ fun ViewOptionsDialog(
                             ) { push(view.copy(mode = mode)) }
                         }
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("מיון", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.weight(1f))
                         Text(
@@ -143,8 +141,8 @@ fun ViewOptionsDialog(
                                 icon = when (key) {
                                     SortKey.Name -> null
                                     SortKey.Date -> Icons.Outlined.CalendarToday
-                                    SortKey.Size -> Icons.Outlined.Sort
-                                    SortKey.Type -> Icons.Outlined.InsertDriveFile
+                                    SortKey.Size -> Icons.AutoMirrored.Outlined.Sort
+                                    SortKey.Type -> Icons.AutoMirrored.Outlined.InsertDriveFile
                                 },
                                 modifier = Modifier.weight(1f),
                             ) {
@@ -154,7 +152,7 @@ fun ViewOptionsDialog(
                             }
                         }
                     }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                     Text("צפיפות", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold))
                     Slider(
                         value = view.density.toFloat(),
@@ -162,7 +160,7 @@ fun ViewOptionsDialog(
                         valueRange = 0f..ViewOptions.MAX_DENSITY.toFloat(),
                         steps = ViewOptions.MAX_DENSITY - 1,
                     )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline)
                     Column {
                         CheckRow("הצג מדורים", view.showSections) { push(view.copy(showSections = it)) }
                         CheckRow("הצג קבצים מוסתרים", view.showHidden) { push(view.copy(showHidden = it)) }

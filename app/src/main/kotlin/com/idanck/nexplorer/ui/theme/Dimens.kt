@@ -35,8 +35,19 @@ object NexplorerDimens {
     /** רוחב מגירת המקומות בטלפון. */
     val DrawerWidth = 312.dp
 
-    /** גובה הבאנר בראש המגירה. */
+    /** גובה הבאנר בראש המגירה (בלי שורת המצב, שנוספת מעליו). */
     val DrawerBannerHeight = 168.dp
+
+    /** תוכן הבאנר: ריפוד, אריח הסמל, ושורת המכשיר. */
+    val BannerPaddingStart = 20.dp
+    val BannerPaddingEnd = 14.dp
+    val BannerPaddingTop = 24.dp
+    val BannerPaddingBottom = 10.dp
+    val BannerLogoTile = 32.dp
+    val BannerLogoIcon = 18.dp
+    val BannerLogoGap = 10.dp
+    val BannerDeviceIcon = 16.dp
+    val BannerDeviceGap = 7.dp
 
     /** ריפוד אנכי של שורת קובץ (ברמת צפיפות רגילה). */
     val RowPaddingVertical = 10.dp

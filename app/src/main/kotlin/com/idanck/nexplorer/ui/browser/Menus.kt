@@ -1,4 +1,4 @@
-@file:Suppress("DEPRECATION") // אייקונים שקיבלו גרסת AutoMirrored זהים ויזואלית ואין בהם כיוון שצריך שיקוף.
+@file:Suppress("DEPRECATION") // אייקון בלי כיוון (AddToHomeScreen) שאולי מסומן לטובת AutoMirrored — שיקוף לא משנה אותו. אייקונים עם חץ כבר משוקפים.
 
 package com.idanck.nexplorer.ui.browser
 
@@ -31,13 +31,13 @@ import androidx.compose.material.icons.outlined.CheckBox
 import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.CreateNewFolder
-import androidx.compose.material.icons.outlined.DriveFileMove
+import androidx.compose.material.icons.automirrored.outlined.DriveFileMove
 import androidx.compose.material.icons.outlined.FilterList
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.NoteAdd
-import androidx.compose.material.icons.outlined.OpenInNew
+import androidx.compose.material.icons.automirrored.outlined.NoteAdd
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.SelectAll
 import androidx.compose.material.icons.outlined.Settings
@@ -151,7 +151,7 @@ fun OverflowMenu(expanded: Boolean, onDismiss: () -> Unit, model: OverflowMenuMo
         MenuRow("בחר הכל", Icons.Outlined.SelectAll, act(model.onSelectAll), trailing = { TrailingText(model.count.toString()) }, enabled = model.count > 0)
         if (model.isFolder) MenuRow("מאפייני התיקייה", Icons.Outlined.Info, act(model.onProperties))
         MenuRow("רענן", Icons.Outlined.Refresh, act(model.onRefresh))
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
         MenuRow("אפשרויות תצוגה", Icons.Outlined.ViewAgenda, act(model.onViewOptions), trailing = { TrailingText(model.viewSummary) })
         MenuRow("סנן ברשימה", Icons.Outlined.FilterList, act(model.onFilter))
         MenuRow(
@@ -161,7 +161,7 @@ fun OverflowMenu(expanded: Boolean, onDismiss: () -> Unit, model: OverflowMenuMo
             // "ימינה" משוקף: ב-RTL החץ מצביע שמאלה, לכיוון תת-התפריט.
             trailing = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
         )
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline)
         MenuRow(
             "העברות",
             Icons.Outlined.SwapVert,
@@ -204,8 +204,8 @@ class ItemMenuModel(
 fun ItemMenu(expanded: Boolean, onDismiss: () -> Unit, model: ItemMenuModel) {
     fun act(block: () -> Unit) = { onDismiss(); block() }
     NexplorerMenu(expanded, onDismiss) {
-        if (model.single && !model.isFolder) MenuRow("פתיחה באמצעות", Icons.Outlined.OpenInNew, act(model.onOpenWith))
-        MenuRow("העבר", Icons.Outlined.DriveFileMove, act(model.onMove))
+        if (model.single && !model.isFolder) MenuRow("פתיחה באמצעות", Icons.AutoMirrored.Outlined.OpenInNew, act(model.onOpenWith))
+        MenuRow("העבר", Icons.AutoMirrored.Outlined.DriveFileMove, act(model.onMove))
         if (model.single) MenuRow("העתק נתיב", Icons.Outlined.Link, act(model.onCopyPath))
         if (model.single && model.isFolder) {
             MenuRow(
@@ -250,7 +250,7 @@ fun BoxScope.NewFab(
         AnimatedVisibility(visible = open, enter = fadeIn(), exit = fadeOut()) {
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(NexplorerDimens.Space3)) {
                 SpeedDialPill("תיקייה חדשה", Icons.Outlined.CreateNewFolder) { onToggle(); onNewFolder() }
-                SpeedDialPill("קובץ חדש", Icons.Outlined.NoteAdd) { onToggle(); onNewFile() }
+                SpeedDialPill("קובץ חדש", Icons.AutoMirrored.Outlined.NoteAdd) { onToggle(); onNewFile() }
                 SpeedDialPill("תיקייה מוצפנת", Icons.Outlined.Lock, available = false) { onUnavailable("תיקייה מוצפנת") }
                 SpeedDialPill("חיבור רשת / ענן", Icons.Outlined.Cloud, available = false) { onUnavailable("חיבור רשת וענן") }
                 Spacer(Modifier.height(NexplorerDimens.Space1))

@@ -2,6 +2,7 @@ package com.idanck.nexplorer.ui.browser
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.idanck.nexplorer.NexplorerApp
 import com.idanck.nexplorer.core.Entry
@@ -12,9 +13,11 @@ import com.idanck.nexplorer.core.sortedFor
 import com.idanck.nexplorer.data.files.LocalFiles
 import com.idanck.nexplorer.data.files.MediaCollection
 import com.idanck.nexplorer.data.files.MediaCollections
+import com.idanck.nexplorer.data.files.MediaScan
 import com.idanck.nexplorer.data.files.StorageVolumeInfo
 import com.idanck.nexplorer.data.files.StorageVolumes
 import com.idanck.nexplorer.data.transfer.TransferKind
+import com.idanck.nexplorer.data.settings.relocated
 import com.idanck.nexplorer.data.transfer.TransferStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -104,13 +107,17 @@ sealed interface BrowserEvent {
  * המצב של חלון הקבצים: מיקום, רשימה, בחירה, לוח גזירים ומסנן.
  * חי ברמת ה-Activity, כך שחזרה מההגדרות או מהחיפוש מוצאת את החלון כפי שהיה.
  */
-class BrowserViewModel(app: Application) : AndroidViewModel(app) {
+class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : AndroidViewModel(app) {
 
     private val container = (app as NexplorerApp).container
     private val settings = container.settings
     private val transfers = container.transfers
 
-    private val _state = MutableStateFlow(BrowserState(location = initialLocation()))
+    // הנפחים נטענים מייד (StatFs זול): בלעדיהם הפריימים הראשונים מציגים "/ › storage › emulated › 0",
+    // ו"חזרה" מיידית יוצאת מהשורש. המיקום ולוח הגזירים שורדים הריגת תהליך ברקע.
+    private val _state = MutableStateFlow(
+        BrowserState(location = initialLocation(), volumes = StorageVolumes.list(app), clipboard = savedClipboard()),
+    )
     val state: StateFlow<BrowserState> = _state
 
     private val _events = Channel<BrowserEvent>(Channel.BUFFERED)
@@ -118,9 +125,12 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
 
     private var loadJob: Job? = null
     private var selectionAnchor: String? = null
+    private var resumedOnce = false
+
+    /** מיקום הגלילה של כל תיקייה שביקרנו בה — "למעלה" חוזר לאותה שורה. */
+    private val scrollPositions = mutableMapOf<String, Pair<Int, Int>>()
 
     init {
-        refreshVolumes()
         applySettings(reload = false)
         load()
         viewModelScope.launch {
@@ -132,6 +142,9 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             transfers.finished.collect { transfer ->
                 refresh()
+                refreshVolumes()
+                // מועדפים ותצוגה "רק בתיקייה זו" עוברים עם התיקייה.
+                if (transfer.moved.isNotEmpty()) settings.update { s -> transfer.moved.fold(s) { acc, (from, to) -> acc.relocated(from, to) } }
                 if (transfer.status == TransferStatus.Failed) {
                     emit("${transfer.kind.verb} נכשלה: ${transfer.error}")
                 }
@@ -140,9 +153,53 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun initialLocation(): Location {
+        saved.get<String>(KEY_LOCATION)?.let { key ->
+            if (key.startsWith(MEDIA_PREFIX)) {
+                MediaCollection.entries.firstOrNull { it.name == key.removePrefix(MEDIA_PREFIX) }?.let { return Location.Media(it) }
+            } else if (File(key).isDirectory) {
+                return Location.Folder(key)
+            }
+        }
         val s = settings.state.value
         val last = s.lastFolder?.takeIf { s.reopenLastFolder && File(it).isDirectory }
         return Location.Folder(last ?: StorageVolumes.primaryPath())
+    }
+
+    private fun savedClipboard(): Clipboard? {
+        val paths = saved.get<ArrayList<String>>(KEY_CLIP_PATHS) ?: return null
+        return Clipboard(paths, saved.get<Boolean>(KEY_CLIP_CUT) ?: false)
+    }
+
+    private fun saveClipboard(clip: Clipboard?) {
+        // לוח ענק (בחר הכל ב-DCIM) לא נכנס ל-Bundle — עדיף לאבד אותו בהריגת תהליך מאשר לקרוס בשמירה.
+        if (clip == null || clip.paths.size > MAX_SAVED_CLIP) {
+            saved.remove<ArrayList<String>>(KEY_CLIP_PATHS)
+            saved.remove<Boolean>(KEY_CLIP_CUT)
+        } else {
+            saved[KEY_CLIP_PATHS] = ArrayList(clip.paths)
+            saved[KEY_CLIP_CUT] = clip.cut
+        }
+    }
+
+    /** חזרה לאפליקציה: קבצים שהורדו או נערכו באפליקציה אחרת, ומקום פנוי עדכני. */
+    fun onResume() {
+        if (!resumedOnce) {
+            resumedOnce = true
+            return
+        }
+        refresh()
+        refreshVolumes()
+    }
+
+    fun scrollFor(location: Location): Pair<Int, Int> = scrollPositions[keyOf(location)] ?: (0 to 0)
+
+    fun saveScroll(location: Location, index: Int, offset: Int) {
+        scrollPositions[keyOf(location)] = index to offset
+    }
+
+    private fun keyOf(location: Location): String = when (location) {
+        is Location.Folder -> location.path
+        is Location.Media -> MEDIA_PREFIX + location.collection.name
     }
 
     fun refreshVolumes() {
@@ -163,7 +220,14 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun navigate(location: Location) {
-        _state.update { it.copy(location = location, selection = emptySet(), filter = null, error = null) }
+        // בלי הרשימה הקודמת: אחרת שורות של התיקייה הקודמת מוצגות (ולחיצות) מתחת לכותרת החדשה עד שהרישום מסתיים.
+        _state.update {
+            it.copy(
+                location = location, selection = emptySet(), filter = null, error = null,
+                listed = emptyList(), entries = emptyList(), sections = emptyList(), loading = true,
+            )
+        }
+        saved[KEY_LOCATION] = keyOf(location)
         selectionAnchor = null
         applySettings(reload = false)
         load()
@@ -210,8 +274,16 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
             }
             result
                 .onSuccess { listed ->
-                    _state.update { it.copy(listed = listed, loading = false, error = null) }
-                    arrange()
+                    // הרשימה, המיון והמדורים מתפרסמים יחד: בלי הבהוב של "התיקייה ריקה" לפני המיון.
+                    val s = _state.value.copy(listed = listed)
+                    val (entries, sections) = withContext(Dispatchers.Default) { arranged(s) }
+                    _state.update {
+                        if (it.location != location) it
+                        else it.copy(
+                            listed = listed, entries = entries, sections = sections, loading = false, error = null,
+                            selection = it.selection.intersect(entries.map { e -> e.path }.toSet()),
+                        )
+                    }
                 }
                 .onFailure { e ->
                     _state.update {
@@ -233,16 +305,18 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** סינון, מיון וקיבוץ — מחוץ ל-main thread כי תיקייה יכולה להכיל אלפי פריטים. */
+    private fun arranged(s: BrowserState): Pair<List<Entry>, List<Section>> {
+        val filtered = s.filter?.takeIf { it.isNotBlank() }?.let { f ->
+            s.listed.filter { it.name.contains(f, ignoreCase = true) }
+        } ?: s.listed
+        val sorted = filtered.sortedFor(s.view.sort)
+        return sorted to if (s.view.showSections) sectionsFor(sorted, s.view.sort, System.currentTimeMillis(), ZoneId.systemDefault()) else emptyList()
+    }
+
     private fun arrange() {
         viewModelScope.launch {
             val s = _state.value
-            val (entries, sections) = withContext(Dispatchers.Default) {
-                val filtered = s.filter?.takeIf { it.isNotBlank() }?.let { f ->
-                    s.listed.filter { it.name.contains(f, ignoreCase = true) }
-                } ?: s.listed
-                val sorted = filtered.sortedFor(s.view.sort)
-                sorted to if (s.view.showSections) sectionsFor(sorted, s.view.sort, System.currentTimeMillis(), ZoneId.systemDefault()) else emptyList()
-            }
+            val (entries, sections) = withContext(Dispatchers.Default) { arranged(s) }
             _state.update { current ->
                 // תוצאה של רשימה ישנה (ניווט באמצע) לא דורסת את החדשה.
                 if (current.listed !== s.listed || current.filter != s.filter || current.view != s.view) current
@@ -324,10 +398,15 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
 
     fun copyToClipboard(paths: List<String>, cut: Boolean) {
         if (paths.isEmpty()) return
-        _state.update { it.copy(clipboard = Clipboard(paths, cut), selection = emptySet()) }
+        val clip = Clipboard(paths, cut)
+        _state.update { it.copy(clipboard = clip, selection = emptySet()) }
+        saveClipboard(clip)
     }
 
-    fun cancelClipboard() = _state.update { it.copy(clipboard = null) }
+    fun cancelClipboard() {
+        _state.update { it.copy(clipboard = null) }
+        saveClipboard(null)
+    }
 
     fun paste() {
         val s = _state.value
@@ -335,6 +414,7 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
         val target = s.folderPath ?: return
         transfers.enqueue(if (clip.cut) TransferKind.Move else TransferKind.Copy, clip.paths, target)
         _state.update { it.copy(clipboard = null) }
+        saveClipboard(null)
     }
 
     fun delete(paths: List<String>) {
@@ -348,7 +428,13 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
     fun createFile(name: String) = runOp { LocalFiles.createFile(requireNotNull(_state.value.folderPath), name) }
 
     fun rename(path: String, newName: String) = runOp {
-        LocalFiles.rename(path, newName).also { if (it.isSuccess) clearSelection() }
+        LocalFiles.rename(path, newName).onSuccess { newPath ->
+            clearSelection()
+            if (newPath != path) {
+                MediaScan.changed(getApplication(), listOf(path, newPath))
+                settings.update { it.relocated(path, newPath) }
+            }
+        }
     }
 
     private fun runOp(block: suspend () -> Result<String>) {
@@ -359,6 +445,14 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun emit(text: String) = emitEvent(BrowserEvent.Message(text))
+
+    private companion object {
+        const val KEY_LOCATION = "location"
+        const val KEY_CLIP_PATHS = "clipboard_paths"
+        const val KEY_CLIP_CUT = "clipboard_cut"
+        const val MEDIA_PREFIX = "media:"
+        const val MAX_SAVED_CLIP = 500
+    }
 
     private fun emitEvent(event: BrowserEvent) {
         _events.trySend(event)

@@ -1,6 +1,12 @@
 package com.idanck.nexplorer.ui.browser
 
+import android.Manifest
+import android.app.Activity
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,16 +15,21 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ContentPaste
 import androidx.compose.material.icons.outlined.CreateNewFolder
@@ -37,21 +48,30 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.AnnotatedString
+import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.idanck.nexplorer.core.Counts
 import com.idanck.nexplorer.core.Entry
 import com.idanck.nexplorer.core.SizeFormat
+import com.idanck.nexplorer.core.isolated
 import com.idanck.nexplorer.data.files.FileIntents
 import com.idanck.nexplorer.data.files.LocalFiles
 import com.idanck.nexplorer.data.files.StorageVolumes
@@ -81,6 +101,34 @@ private sealed interface BrowserDialog {
 }
 
 /**
+ * סיבוב מסך לא סוגר "שינוי שם" או "תיקייה חדשה". מחיקה לא נשמרת בכוונה: רשימה של אלפי נתיבים
+ * לא נכנסת ל-Bundle, ואישור מחיקה שנפתח מחדש לבד אחרי סיבוב הוא לא מה שרוצים ממילא.
+ */
+private val BrowserDialogSaver = Saver<BrowserDialog?, String>(
+    save = { dialog ->
+        when (dialog) {
+            BrowserDialog.NewFolder -> "new-folder"
+            BrowserDialog.NewFile -> "new-file"
+            BrowserDialog.ViewOptions -> "view"
+            BrowserDialog.Clipboard -> "clipboard"
+            is BrowserDialog.Rename -> "rename:" + dialog.entry.path
+            is BrowserDialog.Delete, null -> null
+        }
+    },
+    restore = { saved ->
+        when {
+            saved == "new-folder" -> BrowserDialog.NewFolder
+            saved == "new-file" -> BrowserDialog.NewFile
+            saved == "view" -> BrowserDialog.ViewOptions
+            saved == "clipboard" -> BrowserDialog.Clipboard
+            saved.startsWith("rename:") -> File(saved.removePrefix("rename:")).takeIf { it.exists() }
+                ?.let { BrowserDialog.Rename(LocalFiles.entryOf(it, countChildren = false)) }
+            else -> null
+        }
+    },
+)
+
+/**
  * המסך הראשי: מגירה (מקומות) ‹ רשימה (תוכן) ‹ כפתור צף ותפריט ⋮ (פעולות) — עיקרון 1 בשפת העיצוב.
  */
 @Composable
@@ -101,28 +149,62 @@ fun BrowserScreen(
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
 
-    var fabOpen by remember { mutableStateOf(false) }
+    var fabOpen by rememberSaveable { mutableStateOf(false) }
     var overflowOpen by remember { mutableStateOf(false) }
     var itemMenuOpen by remember { mutableStateOf(false) }
-    var dialog by remember { mutableStateOf<BrowserDialog?>(null) }
-    var showTransfers by remember { mutableStateOf(false) }
+    var dialog by rememberSaveable(stateSaver = BrowserDialogSaver) { mutableStateOf<BrowserDialog?>(null) }
+    var showTransfers by rememberSaveable { mutableStateOf(false) }
     var properties by remember { mutableStateOf<List<Entry>?>(null) }
+    val canPin = remember(context) { FileIntents.canPinShortcut(context) }
 
     fun message(text: String) {
         scope.launch { snackbar.showSnackbar(text) }
     }
 
+    // התראת ההתקדמות של העברה ארוכה (Android 13+). נשאלת פעם אחת, ברגע שיש בשבילה סיבה.
+    val notifyPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    var askedNotify by rememberSaveable { mutableStateOf(false) }
+    fun beforeTransfer() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        if (askedNotify) return
+        askedNotify = true
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            notifyPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
     LaunchedEffect(vm) {
         vm.events.collect { event ->
             when (event) {
-                is BrowserEvent.Message -> snackbar.showSnackbar(event.text)
+                // showSnackbar ממתין עד שההודעה נעלמת — בלי launch, פתיחת קובץ הייתה מחכה מאחוריה.
+                is BrowserEvent.Message -> launch { snackbar.showSnackbar(event.text) }
                 is BrowserEvent.OpenFile -> if (!FileIntents.open(context, event.entry.path, event.entry.name)) {
-                    snackbar.showSnackbar("אין אפליקציה שפותחת קבצים מסוג זה")
+                    launch { snackbar.showSnackbar("אין אפליקציה שפותחת קבצים מסוג זה") }
                 }
             }
         }
     }
     LaunchedEffect(drawerState.isOpen) { if (drawerState.isOpen) vm.refreshVolumes() }
+    // הבאנר כחול בשתי הערכות: כשהמגירה פתוחה, אייקוני שורת המצב בהירים (בערכה הבהירה הם כהים ונבלעים).
+    val view = LocalView.current
+    val drawerShown = drawerState.targetValue == DrawerValue.Open
+    DisposableEffect(drawerShown) {
+        val window = (view.context as? Activity)?.window
+        val controller = window?.let { WindowCompat.getInsetsController(it, view) }
+        val before = controller?.isAppearanceLightStatusBars
+        if (drawerShown) controller?.isAppearanceLightStatusBars = false
+        onDispose { if (controller != null && before != null) controller.isAppearanceLightStatusBars = before }
+    }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.onResume() }
+    val listActions = remember(vm) {
+        FileListActions(
+            onClick = vm::open,
+            onLongClick = { vm.longPress(it.path) },
+            onIconClick = { vm.toggle(it.path) },
+            scrollFor = vm::scrollFor,
+            onScrolled = vm::saveScroll,
+        )
+    }
 
     BackHandler(enabled = fabOpen || drawerState.isOpen || state.filter != null || state.inSelection || !state.isAtRoot) {
         when {
@@ -168,7 +250,14 @@ fun BrowserScreen(
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
         ) { scaffoldPadding ->
             Box(Modifier.fillMaxSize().padding(scaffoldPadding)) {
-                Column(Modifier.fillMaxSize().statusBarsPadding()) {
+                Column(
+                    Modifier
+                        .fillMaxSize()
+                        .statusBarsPadding()
+                        // לרוחב: סרגל ניווט צדדי וחריץ מצלמה; ומקלדת הסינון לא מסתירה את סוף הרשימה.
+                        .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
+                        .imePadding(),
+                ) {
                     if (state.inSelection) {
                         SelectionHeader(
                             count = state.selection.size,
@@ -195,8 +284,8 @@ fun BrowserScreen(
                                         state = state,
                                         vm = vm,
                                         activeTransfers = activeTransfers,
-                                        canPin = FileIntents.canPinShortcut(context),
-                                        onProperties = { state.folderPath?.let { properties = listOf(LocalFiles.entryOf(File(it))) } },
+                                        canPin = canPin,
+                                        onProperties = { state.folderPath?.let { properties = listOf(LocalFiles.entryOf(File(it), countChildren = false)) } },
                                         onViewOptions = { dialog = BrowserDialog.ViewOptions },
                                         onPinShortcut = {
                                             state.folderPath?.let { path ->
@@ -226,11 +315,7 @@ fun BrowserScreen(
                         val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
                         FileList(
                             state = state,
-                            actions = FileListActions(
-                                onClick = vm::open,
-                                onLongClick = { vm.longPress(it.path) },
-                                onIconClick = { vm.toggle(it.path) },
-                            ),
+                            actions = listActions,
                             contentPadding = PaddingValues(
                                 top = NexplorerDimens.Space2,
                                 bottom = if (state.clipboard != null) NexplorerDimens.Space4 else navBottom + NexplorerDimens.Fab + NexplorerDimens.FabMargin * 2,
@@ -240,8 +325,15 @@ fun BrowserScreen(
                     if (state.clipboard != null && !state.inSelection) {
                         PasteBar(
                             count = state.clipboard?.paths?.size ?: 0,
-                            canPaste = state.location is Location.Folder,
-                            onPaste = vm::paste,
+                            blockedReason = when {
+                                state.location !is Location.Folder -> "פתח תיקייה כדי להדביק"
+                                state.volume?.writable == false -> "אין הרשאת כתיבה כאן"
+                                else -> null
+                            },
+                            onPaste = {
+                                beforeTransfer()
+                                vm.paste()
+                            },
                             onNewFolder = { dialog = BrowserDialog.NewFolder },
                             onCancel = vm::cancelClipboard,
                         )
@@ -257,11 +349,18 @@ fun BrowserScreen(
                             val files = selected.filter { !it.isDirectory }
                             when {
                                 files.isEmpty() -> message("אי אפשר לשתף תיקיות — בחר קבצים")
+                                // כל URI עובר שלוש פעמים ב-Intent; אלפים חורגים ממגבלת ה-Binder ומפילים את השליחה.
+                                files.size > FileIntents.MAX_SHARE -> message("אפשר לשתף עד ${FileIntents.MAX_SHARE} קבצים בבת אחת")
                                 FileIntents.share(context, files.map { it.path to it.name }) == 0 -> message("אין אפליקציה לשיתוף")
                             }
                         },
                         onDelete = {
-                            if (settings.confirmDelete) dialog = BrowserDialog.Delete(selected) else vm.delete(selected.map { it.path })
+                            if (settings.confirmDelete) {
+                                dialog = BrowserDialog.Delete(selected)
+                            } else {
+                                beforeTransfer()
+                                vm.delete(selected.map { it.path })
+                            }
                         },
                         onCopy = { vm.copyToClipboard(selected.map { it.path }, cut = false) },
                         onCut = { vm.copyToClipboard(selected.map { it.path }, cut = true) },
@@ -273,7 +372,7 @@ fun BrowserScreen(
                                     single = single != null,
                                     isFolder = single?.isDirectory == true,
                                     isFavorite = single != null && single.path in state.favorites,
-                                    canPinShortcut = FileIntents.canPinShortcut(context),
+                                    canPinShortcut = canPin,
                                     onOpenWith = {
                                         single?.let { if (!FileIntents.openWith(context, it.path, it.name)) message("אין אפליקציה מתאימה") }
                                     },
@@ -324,7 +423,11 @@ fun BrowserScreen(
         is BrowserDialog.Rename -> NameDialog("שינוי שם", "שנה", d.entry.name, onConfirm = { vm.rename(d.entry.path, it); dialog = null }, onDismiss = { dialog = null })
         is BrowserDialog.Delete -> ConfirmDeleteDialog(
             d.entries.map { it.name },
-            onConfirm = { vm.delete(d.entries.map { it.path }); dialog = null },
+            onConfirm = {
+                beforeTransfer()
+                vm.delete(d.entries.map { it.path })
+                dialog = null
+            },
             onDismiss = { dialog = null },
         )
         BrowserDialog.ViewOptions -> ViewOptionsDialog(
@@ -365,7 +468,7 @@ private fun summary(state: BrowserState): String = when (state.location) {
     is Location.Folder -> {
         val folders = state.listed.count { it.isDirectory }
         val files = state.listed.size - folders
-        val free = state.volume?.let { " · ${SizeFormat.short(it.freeBytes)} פנויים" }.orEmpty()
+        val free = state.volume?.let { " · ${SizeFormat.short(it.freeBytes).isolated()} פנויים" }.orEmpty()
         "${Counts.folders(folders)} · ${Counts.files(files)}$free"
     }
 }
@@ -408,7 +511,8 @@ private fun overflowModel(
 
 /** סרגל "הדבק כאן (N)" (לוח "הדבקה"): הדבקה, תיקייה חדשה ליעד, ביטול. */
 @Composable
-private fun PasteBar(count: Int, canPaste: Boolean, onPaste: () -> Unit, onNewFolder: () -> Unit, onCancel: () -> Unit) {
+private fun PasteBar(count: Int, blockedReason: String?, onPaste: () -> Unit, onNewFolder: () -> Unit, onCancel: () -> Unit) {
+    val canPaste = blockedReason == null
     Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
         HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
         Row(
@@ -425,7 +529,7 @@ private fun PasteBar(count: Int, canPaste: Boolean, onPaste: () -> Unit, onNewFo
                 shape = NexplorerShape.Pill,
                 modifier = Modifier.weight(1f).height(NexplorerDimens.BottomBarButton),
             ) {
-                Text(if (canPaste) "הדבק כאן ($count)" else "פתח תיקייה כדי להדביק", style = MaterialTheme.typography.labelLarge)
+                Text(blockedReason ?: "הדבק כאן ($count)", style = MaterialTheme.typography.labelLarge)
                 if (canPaste) {
                     Spacer(Modifier.width(NexplorerDimens.Space2))
                     Icon(Icons.Outlined.ContentPaste, contentDescription = null, modifier = Modifier.size(NexplorerDimens.Space5 - NexplorerDimens.Space1))
