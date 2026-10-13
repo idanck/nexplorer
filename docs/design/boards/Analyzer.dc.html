@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>nexplorer — מנתח אחסון</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#2B6FEE}a:hover{color:#1E4DA8}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; direction: rtl; font-family: 'Noto Sans Hebrew', system-ui, sans-serif; color: #16202A; background: #F3F5F7; display: flex; flex-direction: column; overflow: hidden">
+
+  <div style="display: flex; align-items: center; gap: 8px; padding: 14px 12px 8px 12px">
+    <button aria-label="חזרה" style="width: 44px; height: 44px; border: 0; background: transparent; border-radius: 22px; display: flex; align-items: center; justify-content: center; color: #16202A">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+    </button>
+    <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+      <div style="font-size: 20px; font-weight: 600; line-height: 24px">מנתח אחסון</div>
+      <div style="font-size: 13px; color: #52606D; line-height: 16px">זיכרון פנימי · נסרק לפני 2 דק׳</div>
+    </div>
+    <button style="height: 36px; padding: 0 14px; border: 0; border-radius: 999px; background: #E6EAEE; color: #16202A; font-family: inherit; font-size: 13px; font-weight: 600">NAS ▾</button>
+  </div>
+
+  <div style="flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 12px; padding: 8px 16px 16px 16px">
+
+    <!-- כרטיס סיכום -->
+    <div style="background: #FFFFFF; border-radius: 24px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+      <div style="display: flex; align-items: baseline; justify-content: space-between">
+        <div style="display: flex; align-items: baseline; gap: 6px"><span style="font-size: 32px; font-weight: 700; font-family: 'JetBrains Mono', monospace; direction: ltr">133</span><span style="font-size: 14px; color: #52606D">GB בשימוש מתוך 222</span></div>
+        <span style="font-size: 13px; font-weight: 600; color: #1E4DA8; background: #D5E3FE; padding: 4px 10px; border-radius: 999px">60%</span>
+      </div>
+      <div style="display: flex; height: 14px; border-radius: 7px; overflow: hidden; direction: ltr; gap: 2px">
+        <div style="width: 34%; background: #2B6FEE"></div>
+        <div style="width: 22%; background: #7FB0FF"></div>
+        <div style="width: 15%; background: #B4640B"></div>
+        <div style="width: 9%; background: #8B98A5"></div>
+        <div style="width: 6%; background: #C7CED5"></div>
+        <div style="width: 14%; background: #EEF1F4"></div>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; font-size: 13px">
+        <div style="display: flex; align-items: center; gap: 8px"><span style="width: 10px; height: 10px; border-radius: 3px; background: #2B6FEE"></span><span style="flex: 1">וידאו</span><span style="font-family: 'JetBrains Mono', monospace; color: #52606D; direction: ltr">45.2 GB</span></div>
+        <div style="display: flex; align-items: center; gap: 8px"><span style="width: 10px; height: 10px; border-radius: 3px; background: #7FB0FF"></span><span style="flex: 1">תמונות</span><span style="font-family: 'JetBrains Mono', monospace; color: #52606D; direction: ltr">29.3 GB</span></div>
+        <div style="display: flex; align-items: center; gap: 8px"><span style="width: 10px; height: 10px; border-radius: 3px; background: #B4640B"></span><span style="flex: 1">אפליקציות</span><span style="font-family: 'JetBrains Mono', monospace; color: #52606D; direction: ltr">19.9 GB</span></div>
+        <div style="display: flex; align-items: center; gap: 8px"><span style="width: 10px; height: 10px; border-radius: 3px; background: #8B98A5"></span><span style="flex: 1">מסמכים</span><span style="font-family: 'JetBrains Mono', monospace; color: #52606D; direction: ltr">12.0 GB</span></div>
+        <div style="display: flex; align-items: center; gap: 8px"><span style="width: 10px; height: 10px; border-radius: 3px; background: #C7CED5"></span><span style="flex: 1">אודיו</span><span style="font-family: 'JetBrains Mono', monospace; color: #52606D; direction: ltr">8.0 GB</span></div>
+        <div style="display: flex; align-items: center; gap: 8px"><span style="width: 10px; height: 10px; border-radius: 3px; background: #EEF1F4; border: 1px solid #C7CED5"></span><span style="flex: 1">אחר</span><span style="font-family: 'JetBrains Mono', monospace; color: #52606D; direction: ltr">18.6 GB</span></div>
+      </div>
+    </div>
+
+    <!-- שלושת הממצאים -->
+    <div style="font-size: 12px; font-weight: 600; color: #52606D; letter-spacing: 0.04em; padding: 4px 4px 0 4px">מה אפשר לפנות</div>
+
+    <a href="Select.dc.html" style="text-decoration: none; color: inherit; background: #FFFFFF; border-radius: 20px; padding: 14px 16px; display: flex; align-items: center; gap: 14px">
+      <div style="width: 44px; height: 44px; border-radius: 14px; background: #FBE7C9; color: #5C3203; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg></div>
+      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px"><div style="font-size: 16px; font-weight: 600">כפילויות</div><div style="font-size: 13px; color: #52606D">12 קבוצות · ניתן לפנות <span style="font-family: 'JetBrains Mono', monospace; direction: ltr; unicode-bidi: isolate">1.4 GB</span></div></div>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9AA7B2" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+    </a>
+
+    <div style="background: #FFFFFF; border-radius: 20px; padding: 14px 16px; display: flex; align-items: center; gap: 14px">
+      <div style="width: 44px; height: 44px; border-radius: 14px; background: #D5E3FE; color: #1E4DA8; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg></div>
+      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px"><div style="font-size: 16px; font-weight: 600">קבצים גדולים</div><div style="font-size: 13px; color: #52606D">20 הגדולים · <span style="font-family: 'JetBrains Mono', monospace; direction: ltr; unicode-bidi: isolate">31.7 GB</span> יחד</div></div>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9AA7B2" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+    </div>
+
+    <div style="background: #FFFFFF; border-radius: 20px; padding: 14px 16px; display: flex; align-items: center; gap: 14px">
+      <div style="width: 44px; height: 44px; border-radius: 14px; background: #E6EAEE; color: #16202A; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></div>
+      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px"><div style="font-size: 16px; font-weight: 600">זבל ומטמון</div><div style="font-size: 13px; color: #52606D">תיקיות cache, קבצי .tmp, הורדות שבורות · <span style="font-family: 'JetBrains Mono', monospace; direction: ltr; unicode-bidi: isolate">3.8 GB</span></div></div>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9AA7B2" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+    </div>
+
+    <!-- 5 התיקיות הגדולות -->
+    <div style="font-size: 12px; font-weight: 600; color: #52606D; letter-spacing: 0.04em; padding: 4px 4px 0 4px">תיקיות גדולות</div>
+    <div style="background: #FFFFFF; border-radius: 20px; padding: 6px 16px; display: flex; flex-direction: column">
+      <div style="display: flex; align-items: center; gap: 12px; min-height: 48px"><span style="flex: 1; font-size: 15px; font-weight: 500; direction: ltr; unicode-bidi: isolate; text-align: start">DCIM/Camera</span><div style="width: 90px; height: 6px; border-radius: 3px; background: #E6EAEE; overflow: hidden; direction: ltr"><div style="width: 100%; height: 6px; background: #2B6FEE"></div></div><span style="width: 64px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #52606D; direction: ltr; text-align: end">38.1 GB</span></div>
+      <div style="display: flex; align-items: center; gap: 12px; min-height: 48px"><span style="flex: 1; font-size: 15px; font-weight: 500; direction: ltr; unicode-bidi: isolate; text-align: start">Movies</span><div style="width: 90px; height: 6px; border-radius: 3px; background: #E6EAEE; overflow: hidden; direction: ltr"><div style="width: 58%; height: 6px; background: #2B6FEE"></div></div><span style="width: 64px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #52606D; direction: ltr; text-align: end">22.0 GB</span></div>
+      <div style="display: flex; align-items: center; gap: 12px; min-height: 48px"><span style="flex: 1; font-size: 15px; font-weight: 500; direction: ltr; unicode-bidi: isolate; text-align: start">Download</span><div style="width: 90px; height: 6px; border-radius: 3px; background: #E6EAEE; overflow: hidden; direction: ltr"><div style="width: 31%; height: 6px; background: #2B6FEE"></div></div><span style="width: 64px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #52606D; direction: ltr; text-align: end">11.9 GB</span></div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

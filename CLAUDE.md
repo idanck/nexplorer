@@ -10,9 +10,13 @@
 
 ## מצב ותיעוד
 
-שלב מחקר — אין קוד עדיין. לפני כל עבודה קרא את `docs/README.md`.
+שפת העיצוב אושרה ונמצאת בקוד; אין עדיין לוגיקת קבצים. לפני כל עבודה קרא את `docs/README.md`.
+- **שפת העיצוב של nexplorer (מחייבת):** `docs/design/design-language.md` + `docs/design/tokens.json`. צילומי המסכים ב-`docs/design/screens/` — בנה מסכים לפיהם.
+- הקוד של העיצוב: `app/src/main/kotlin/com/idanck/nexplorer/ui/theme/`. **אל תכתוב hex או גדלים בתוך מסכים** — רק דרך `MaterialTheme`, `NexplorerTheme.colors`, `NexplorerDimens`, `NexplorerShape`.
+- שינוי ערך עיצוב = עדכון `tokens.json` + הקוד + `design-language.md` באותו PR.
+- שמות קבצים ונתיבים: `FileNameTextStyle` / `MonoTextStyle` (LTR מבודד). הכפתור הצף: עיגול, `FabPosition.End`.
 - מפת יכולות Solid Explorer: `docs/research/02-features.md`
-- שפת עיצוב + טוקנים: `docs/research/05-design-language.md`, `docs/design/tokens.json`
+- מחקר שפת העיצוב של Solid (השראה בלבד): `docs/research/05-design-language.md`, `docs/research/solid-tokens.json`
 - החלטות פתוחות (אין לבחור במקום עידן): `docs/research/08-open-decisions.md`
 - אין להשתמש בשם, לוגו או נכסים של Solid Explorer / NeatBytes בקוד או במשאבים.
 

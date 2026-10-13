@@ -1,6 +1,18 @@
 <div dir="rtl">
 
-# תיעוד מחקר — Solid Explorer
+# תיעוד
+
+## שפת העיצוב של nexplorer
+
+| מסמך | מה יש בו |
+|---|---|
+| [שפת העיצוב](design/design-language.md) | "סלע ואות": עקרונות מבנה, צבע, טיפוגרפיה, צורות, 15 מסכים, יומן החלטות, פתוח |
+| [tokens.json](design/tokens.json) | הטוקנים — מקור האמת לקוד ב-`app/.../ui/theme/` |
+| [screens/](design/screens/) | צילום של כל לוח מהקנבס |
+| [boards/](design/boards/) | מקורות ה-HTML של הלוחות (ערכים מדויקים) |
+| [fonts/](design/fonts/) | רישיונות OFL של הפונטים |
+
+## מחקר — Solid Explorer
 
 מיפוי של Solid Explorer File Manager (NeatBytes) כהכנה לבניית nexplorer.
 נאסף ב-13/10/2026 מתוך 4 צילומי מסך של עידן (Samsung, ממשק בעברית, גרסה 3.6.x) ומקורות פומביים.
@@ -16,7 +28,7 @@
 | 7 | [מיפוי טכני](research/07-technical-mapping.md) | יכולת ← API / ספריות אנדרואיד אפשריות |
 | 8 | [החלטות פתוחות](research/08-open-decisions.md) | החלטות שעידן צריך לקבל — אפשרויות, יתרונות וחסרונות |
 | — | [מקורות](research/sources.md) | כל הקישורים |
-| — | [טוקני עיצוב](design/tokens.json) | צבעים ומידות במבנה JSON |
+| — | [טוקני Solid](research/solid-tokens.json) | הצבעים והמידות שנדגמו מ-Solid במבנה JSON |
 | — | [צילומי מסך](screenshots/) | 4 המסכים המקוריים (מוקטנים ל-432px, WebP) |
 
 ## מוסכמות במסמכים

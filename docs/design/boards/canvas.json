@@ -1,0 +1,160 @@
+{
+  "v": 3,
+  "createdOnFiles": {
+    "v": 1,
+    "at": "2026-10-13T08:40:00Z"
+  },
+  "title": "nexplorer — שפת עיצוב",
+  "launch": {
+    "view": "canvas"
+  },
+  "pages": [],
+  "boards": {
+    "Tokens.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1280,
+      "h": 1180,
+      "title": "טוקנים ורכיבים"
+    },
+    "Fonts.dc.html": {
+      "x": 1360,
+      "y": 0,
+      "w": 1100,
+      "h": 1180,
+      "title": "השוואת פונטים"
+    },
+    "Main.dc.html": {
+      "x": 0,
+      "y": 1540,
+      "w": 390,
+      "h": 844,
+      "title": "מסך ראשי — רשימה"
+    },
+    "Drawer.dc.html": {
+      "x": 470,
+      "y": 1540,
+      "w": 390,
+      "h": 844,
+      "title": "מגירת מקומות — באנר"
+    },
+    "Select.dc.html": {
+      "x": 940,
+      "y": 1540,
+      "w": 390,
+      "h": 844,
+      "title": "מצב בחירה"
+    },
+    "Transfer.dc.html": {
+      "x": 1410,
+      "y": 1540,
+      "w": 390,
+      "h": 844,
+      "title": "הדבקה + מגש העברות"
+    },
+    "Analyzer.dc.html": {
+      "x": 1880,
+      "y": 1540,
+      "w": 390,
+      "h": 844,
+      "title": "מנתח אחסון"
+    },
+    "Connect.dc.html": {
+      "x": 2350,
+      "y": 1540,
+      "w": 390,
+      "h": 844,
+      "title": "חיבור חדש"
+    },
+    "ViewOptions.dc.html": {
+      "x": 2820,
+      "y": 1540,
+      "w": 390,
+      "h": 844,
+      "title": "אפשרויות תצוגה"
+    },
+    "Settings.dc.html": {
+      "x": 3290,
+      "y": 1540,
+      "w": 390,
+      "h": 844,
+      "title": "הגדרות"
+    },
+    "Menu.dc.html": {
+      "x": 3760,
+      "y": 1540,
+      "w": 390,
+      "h": 844,
+      "title": "תפריט פעולות (כהה)"
+    },
+    "Search.dc.html": {
+      "x": 4230,
+      "y": 1540,
+      "w": 390,
+      "h": 844,
+      "title": "חיפוש"
+    },
+    "NewFab.dc.html": {
+      "x": 4700,
+      "y": 1540,
+      "w": 390,
+      "h": 844,
+      "title": "כפתור צף — תפריט חדש"
+    },
+    "Dark.dc.html": {
+      "x": 0,
+      "y": 2760,
+      "w": 390,
+      "h": 844,
+      "title": "מצב כהה"
+    },
+    "Tablet.dc.html": {
+      "x": 470,
+      "y": 2760,
+      "w": 1024,
+      "h": 720,
+      "title": "טאבלט — שני חלונות"
+    }
+  },
+  "order": [
+    "Tokens.dc.html",
+    "Fonts.dc.html",
+    "Main.dc.html",
+    "Drawer.dc.html",
+    "Select.dc.html",
+    "Transfer.dc.html",
+    "Analyzer.dc.html",
+    "Connect.dc.html",
+    "ViewOptions.dc.html",
+    "Settings.dc.html",
+    "Menu.dc.html",
+    "Search.dc.html",
+    "NewFab.dc.html",
+    "Dark.dc.html",
+    "Tablet.dc.html"
+  ],
+  "notes": {
+    "t1": {
+      "x": 0,
+      "y": -260,
+      "text": "1 · שפת העיצוב — סלע ואות",
+      "kind": "title1",
+      "maxW": 2460
+    },
+    "t2": {
+      "x": 0,
+      "y": 1280,
+      "text": "2 · שפת המבנה — מסכי טלפון (390×844, RTL)",
+      "kind": "title1",
+      "maxW": 5090
+    },
+    "t3": {
+      "x": 0,
+      "y": 2500,
+      "text": "3 · מצב כהה ופריסה לטאבלט",
+      "kind": "title1",
+      "maxW": 1494
+    }
+  },
+  "designSystems": []
+}
