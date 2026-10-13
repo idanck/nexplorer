@@ -21,6 +21,15 @@ function plain(status, text) {
   return new Response(text, { status, headers: harden(new Headers()) });
 }
 
+// Constant-time for equal lengths, so the token can't be guessed byte by byte from response times.
+function sameSecret(given, expected) {
+  const encoder = new TextEncoder();
+  const a = encoder.encode(given);
+  const b = encoder.encode(expected);
+  if (a.byteLength !== b.byteLength) return false;
+  return crypto.subtle.timingSafeEqual(a, b);
+}
+
 function keyFor(path) {
   if (path === "/latest.json") return "latest.json";
   if (path.startsWith("/apk/")) return path.slice(1);
@@ -30,12 +39,18 @@ function keyFor(path) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    const path = decodeURIComponent(url.pathname);
+    let path;
+    try {
+      path = decodeURIComponent(url.pathname);
+    } catch {
+      // A malformed escape (e.g. "%E0%A4%A") is the client's mistake, not a 500.
+      return plain(400, "bad path");
+    }
 
     if (request.method === "PUT" && path.startsWith("/publish/")) {
       const token = env.UPLOAD_TOKEN;
       const auth = request.headers.get("authorization") || "";
-      if (!token || auth !== "Bearer " + token) return plain(401, "unauthorized");
+      if (!token || !sameSecret(auth, "Bearer " + token)) return plain(401, "unauthorized");
       const key = path.slice("/publish/".length);
       if (!SAFE.test(key) || key.includes("..") || !keyFor("/" + key)) return plain(400, "bad key");
       const contentType = key.endsWith(".apk") ? APK_TYPE : "application/json; charset=utf-8";
