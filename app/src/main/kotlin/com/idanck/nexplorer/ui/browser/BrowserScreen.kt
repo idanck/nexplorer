@@ -117,7 +117,9 @@ private sealed interface BrowserDialog {
     data class BatchRename(val entries: List<Entry>) : BrowserDialog
     data class Encrypt(val entries: List<Entry>) : BrowserDialog
     data class Decrypt(val entries: List<Entry>) : BrowserDialog
-    data class OpenEncrypted(val entry: Entry) : BrowserDialog
+    data class OpenEncrypted(val entry: Entry, val inVault: Boolean = false) : BrowserDialog
+    data object NewVault : BrowserDialog
+    data class UnlockVault(val vault: Entry, val then: String) : BrowserDialog
 }
 
 /**
@@ -134,7 +136,8 @@ private val BrowserDialogSaver = Saver<BrowserDialog?, String>(
             is BrowserDialog.Rename -> "rename:" + dialog.entry.path
             // רשימות (ובחלונות החילוץ וההצפנה — סיסמה) לא נשמרות ב-Bundle.
             is BrowserDialog.Delete, is BrowserDialog.Compress, is BrowserDialog.Extract, is BrowserDialog.BatchRename,
-            is BrowserDialog.Encrypt, is BrowserDialog.Decrypt, is BrowserDialog.OpenEncrypted, null -> null
+            is BrowserDialog.Encrypt, is BrowserDialog.Decrypt, is BrowserDialog.OpenEncrypted,
+            BrowserDialog.NewVault, is BrowserDialog.UnlockVault, null -> null
         }
     },
     restore = { saved ->
@@ -219,7 +222,8 @@ fun BrowserScreen(
                 }
                 is BrowserEvent.OpenArchive -> dialog = BrowserDialog.Extract(event.entry)
                 is BrowserEvent.OpenApk -> apk = event.entry
-                is BrowserEvent.OpenEncrypted -> dialog = BrowserDialog.OpenEncrypted(event.entry)
+                is BrowserEvent.OpenEncrypted -> dialog = BrowserDialog.OpenEncrypted(event.entry, event.inVault)
+                is BrowserEvent.UnlockVault -> dialog = BrowserDialog.UnlockVault(event.vault, event.then)
             }
         }
     }
@@ -545,7 +549,9 @@ fun BrowserScreen(
                             onToggle = { fabOpen = !fabOpen },
                             onNewFolder = { dialog = BrowserDialog.NewFolder },
                             onNewFile = { dialog = BrowserDialog.NewFile },
-                            onUnavailable = { what -> message("$what — יגיע בשלב הבא") },
+                            onNewVault = { dialog = BrowserDialog.NewVault },
+                            inVault = state.vaultRoot != null,
+                            onUnavailable = { what -> message(what) },
                         )
                     }
                 }
@@ -656,6 +662,19 @@ fun BrowserScreen(
                 vm.decrypt(listOf(d.entry.path), password)
                 dialog = null
             },
+            onDismiss = { dialog = null },
+            passwordless = d.inVault,
+        )
+        BrowserDialog.NewVault -> NewVaultDialog(
+            onConfirm = { name, password ->
+                vm.createVault(name, password)
+                dialog = null
+            },
+            onDismiss = { dialog = null },
+        )
+        is BrowserDialog.UnlockVault -> UnlockVaultDialog(
+            name = d.vault.name,
+            onUnlock = { password -> vm.unlockVault(d.vault, d.then, password) },
             onDismiss = { dialog = null },
         )
         is BrowserDialog.BatchRename -> BatchRenameDialog(
@@ -809,6 +828,8 @@ private fun overflowModel(
         onToggleHidden = { vm.setView(state.view.copy(showHidden = !state.view.showHidden), state.viewIsFolderScoped) },
         onToggleFolderSizes = { vm.setView(state.view.copy(showFolderSizes = !state.view.showFolderSizes), state.viewIsFolderScoped) },
         onHideFolder = vm::hideCurrentFolder,
+        canLockVault = state.vaultRoot != null,
+        onLockVault = vm::lockVault,
         onToggleFavorite = { vm.toggleFavorite() },
         onPinShortcut = onPinShortcut,
         onTransfers = onTransfers,

@@ -135,6 +135,9 @@ class OverflowMenuModel(
     val onRefresh: () -> Unit,
     val onSettings: () -> Unit,
     val onAnalyzer: () -> Unit,
+    /** בתוך תיקייה מוצפנת פתוחה. */
+    val canLockVault: Boolean = false,
+    val onLockVault: () -> Unit = {},
 )
 
 @Composable
@@ -168,6 +171,7 @@ fun OverflowMenu(expanded: Boolean, onDismiss: () -> Unit, model: OverflowMenuMo
         }
         MenuRow("בחר הכל", Icons.Outlined.SelectAll, act(model.onSelectAll), trailing = { TrailingText(model.count.toString()) }, enabled = model.count > 0)
         if (model.isFolder) MenuRow("מאפייני התיקייה", Icons.Outlined.Info, act(model.onProperties))
+        if (model.canLockVault) MenuRow("נעל תיקייה מוצפנת", Icons.Outlined.Lock, act(model.onLockVault))
         MenuRow("רענן", Icons.Outlined.Refresh, act(model.onRefresh))
         MenuRow("מנתח אחסון", Icons.Outlined.DonutLarge, act(model.onAnalyzer))
         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
@@ -260,7 +264,8 @@ fun ItemMenu(expanded: Boolean, onDismiss: () -> Unit, model: ItemMenuModel) {
 
 /**
  * הכפתור הצף ותפריט "חדש" (לוח "תפריט חדש"): עיגול בצד הסוף; בפתיחה — עמעום, הכפתור גדל ל-64
- * ומתחלף ל-✕, והגלולות נערמות מעליו. תיקייה מוצפנת וחיבור רשת עוד לא קיימים — מוצגים מעומעמים.
+ * ומתחלף ל-✕, והגלולות נערמות מעליו. חיבור רשת עוד לא קיים — מוצג מעומעם. בתוך תיקייה מוצפנת ([inVault])
+ * "קובץ חדש" (היה נשמר לא מוצפן) ו"תיקייה מוצפנת" (אין קינון) מעומעמים, ו-[onUnavailable] מקבל את ההסבר.
  */
 @Composable
 fun BoxScope.NewFab(
@@ -268,6 +273,8 @@ fun BoxScope.NewFab(
     onToggle: () -> Unit,
     onNewFolder: () -> Unit,
     onNewFile: () -> Unit,
+    onNewVault: () -> Unit,
+    inVault: Boolean,
     onUnavailable: (String) -> Unit,
 ) {
     AnimatedVisibility(visible = open, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.matchParentSize()) {
@@ -289,9 +296,13 @@ fun BoxScope.NewFab(
         AnimatedVisibility(visible = open, enter = fadeIn(), exit = fadeOut()) {
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(NexplorerDimens.Space3)) {
                 SpeedDialPill("תיקייה חדשה", Icons.Outlined.CreateNewFolder) { onToggle(); onNewFolder() }
-                SpeedDialPill("קובץ חדש", Icons.AutoMirrored.Outlined.NoteAdd) { onToggle(); onNewFile() }
-                SpeedDialPill("תיקייה מוצפנת", Icons.Outlined.Lock, available = false) { onUnavailable("תיקייה מוצפנת") }
-                SpeedDialPill("חיבור רשת / ענן", Icons.Outlined.Cloud, available = false) { onUnavailable("חיבור רשת וענן") }
+                SpeedDialPill("קובץ חדש", Icons.AutoMirrored.Outlined.NoteAdd, available = !inVault) {
+                    if (inVault) onUnavailable("בתיקייה מוצפנת אין קובץ חדש — הוא היה נשמר לא מוצפן. העתק לכאן קבצים קיימים") else { onToggle(); onNewFile() }
+                }
+                SpeedDialPill("תיקייה מוצפנת", Icons.Outlined.Lock, available = !inVault) {
+                    if (inVault) onUnavailable("אי אפשר ליצור תיקייה מוצפנת בתוך תיקייה מוצפנת") else { onToggle(); onNewVault() }
+                }
+                SpeedDialPill("חיבור רשת / ענן", Icons.Outlined.Cloud, available = false) { onUnavailable("חיבור רשת וענן — יגיע בשלב הבא") }
                 Spacer(Modifier.height(NexplorerDimens.Space1))
             }
         }

@@ -72,6 +72,7 @@ run_class Phase3Test
 run_class Phase3bTest
 run_class Phase4Test
 run_class Phase4bTest
+run_class Phase4cTest
 # Phase2bTest מדמה טאבלט ו-Phase3bTest מסובב; אם התהליך קרס לפני tearDown — שהמונקי ירוץ על המסך הרגיל.
 adb shell wm size reset || true
 adb shell wm density reset || true

@@ -6,6 +6,7 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.decode.VideoFrameDecoder
 import com.idanck.nexplorer.data.crypto.EncryptedPreview
+import com.idanck.nexplorer.data.crypto.VaultKeys
 import com.idanck.nexplorer.data.settings.SettingsRepository
 import com.idanck.nexplorer.data.transfer.TransferManager
 import com.idanck.nexplorer.ui.keys.KeyBus
@@ -23,7 +24,9 @@ class AppContainer(app: Application) {
         SupervisorJob() + Dispatchers.Default + CoroutineExceptionHandler { _, e -> Log.w("nexplorer", "background work failed", e) },
     )
     val settings = SettingsRepository(app, scope)
-    val transfers = TransferManager(app, scope)
+    /** תיקיות מוצפנות שנפתחו — בזיכרון בלבד. */
+    val vaults = VaultKeys()
+    val transfers = TransferManager(app, scope, vaults)
     val updates = UpdateManager(app, settings, transfers)
     val keys = KeyBus()
 }

@@ -188,21 +188,41 @@ fun EncryptDialog(count: Int, onConfirm: (CharArray) -> Unit, onDismiss: () -> U
  * קובץ מוצפן (הקשה עליו) או "פענח" מהבחירה. "פתח" מפענח עותק זמני ופותח אותו בלי לשנות את הקובץ;
  * "פענח" מחזיר את המקור במקומו, בתור ההעברות. [onOpen] — null כשאין מה לפתוח (כמה פריטים, תיקייה);
  * מחזיר הודעת שגיאה, או null כשהקובץ נפתח. סגירת החלון באמצע הפתיחה מבטלת אותה.
+ * [passwordless] — בתוך תיקייה מוצפנת פתוחה: בלי שדה, הפתיחה מתחילה מייד (הסיסמה ל-[onOpen] היא null).
+ * קובץ שהוצפן בסיסמה אחרת (הועתק לתיקייה כבר מוצפן) נכשל במפתח שלה — ואז השדה והכפתורים מופיעים.
  */
 @Composable
 fun DecryptDialog(
     title: String,
     subtitle: String,
     titleIsFileName: Boolean,
-    onOpen: (suspend (password: CharArray, onProgress: (Float) -> Unit) -> String?)?,
+    onOpen: (suspend (password: CharArray?, onProgress: (Float) -> Unit) -> String?)?,
     onDecrypt: (CharArray) -> Unit,
     onDismiss: () -> Unit,
+    passwordless: Boolean = false,
 ) {
     var password by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var progress by remember { mutableStateOf<Float?>(null) }
+    var askPassword by remember { mutableStateOf(!passwordless) }
     val scope = rememberCoroutineScope()
     val opening = progress != null
+    fun open(secret: CharArray?) {
+        val action = onOpen ?: return
+        // לפני launch: הקשה שנייה מהירה כבר רואה את הכפתור מושבת.
+        progress = 0f
+        scope.launch {
+            error = try {
+                action(secret) { progress = it }
+            } finally {
+                secret?.fill('\u0000')
+                progress = null
+            }
+            if (error != null) askPassword = true
+            if (error == null) onDismiss()
+        }
+    }
+    if (passwordless) LaunchedEffect(Unit) { open(null) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -216,7 +236,7 @@ fun DecryptDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(NexplorerDimens.Space3)) {
                 Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                PasswordField(password, { password = it; error = null }, "סיסמה")
+                if (askPassword) PasswordField(password, { password = it; error = null }, "סיסמה")
                 error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
                 progress?.let { done ->
                     // בהתחלה גוזרים את המפתח מהסיסמה (שנייה בערך) — עוד אין מה למדוד.
@@ -226,28 +246,100 @@ fun DecryptDialog(
             }
         },
         confirmButton = {
-            Row {
-                TextButton(onClick = { onDecrypt(password.toCharArray()) }, enabled = password.isNotEmpty() && !opening) { Text("פענח") }
-                if (onOpen != null) {
-                    TextButton(
-                        onClick = {
-                            val secret = password.toCharArray()
-                            // לפני launch: הקשה שנייה מהירה כבר רואה את הכפתור מושבת.
-                            progress = 0f
-                            scope.launch {
-                                error = try {
-                                    onOpen(secret) { progress = it }
-                                } finally {
-                                    secret.fill('\u0000')
-                                    progress = null
-                                }
-                                if (error == null) onDismiss()
-                            }
-                        },
-                        enabled = password.isNotEmpty() && !opening,
-                    ) { Text("פתח") }
+            if (askPassword) {
+                Row {
+                    TextButton(onClick = { onDecrypt(password.toCharArray()) }, enabled = password.isNotEmpty() && !opening) { Text("פענח") }
+                    if (onOpen != null) {
+                        TextButton(onClick = { open(password.toCharArray()) }, enabled = password.isNotEmpty() && !opening) { Text("פתח") }
+                    }
                 }
             }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("ביטול") } },
+    )
+}
+
+/** "תיקייה מוצפנת" בכפתור "חדש": שם, והסיסמה פעמיים — אין שחזור. */
+@Composable
+fun NewVaultDialog(onConfirm: (name: String, password: CharArray) -> Unit, onDismiss: () -> Unit) {
+    var name by rememberSaveable { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf("") }
+    val nameError = if (name.isBlank()) null else FileNames.validate(name)
+    val matches = password == confirm
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("תיקייה מוצפנת") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(NexplorerDimens.Space3)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    singleLine = true,
+                    label = { Text("שם התיקייה") },
+                    isError = nameError != null,
+                    supportingText = if (nameError != null) { { Text(nameError) } } else null,
+                    textStyle = MaterialTheme.typography.bodyLarge.copy(textDirection = LtrField),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                PasswordField(password, { password = it }, "סיסמה")
+                PasswordField(confirm, { confirm = it }, "הסיסמה שוב")
+                if (confirm.isNotEmpty() && !matches) {
+                    Text("הסיסמאות לא זהות", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                }
+                Text(
+                    "מה שמועתק או מועבר לתוכה דרך האפליקציה נשמר מוצפן ב-${"AES-256".isolated()}. " +
+                        "הכניסה אליה בסיסמה, והיא ננעלת כשיוצאים מהאפליקציה. בלי הסיסמה אי אפשר לפתוח אותה — אין שחזור",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(name.trim(), password.toCharArray()) },
+                enabled = name.isNotBlank() && nameError == null && password.isNotEmpty() && matches,
+            ) { Text("צור") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("ביטול") } },
+    )
+}
+
+/** כניסה לתיקייה מוצפנת נעולה. [onUnlock] מחזיר הודעת שגיאה, או null כשנפתחה. */
+@Composable
+fun UnlockVaultDialog(name: String, onUnlock: suspend (CharArray) -> String?, onDismiss: () -> Unit) {
+    var password by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(name, style = FileNameTextStyle.merge(MaterialTheme.typography.titleLarge), maxLines = 2, overflow = TextOverflow.Ellipsis) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(NexplorerDimens.Space3)) {
+                Text("תיקייה מוצפנת", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                PasswordField(password, { password = it; error = null }, "סיסמה")
+                error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+                if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val secret = password.toCharArray()
+                    busy = true
+                    scope.launch {
+                        error = try {
+                            onUnlock(secret)
+                        } finally {
+                            secret.fill('\u0000')
+                            busy = false
+                        }
+                        if (error == null) onDismiss()
+                    }
+                },
+                enabled = password.isNotEmpty() && !busy,
+            ) { Text("פתח") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("ביטול") } },
     )

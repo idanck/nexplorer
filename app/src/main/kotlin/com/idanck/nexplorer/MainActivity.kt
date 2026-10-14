@@ -101,6 +101,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** יציאה מהאפליקציה (לא סיבוב) נועלת את התיקיות המוצפנות — המפתח לא נשאר בזיכרון ברקע. */
+    override fun onStop() {
+        super.onStop()
+        if (!isChangingConfigurations) (application as NexplorerApp).container.vaults.lockAll()
+    }
+
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus && currentFocus == null) contentRoot?.requestFocus()

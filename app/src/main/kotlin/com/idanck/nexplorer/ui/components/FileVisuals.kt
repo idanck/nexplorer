@@ -60,7 +60,7 @@ import java.io.File
 import java.time.ZoneId
 
 fun iconFor(entry: Entry): ImageVector = when (entry.kind) {
-    FileKind.Folder -> Icons.Outlined.Folder
+    FileKind.Folder -> if (entry.isVault) Icons.Outlined.Lock else Icons.Outlined.Folder
     FileKind.Image -> Icons.Outlined.Image
     FileKind.Video -> Icons.Outlined.Movie
     FileKind.Audio -> Icons.Outlined.MusicNote

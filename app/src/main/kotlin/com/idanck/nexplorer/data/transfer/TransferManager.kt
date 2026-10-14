@@ -6,6 +6,8 @@ import com.idanck.nexplorer.core.FileNames
 import com.idanck.nexplorer.data.archive.Archives
 import com.idanck.nexplorer.data.crypto.EncryptedFiles
 import com.idanck.nexplorer.data.crypto.KeyRing
+import com.idanck.nexplorer.data.crypto.VaultKeys
+import com.idanck.nexplorer.data.crypto.Vaults
 import com.idanck.nexplorer.data.files.LocalFiles
 import com.idanck.nexplorer.data.files.MediaScan
 import kotlinx.coroutines.CoroutineScope
@@ -89,7 +91,7 @@ data class Transfer(
  * [TransferService] מחזיק את התהליך בחיים כל עוד יש משהו פעיל.
  * אף פעולה לא דורסת קובץ קיים: התנגשות מקבלת שם פנוי ("name (1).ext").
  */
-class TransferManager(private val context: Context, private val scope: CoroutineScope) {
+class TransferManager(private val context: Context, private val scope: CoroutineScope, private val vaults: VaultKeys) {
 
     private val _transfers = MutableStateFlow<List<Transfer>>(emptyList())
     val transfers: StateFlow<List<Transfer>> = _transfers
@@ -218,12 +220,35 @@ class TransferManager(private val context: Context, private val scope: Coroutine
             throw IOException("אי אפשר להעתיק את \"${it.name}\" לתוך עצמה")
         }
 
+        // לתוך תיקייה מוצפנת (פתוחה): כל קובץ שמגיע מבחוץ נכתב מוצפן. עותק של המפתח — נעילה באמצע לא עוצרת.
+        val vault = Vaults.rootOf(targetDir)
+        val vaultKeys = vault?.let {
+            vaults.copyFor(it) ?: throw IOException("התיקייה המוצפנת \"${it.name}\" נעולה — פתח אותה ונסה שוב")
+        }
+        try {
+            copyOrMoveInto(job, targetDir, targetCanonical, sources, vault, vaultKeys)
+        } finally {
+            vaultKeys?.close()
+        }
+    }
+
+    private suspend fun copyOrMoveInto(
+        job: Transfer,
+        targetDir: File,
+        targetCanonical: String,
+        sources: List<File>,
+        vault: File?,
+        vaultKeys: KeyRing?,
+    ) {
+        /** מבחוץ לתוך התיקייה המוצפנת. בתוכה (העברה בין תת-תיקיות) הקבצים כבר מוצפנים. */
+        fun sealing(source: File) = vaultKeys != null && Vaults.rootOf(source) != vault
         val pending = mutableListOf<File>()
         var doneItems = 0
         for (source in sources) {
             checkpoint(job.id)
             if (!source.exists() && !LocalFiles.isLink(source)) throw IOException("\"${source.name}\" כבר לא קיים")
-            if (job.kind == TransferKind.Move) {
+            // שינוי שם היה מכניס את הקובץ לתיקייה המוצפנת כמו שהוא — לא מוצפן.
+            if (job.kind == TransferKind.Move && !sealing(source)) {
                 // העברה בתוך אותה תיקייה היא כלום; בתוך אותו נפח — שינוי שם מיידי בלי להעתיק בתים.
                 if (source.parentFile?.canonicalPath == targetCanonical) {
                     doneItems++
@@ -246,14 +271,19 @@ class TransferManager(private val context: Context, private val scope: Coroutine
         if (pending.isEmpty()) return
 
         var total = 0L
-        for (source in pending) total += sizeOf(job.id, source)
+        // הצפנה סופרת כל בית פעמיים: בכתיבה ובאימות.
+        for (source in pending) total += sizeOf(job.id, source) * (if (sealing(source)) 2 else 1)
         set(job.id) { it.copy(status = TransferStatus.Running, totalBytes = total) }
         val progress = Progress(job.id)
         val move = job.kind == TransferKind.Move
         for (source in pending) {
             val dest = File(targetDir, uniqueIn(targetDir, source.name))
             try {
-                if (LocalFiles.isLink(source)) {
+                if (sealing(source)) {
+                    val real = if (LocalFiles.isLink(source)) source.canonicalFile else source
+                    sealTree(job.id, real, targetDir, if (real.isDirectory) dest.name else null, requireNotNull(vaultKeys), progress, move && real == source)
+                    if (move && real != source) Files.deleteIfExists(source.toPath())
+                } else if (LocalFiles.isLink(source)) {
                     // קישור לקובץ שנבחר במפורש: מעתיקים את התוכן; בהעברה נמחק הקישור — לא הקובץ שהוא מצביע עליו.
                     copyTree(job.id, source.canonicalFile, dest, progress, move = false)
                     if (move) Files.deleteIfExists(source.toPath())
@@ -270,6 +300,37 @@ class TransferManager(private val context: Context, private val scope: Coroutine
             doneItems++
             set(job.id) { it.copy(doneItems = doneItems) }
         }
+    }
+
+    /**
+     * כמו [copyTree], לתוך תיקייה מוצפנת: כל קובץ נכתב מוצפן ([EncryptedFiles.encryptFile] — נקרא בחזרה לפני
+     * שהמקור נמחק בהעברה). קובץ שכבר מוצפן מועתק כמו שהוא. [name] — שם התיקייה ביעד; לקובץ השם נקבע בהצפנה.
+     */
+    private suspend fun sealTree(id: Long, source: File, destDir: File, name: String?, keys: KeyRing, progress: Progress, move: Boolean) {
+        checkpoint(id)
+        if (LocalFiles.isLink(source)) return
+        if (source.isDirectory) {
+            val dest = File(destDir, name ?: source.name)
+            if (!dest.exists() && !dest.mkdirs()) throw IOException("לא ניתן ליצור את \"${dest.name}\"")
+            val children = source.listFiles() ?: throw IOException("לא ניתן לקרוא את התיקייה \"${source.name}\"")
+            for (child in children) sealTree(id, child, dest, null, keys, progress, move)
+            dest.setLastModified(source.lastModified())
+            if (move && !source.delete()) {
+                throw IOException("חלק מהפריטים נשארו ב-\"${source.name}\" (נוספו בזמן ההעברה, או שהם קישורים)")
+            }
+            return
+        }
+        if (EncryptedFiles.isEncrypted(source)) {
+            // כבר מוצפן (אולי בסיסמה אחרת) — לא מצפינים פעמיים. הבתים נספרו כפול בסך הכל.
+            val size = source.length()
+            copyTree(id, source, File(destDir, uniqueIn(destDir, source.name)), progress, move)
+            progress.add(size)
+            return
+        }
+        set(id) { it.copy(currentName = source.name) }
+        val sealed = EncryptedFiles.encryptFile(source, destDir, keys, { checkpoint(id) }, progress::add)
+        if (move && !source.delete()) throw IOException("ההצפנה הצליחה, אבל לא ניתן למחוק את המקור \"${source.name}\"")
+        touched(if (move) source else null, sealed)
     }
 
     private suspend fun compress(job: Transfer) {
@@ -289,6 +350,9 @@ class TransferManager(private val context: Context, private val scope: Coroutine
         val archive = File(job.sources.single())
         val parent = File(requireNotNull(job.targetDir))
         if (!parent.canWrite()) throw IOException("אין הרשאת כתיבה בתיקיית היעד")
+        if (Vaults.rootOf(parent) != null) {
+            throw IOException("חילוץ לתוך תיקייה מוצפנת היה כותב בה קבצים לא מוצפנים — חלץ מחוץ לה, והעבר לתוכה")
+        }
         set(job.id) { it.copy(status = TransferStatus.Running, currentName = archive.name) }
         // "חלץ לתיקייה": תיקייה חדשה בשם פנוי — היא שלנו, ולכן בכשל אפשר למחוק אותה כולה.
         val folder = job.archiveName?.let { name ->
@@ -434,7 +498,8 @@ class TransferManager(private val context: Context, private val scope: Coroutine
                 when {
                     LocalFiles.isLink(child) -> links++
                     child.isDirectory -> stack.addLast(child)
-                    child.name.endsWith(".nexplorer-part") -> Unit
+                    // הסימון של תיקייה מוצפנת: פענוח שלו היה הורס אותה.
+                    child.name.endsWith(".nexplorer-part") || child.name == Vaults.MARKER -> Unit
                     else -> files += child
                 }
             }

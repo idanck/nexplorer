@@ -12,6 +12,8 @@ data class Entry(
     val lastModified: Long,
     val isHidden: Boolean,
     val kind: FileKind,
+    /** "תיקייה מוצפנת" (יש בה קובץ הסימון) — אייקון מנעול, ופתיחה בסיסמה. */
+    val isVault: Boolean = false,
 ) {
     val extension: String get() = if (isDirectory) "" else name.substringAfterLast('.', "").lowercase()
 }
