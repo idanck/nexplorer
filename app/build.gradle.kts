@@ -20,7 +20,7 @@ val releaseKeystore: File? = System.getenv("RELEASE_KEYSTORE_PATH")?.let(::file)
 
 android {
     namespace = "com.idanck.nexplorer"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.idanck.nexplorer"

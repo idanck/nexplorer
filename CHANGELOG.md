@@ -50,6 +50,7 @@
 - Worker: השוואת טוקן בזמן קבוע, 400 (לא 500) על נתיב פגום. CI: versionCode ו-minSdk נקראים מה-APK; תקלה בערוץ לא נחשבת "עוד לא פורסם"
 
 ### Changed
+- Compose BOM ‏2024.12.01 ← 2026.03.01 ‏(Compose 1.10.6) ו-AGP ‏8.7.3 ← 8.13.2 עם compileSdk 36 ו-Gradle ‏8.14.6 (תיקוני האבטחה של 9.8.1; ‏Gradle 9.6 ומעלה דורש AGP 9) (ה-lint של Compose 1.9 ומעלה דורש AGP 8.8.2, ו-media3 1.11 דורש compileSdk 36; targetSdk נשאר 35). ב-ui-test של Compose 1.7 ההתאמה לצמתים רצה על חוט הבדיקה במקביל ל-layout, ובאמולטור API 29 בדיקות נפלו לסירוגין ("Detected multithreaded access to SnapshotStateObserver", "performMeasureAndLayout called during measure layout")
 - מסך הקטלוג הזמני הוסר — המסך הראשי מחליף אותו
 - build ה-debug מקבל `applicationIdSuffix ".debug"` ולא בודק עדכונים, כדי לא להתנגש בגרסה החתומה
 - טוקני Solid הועברו מ-`docs/design/tokens.json` ל-`docs/research/solid-tokens.json`; `docs/design/tokens.json` הוא עכשיו של nexplorer

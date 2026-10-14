@@ -51,8 +51,9 @@ wait_for "פרטי חיבור" 10 || fail "the add place screen did not open"
 # המקלדת מכסה את השדות שמתחת לשדה הפעיל — מגוללים עד שהשדה על המסך (uiautomator לא רואה מה שמחוץ לו).
 field() {
   for _ in 1 2 3 4; do
-    # לוחצים רק על מיקום יציב — אחרת הטקסט נכתב לשדה הקודם (ראו focus-desc ב-ui.py).
-    if ui focus-desc "$1"; then
+    # לוחצים רק על מיקום יציב, ורק כשהשדה מעל הסרגל התחתון — אחרת הטקסט נכתב לשדה הקודם
+    # (ראו focus-desc ב-ui.py).
+    if ui focus-desc "$1" "בדוק והתחבר"; then
       adb shell input text "$2"
       return 0
     fi

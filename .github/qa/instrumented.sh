@@ -135,6 +135,8 @@ if grep -q "$pkg" "$out/crash.txt"; then
   status=1
 fi
 adb logcat -d -b events -s am_anr > "$out/anr.txt" || true
+# הצד של השרת: חיבור שנתקע ב"מתחבר…" — האם הגיע ל-sshd, ואיפה נעצר (sftp-server.sh, ‏LogLevel VERBOSE).
+sudo cat /tmp/nexplorer-sftp/sshd.log > "$out/sshd.log" 2>/dev/null || true
 if grep -q "$pkg" "$out/anr.txt"; then
   echo "::error::the app stopped responding on API $api (anr.txt)"
   status=1
