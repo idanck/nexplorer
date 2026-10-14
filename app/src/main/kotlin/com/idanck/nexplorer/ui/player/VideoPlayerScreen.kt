@@ -12,14 +12,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.displayCutout
-import androidx.compose.foundation.layout.displayCutoutPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
@@ -158,8 +159,8 @@ fun VideoPlayerScreen(viewModel: VideoPlayerViewModel, path: String, onPathChang
                 Modifier
                     .fillMaxWidth()
                     .background(colors.viewerChrome)
-                    .statusBarsPadding()
-                    .displayCutoutPadding()
+                    // לרוחב שורת הניווט והמגרעת בצד: הכפתורים לא יושבים מתחתיהן.
+                    .windowInsetsPadding(insets.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
                     .padding(horizontal = NexplorerDimens.Space1, vertical = NexplorerDimens.Space1),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
