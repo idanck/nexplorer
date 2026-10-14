@@ -129,7 +129,7 @@ class Phase2bTest {
         compose.waitForDisk { !File(root, "archive.zip").exists() }
 
         // Tab: החלון השני פעיל; Backspace שם עולה מ-Empty, ו-big.bin (שהועבר לתוכה) כבר לא מוצג.
-        // ב-API 29 הפוקוס חוזר מהדיאלוג באיחור — מקש שנלחץ לפני כן הולך לחלון הדיאלוג ואובד.
+        // המקש הולך לחלון שבפוקוס: מחכים שחלון הדיאלוג ייסגר והפוקוס יחזור לפעילות.
         waitForWindowFocus()
         Qa.device.pressKeyCode(KeyEvent.KEYCODE_TAB)
         compose.waitFor(hasContentDescription("חלון שני") and isSelected())
@@ -150,7 +150,12 @@ class Phase2bTest {
         compose.onAllNodesWithText("Empty")[1].performScrollTo()
         val from = screenCenter(compose.onAllNodesWithText("readme.md")[0].fetchSemanticsNode().boundsInWindow.center)
         val to = screenCenter(compose.onAllNodesWithText("Empty")[1].fetchSemanticsNode().boundsInWindow.center)
-        longPressDrag(from, to) { Qa.screenshot(compose, "66-dual-drag-hover", settle = false) }
+        longPressDrag(from, to) {
+            // הדגשת היעד היא הרכבה מחדש — בשעון של הבדיקה היא מחכה לפריים.
+            compose.mainClock.advanceTimeByFrame()
+            SystemClock.sleep(300)
+            Qa.screenshot(compose, "66-dual-drag-hover", settle = false)
+        }
         compose.waitForDisk { File(root, "Empty/readme.md").isFile }
         assertTrue("גרירה מעתיקה, לא מעבירה", File(root, "readme.md").isFile)
     }
@@ -172,6 +177,8 @@ class Phase2bTest {
     /**
      * לחיצה ארוכה, גרירה ושחרור — כמו אצבע: אירועי מגע אמיתיים, כי גרירה של המערכת (DragAndDrop)
      * לא מתחילה ממחוות מדומות של Compose. [hovering] רץ מעל היעד, רגע לפני השחרור.
+     * השעון של Compose בבדיקה מדומה ומתקדם רק ב-waitUntil/waitForIdle — לכן כל המתנה כאן מקדמת
+     * אותו גם כן; אחרת ה-timeout של הלחיצה הארוכה לא נגמר, והגרירה פותחת את המגירה במקום.
      */
     private fun longPressDrag(from: Offset, to: Offset, hovering: () -> Unit) {
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
@@ -182,18 +189,24 @@ class Phase2bTest {
             automation.injectInputEvent(event, true)
             event.recycle()
         }
+        fun pause(ms: Long) {
+            SystemClock.sleep(ms)
+            compose.mainClock.advanceTimeBy(ms)
+        }
         inject(MotionEvent.ACTION_DOWN, from)
         val hold = ViewConfiguration.getLongPressTimeout() * 2L
-        while (SystemClock.uptimeMillis() - downTime < hold) {
-            SystemClock.sleep(50)
+        var held = 0L
+        while (held < hold) {
+            pause(HOLD_STEP_MS)
+            held += HOLD_STEP_MS
             inject(MotionEvent.ACTION_MOVE, from)
         }
         val steps = 30
         for (i in 1..steps) {
-            SystemClock.sleep(20)
+            pause(MOVE_STEP_MS)
             inject(MotionEvent.ACTION_MOVE, from + (to - from) * (i / steps.toFloat()))
         }
-        SystemClock.sleep(400)
+        pause(HOVER_MS)
         inject(MotionEvent.ACTION_MOVE, to)
         hovering()
         inject(MotionEvent.ACTION_MOVE, to)
@@ -204,5 +217,9 @@ class Phase2bTest {
         /** 1600×2560 ב-320dpi = 800×1280dp — טאבלט 10 אינץ'. */
         const val TABLET_SIZE = "1600x2560"
         const val TABLET_DENSITY = 320
+
+        const val HOLD_STEP_MS = 50L
+        const val MOVE_STEP_MS = 20L
+        const val HOVER_MS = 400L
     }
 }

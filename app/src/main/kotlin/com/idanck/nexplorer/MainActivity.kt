@@ -3,9 +3,12 @@ package com.idanck.nexplorer
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.Menu
+import android.view.View
+import android.view.ViewGroup
 import android.view.Window
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -61,6 +64,40 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        anchorKeyFocus()
+    }
+
+    /** ה-View של Compose — הילד היחיד של android.R.id.content אחרי setContent. */
+    private val contentRoot: ViewGroup?
+        get() = findViewById<ViewGroup>(android.R.id.content)?.getChildAt(0) as? ViewGroup
+
+    /**
+     * במצב מגע, מאז Android 9, אף View לא בפוקוס — ואז Tab הראשון אחרי נגיעה לא מגיע ל-[dispatchKeyEvent]:
+     * ViewRootImpl מנצל אותו ליציאה ממצב מגע ומעביר את הפוקוס לפריט הראשון. ה-ComposeView מחזיק את
+     * הפוקוס בעצמו (לפני הילדים), ולכן היציאה ממצב מגע משאירה אותו במקום ו-Tab מגיע לקיצורים.
+     * אחרי המקש הזה הפוקוס עובר ל-Compose, כדי שהחצים ינווטו בין הפריטים. שדה טקסט לוקח את הפוקוס
+     * כרגיל, וכשהוא משחרר אותו — הפוקוס חוזר לכאן.
+     */
+    private fun anchorKeyFocus() {
+        val root = contentRoot ?: return
+        root.isFocusableInTouchMode = true
+        root.descendantFocusability = ViewGroup.FOCUS_BEFORE_DESCENDANTS
+        // לא תחנה ריקה ב-TalkBack; הילדים (Compose) נשארים נגישים.
+        root.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) root.defaultFocusHighlightEnabled = false
+        val tree = root.viewTreeObserver
+        tree.addOnGlobalFocusChangeListener { _, newFocus ->
+            if (newFocus == null) root.post { if (currentFocus == null) root.requestFocus() }
+        }
+        // נקרא בתוך עיבוד המקש, לפני ש-ViewRootImpl מחפש למי לתת פוקוס; המעבר ל-Compose אחריו.
+        tree.addOnTouchModeChangeListener { inTouchMode ->
+            if (!inTouchMode && currentFocus === root) root.post { root.getChildAt(0)?.requestFocus() }
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && currentFocus == null) contentRoot?.requestFocus()
     }
 
     /**
