@@ -19,6 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -33,14 +34,20 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import com.idanck.nexplorer.BuildConfig
 import com.idanck.nexplorer.core.HebrewDates
 import com.idanck.nexplorer.core.SizeFormat
 import com.idanck.nexplorer.core.isolated
 import com.idanck.nexplorer.data.settings.AppSettings
 import com.idanck.nexplorer.data.settings.ThemeMode
+import com.idanck.nexplorer.ui.theme.FileNameTextStyle
 import com.idanck.nexplorer.ui.theme.MonoTextStyle
 import com.idanck.nexplorer.ui.theme.NexplorerDimens
 import com.idanck.nexplorer.ui.theme.NexplorerShape
@@ -60,6 +67,8 @@ class SettingsModel(
     val onConfirmDelete: (Boolean) -> Unit,
     val onShowHidden: (Boolean) -> Unit,
     val onReopenLast: (Boolean) -> Unit,
+    /** "תיקיות מוסתרות": החזרה לרשימה. */
+    val onUnhideFolder: (String) -> Unit,
     val onStorageAccess: () -> Unit,
     val onCheckUpdates: () -> Unit,
     val onAutoCheck: (Boolean) -> Unit,
@@ -114,6 +123,18 @@ fun SettingsScreen(model: SettingsModel) {
                     SwitchItem("הצג קבצים מוסתרים", "קבצים ותיקיות שמתחילים בנקודה", s.defaultView.showHidden, onChange = model.onShowHidden)
                     Divider()
                     SwitchItem("פתח בתיקייה האחרונה", s.lastFolder?.substringAfterLast('/'), s.reopenLastFolder, onChange = model.onReopenLast)
+                    Divider()
+                    var showHiddenFolders by remember { mutableStateOf(false) }
+                    Item(
+                        "תיקיות מוסתרות",
+                        if (s.hiddenFolders.isEmpty()) "אין. בתיקייה: ⋮ ← אפשרויות תיקייה ← הסתר תיקייה" else "לא מוצגות ברשימה; במכשיר הן נשארות",
+                        onClick = if (s.hiddenFolders.isEmpty()) null else ({ showHiddenFolders = true }),
+                    ) {
+                        if (s.hiddenFolders.isNotEmpty()) Text(s.hiddenFolders.size.toString(), style = MonoTextStyle)
+                    }
+                    if (showHiddenFolders && s.hiddenFolders.isNotEmpty()) {
+                        HiddenFoldersDialog(s.hiddenFolders, model.onUnhideFolder) { showHiddenFolders = false }
+                    }
                 }
 
                 Group("גישה לאחסון") {
@@ -205,6 +226,29 @@ private fun UpdatesSection(model: SettingsModel) {
     SwitchItem("בדיקה אוטומטית", "פעם ביום, ברקע", s.updateAutoCheck, onChange = model.onAutoCheck)
     Divider()
     SwitchItem("רק ב-Wi-Fi", "לא להוריד עדכון על חבילת גלישה", s.updateWifiOnly, onChange = model.onWifiOnly)
+}
+
+/** התיקיות שהוסתרו: "הצג" מחזיר אחת לרשימה. נסגר לבד כשאין עוד. */
+@Composable
+private fun HiddenFoldersDialog(hidden: Set<String>, onUnhide: (String) -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("תיקיות מוסתרות") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                hidden.sorted().forEach { path ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(path.substringAfterLast('/').ifEmpty { path }, style = FileNameTextStyle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(path, style = MonoTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                        TextButton(onClick = { onUnhide(path) }) { Text("הצג") }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("סגור") } },
+    )
 }
 
 @Composable

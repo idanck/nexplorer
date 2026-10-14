@@ -110,6 +110,10 @@ private fun sortLabel(state: BrowserState): String =
 private fun groups(state: BrowserState): List<Section> =
     if (state.view.showSections && state.sections.isNotEmpty()) state.sections else listOf(Section("", state.entries))
 
+/** "גודל תיקיות" מופעל וכבר חושב לתיקייה הזו. */
+private fun BrowserState.folderSizeOf(entry: Entry): Long? =
+    if (entry.isDirectory && view.showFolderSizes) folderSizes[entry.path] else null
+
 @Composable
 private fun FileColumn(state: BrowserState, actions: FileListActions, contentPadding: PaddingValues, modifier: Modifier) {
     val now = remember(state.entries) { System.currentTimeMillis() }
@@ -201,7 +205,7 @@ private fun FileRow(entry: Entry, state: BrowserState, actions: FileListActions,
                 modifier = Modifier.fillMaxWidth(),
             )
             Text(
-                if (drop.hovering) AnnotatedString(DROP_HINT) else metaLine(entry, now),
+                if (drop.hovering) AnnotatedString(DROP_HINT) else metaLine(entry, now, folderSize = state.folderSizeOf(entry)),
                 style = if (drop.hovering) MaterialTheme.typography.labelMedium else MaterialTheme.typography.bodySmall,
                 color = if (drop.hovering) NexplorerTheme.colors.onAmberContainer else MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -250,7 +254,12 @@ private fun CompactRow(entry: Entry, state: BrowserState, actions: FileListActio
             Text(DROP_HINT, style = MaterialTheme.typography.labelMedium, color = NexplorerTheme.colors.onAmberContainer, maxLines = 1)
         } else {
             Text(
-                if (entry.isDirectory) (entry.childCount.takeIf { it >= 0 }?.toString() ?: "") else SizeFormat.short(entry.size),
+                when {
+                    !entry.isDirectory -> SizeFormat.short(entry.size)
+                    // "גודל תיקיות": בשורה קומפקטית אין מקום לשניהם — הגודל במקום מספר הפריטים.
+                    state.folderSizeOf(entry) != null -> SizeFormat.short(entry.size)
+                    else -> entry.childCount.takeIf { it >= 0 }?.toString() ?: ""
+                },
                 style = MonoTextStyle,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

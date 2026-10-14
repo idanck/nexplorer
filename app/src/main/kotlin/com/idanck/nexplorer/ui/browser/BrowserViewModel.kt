@@ -11,6 +11,7 @@ import com.idanck.nexplorer.core.ArchivePaths
 import com.idanck.nexplorer.core.BatchRename
 import com.idanck.nexplorer.core.Entry
 import com.idanck.nexplorer.core.FileNames
+import com.idanck.nexplorer.core.FolderSizes
 import com.idanck.nexplorer.core.RenamePattern
 import com.idanck.nexplorer.core.Section
 import com.idanck.nexplorer.core.ViewOptions
@@ -33,9 +34,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -67,6 +70,10 @@ data class BrowserState(
     val filter: String? = null,
     val clipboard: Clipboard? = null,
     val favorites: List<String> = emptyList(),
+    /** "הסתר תיקייה" — לא מוצגות. */
+    val hiddenFolders: Set<String> = emptySet(),
+    /** "גודל תיקיות": מה שחושב עד עכשיו (נתיב → בתים). */
+    val folderSizes: Map<String, Long> = emptyMap(),
 ) {
     val folderPath: String? get() = (location as? Location.Folder)?.path
     val volume: StorageVolumeInfo? get() = folderPath?.let { StorageVolumes.volumeOf(it, volumes) }
@@ -139,6 +146,7 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
     val events = _events.receiveAsFlow()
 
     private var loadJob: Job? = null
+    private var sizesJob: Job? = null
     private var selectionAnchor: String? = null
     private var resumedOnce = false
 
@@ -156,7 +164,7 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
         load()
         viewModelScope.launch {
             // שינוי בהעדפות (מכאן או מההגדרות) — מיון מחדש; "הצג מוסתרים" — רישום מחדש.
-            settings.state.drop(1).map { it.viewFor(_state.value.folderPath) to it.favorites }
+            settings.state.drop(1).map { Triple(it.viewFor(_state.value.folderPath), it.favorites, it.hiddenFolders) }
                 .distinctUntilChanged()
                 .collect { applySettings(reload = true) }
         }
@@ -251,11 +259,12 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
         _state.update {
             it.copy(
                 location = location, selection = emptySet(), filter = null, error = null,
-                listed = emptyList(), entries = emptyList(), sections = emptyList(), loading = true,
+                listed = emptyList(), entries = emptyList(), sections = emptyList(), loading = true, folderSizes = emptyMap(),
             )
         }
         saved[KEY_LOCATION] = keyOf(location)
         selectionAnchor = null
+        sizesJob?.cancel()
         applySettings(reload = false)
         load()
         if (location is Location.Folder) {
@@ -311,6 +320,7 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
                             selection = it.selection.intersect(entries.map { e -> e.path }.toSet()),
                         )
                     }
+                    computeFolderSizes()
                 }
                 .onFailure { e ->
                     _state.update {
@@ -325,17 +335,73 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
         val path = _state.value.folderPath
         val view = s.viewFor(path)
         val hiddenChanged = view.showHidden != _state.value.view.showHidden
+        val sizesChanged = view.showFolderSizes != _state.value.view.showFolderSizes
         _state.update {
-            it.copy(view = view, viewIsFolderScoped = path != null && path in s.folderViews, favorites = s.favorites)
+            it.copy(
+                view = view,
+                viewIsFolderScoped = path != null && path in s.folderViews,
+                favorites = s.favorites,
+                hiddenFolders = s.hiddenFolders,
+            )
         }
-        if (reload && hiddenChanged) load() else arrange()
+        if (reload && hiddenChanged) {
+            load()
+        } else {
+            arrange()
+            if (reload && sizesChanged) computeFolderSizes()
+        }
+    }
+
+    /**
+     * "גודל תיקיות": כל תיקייה ברשימה, לפי הסדר שבו היא מוצגת, ברקע. התוצאות מתפרסמות בקבוצות
+     * (לא בכל תיקייה) — במיון לפי גודל הרשימה מסתדרת מחדש, ולא בכל רגע.
+     */
+    private fun computeFolderSizes() {
+        sizesJob?.cancel()
+        val s = _state.value
+        val location = s.location
+        if (!s.view.showFolderSizes || location !is Location.Folder) {
+            if (s.folderSizes.isNotEmpty()) {
+                _state.update { it.copy(folderSizes = emptyMap()) }
+                arrange()
+            }
+            return
+        }
+        val folders = s.entries.filter { it.isDirectory }.map { it.path }
+        sizesJob = viewModelScope.launch {
+            // רענון של אותה תיקייה: הגדלים הקודמים נשארים עד שמחושבים מחדש — בלי הבהוב.
+            val found = s.folderSizes.filterKeys { it in folders }.toMutableMap()
+            var published = System.currentTimeMillis()
+            for (path in folders) {
+                val size = withContext(Dispatchers.IO) { FolderSizes.of(File(path)) { isActive } } ?: continue
+                found[path] = size
+                if (System.currentTimeMillis() - published >= SIZES_PUBLISH_MS) {
+                    publishSizes(location, found.toMap())
+                    published = System.currentTimeMillis()
+                }
+            }
+            publishSizes(location, found.toMap())
+        }
+    }
+
+    private fun publishSizes(location: Location, sizes: Map<String, Long>) {
+        if (_state.value.location != location) return
+        _state.update { it.copy(folderSizes = sizes) }
+        arrange()
     }
 
     /** סינון, מיון וקיבוץ — מחוץ ל-main thread כי תיקייה יכולה להכיל אלפי פריטים. */
     private fun arranged(s: BrowserState): Pair<List<Entry>, List<Section>> {
+        val shown = s.listed
+            .let { list -> if (s.hiddenFolders.isEmpty()) list else list.filter { it.path !in s.hiddenFolders } }
+            // גודל שחושב נכנס לרשומה: גם למיון לפי גודל וגם לסכום הבחירה.
+            .let { list ->
+                if (!s.view.showFolderSizes || s.folderSizes.isEmpty()) list
+                else list.map { e -> if (e.isDirectory) s.folderSizes[e.path]?.let { e.copy(size = it) } ?: e else e }
+            }
         val filtered = s.filter?.takeIf { it.isNotBlank() }?.let { f ->
-            s.listed.filter { it.name.contains(f, ignoreCase = true) }
-        } ?: s.listed
+            shown.filter { it.name.contains(f, ignoreCase = true) }
+        } ?: shown
         val sorted = filtered.sortedFor(s.view.sort)
         return sorted to if (s.view.showSections) sectionsFor(sorted, s.view.sort, System.currentTimeMillis(), ZoneId.systemDefault()) else emptyList()
     }
@@ -346,7 +412,9 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
             val (entries, sections) = withContext(Dispatchers.Default) { arranged(s) }
             _state.update { current ->
                 // תוצאה של רשימה ישנה (ניווט באמצע) לא דורסת את החדשה.
-                if (current.listed !== s.listed || current.filter != s.filter || current.view != s.view) current
+                val stale = current.listed !== s.listed || current.filter != s.filter || current.view != s.view ||
+                    current.folderSizes !== s.folderSizes || current.hiddenFolders != s.hiddenFolders
+                if (stale) current
                 else current.copy(entries = entries, sections = sections, selection = current.selection.intersect(entries.map { it.path }.toSet()))
             }
         }
@@ -374,6 +442,24 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
         viewModelScope.launch {
             settings.update { s -> s.copy(favorites = if (path in s.favorites) s.favorites - path else s.favorites + path) }
         }
+    }
+
+    /** "הסתר תיקייה" (אפשרויות תיקייה): התיקייה הנוכחית יורדת מהרשימה, ועוברים לתיקייה שמעליה. */
+    fun hideCurrentFolder() {
+        val s = _state.value
+        val path = s.folderPath ?: return
+        if (s.isAtRoot) return
+        viewModelScope.launch {
+            settings.update { it.copy(hiddenFolders = it.hiddenFolders + path) }
+            // המעבר לתיקייה שמעל קורא את ההעדפות: מחכים שההסתרה כבר בהן — בלי הבהוב של התיקייה.
+            settings.state.first { path in it.hiddenFolders }
+            goUp()
+            emit("התיקייה הוסתרה. להצגה: הגדרות ← תיקיות מוסתרות")
+        }
+    }
+
+    fun setFavorites(paths: List<String>) {
+        viewModelScope.launch { settings.update { it.copy(favorites = paths) } }
     }
 
     fun removeFavorite(path: String) {
@@ -581,6 +667,9 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
         const val KEY_CLIP_CUT = "clipboard_cut"
         const val MEDIA_PREFIX = "media:"
         const val MAX_SAVED_CLIP = 500
+
+        /** "גודל תיקיות": כל כמה זמן מתפרסמים הגדלים שחושבו (ולא אחרי כל תיקייה). */
+        const val SIZES_PUBLISH_MS = 300L
     }
 
     private fun emitEvent(event: BrowserEvent) {

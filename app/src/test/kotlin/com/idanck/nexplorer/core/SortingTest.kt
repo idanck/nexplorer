@@ -68,8 +68,10 @@ class SortingTest {
 
     @Test
     fun `view options survive encoding and tolerate garbage`() {
-        val options = ViewOptions(ViewMode.Gallery, SortOrder(SortKey.Size, false), 2, false, true)
+        val options = ViewOptions(ViewMode.Gallery, SortOrder(SortKey.Size, false), 2, false, true, showFolderSizes = true)
         assertEquals(options, ViewOptions.decode(options.encode()))
+        // ערך שנשמר לפני "גודל תיקיות" (שישה שדות) נקרא, והשדה החדש בברירת המחדל.
+        assertEquals(options.copy(showFolderSizes = false), ViewOptions.decode("Gallery|Size|0|2|0|1"))
         assertEquals(ViewOptions(), ViewOptions.decode("nonsense"))
         assertEquals(ViewOptions(), ViewOptions.decode(null))
     }

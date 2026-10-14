@@ -49,6 +49,7 @@ import androidx.compose.material.icons.outlined.SwapVert
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material.icons.outlined.Unarchive
 import androidx.compose.material.icons.outlined.ViewAgenda
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -111,7 +112,10 @@ class OverflowMenuModel(
     val viewSummary: String,
     val showSections: Boolean,
     val showHidden: Boolean,
+    val showFolderSizes: Boolean,
     val isFolder: Boolean,
+    /** תיקייה שאינה שורש של אחסון — אפשר להסתיר אותה. */
+    val canHideFolder: Boolean,
     val isFavorite: Boolean,
     val canPinShortcut: Boolean,
     val transfersLabel: String?,
@@ -121,6 +125,8 @@ class OverflowMenuModel(
     val onFilter: () -> Unit,
     val onToggleSections: () -> Unit,
     val onToggleHidden: () -> Unit,
+    val onToggleFolderSizes: () -> Unit,
+    val onHideFolder: () -> Unit,
     val onToggleFavorite: () -> Unit,
     val onPinShortcut: () -> Unit,
     val onTransfers: () -> Unit,
@@ -141,8 +147,13 @@ fun OverflowMenu(expanded: Boolean, onDismiss: () -> Unit, model: OverflowMenuMo
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = NexplorerDimens.Space4, vertical = NexplorerDimens.Space2),
             )
+            // הסדר של הלוח: גודל תיקיות, הצג מדורים, הסתר תיקייה, הוסף למועדפים.
+            if (model.isFolder) {
+                MenuRow("גודל תיקיות", if (model.showFolderSizes) Icons.Outlined.CheckBox else Icons.Outlined.CheckBoxOutlineBlank, act(model.onToggleFolderSizes))
+            }
             MenuRow("הצג מדורים", if (model.showSections) Icons.Outlined.CheckBox else Icons.Outlined.CheckBoxOutlineBlank, act(model.onToggleSections))
             MenuRow("הצג קבצים מוסתרים", if (model.showHidden) Icons.Outlined.CheckBox else Icons.Outlined.CheckBoxOutlineBlank, act(model.onToggleHidden))
+            if (model.canHideFolder) MenuRow("הסתר תיקייה", Icons.Outlined.VisibilityOff, act(model.onHideFolder))
             if (model.isFolder) {
                 MenuRow(
                     if (model.isFavorite) "הסר מהמועדפים" else "הוסף למועדפים",
