@@ -1,12 +1,9 @@
 package com.idanck.nexplorer.update
 
-import android.annotation.SuppressLint
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageInfo
 import android.content.pm.PackageInstaller
-import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
@@ -14,6 +11,7 @@ import android.os.Build
 import android.provider.Settings
 import androidx.core.content.pm.PackageInfoCompat
 import com.idanck.nexplorer.BuildConfig
+import com.idanck.nexplorer.data.apk.PackageSigners
 import com.idanck.nexplorer.data.settings.SettingsRepository
 import com.idanck.nexplorer.data.transfer.TransferManager
 import kotlinx.coroutines.CancellationException
@@ -373,22 +371,11 @@ class UpdateManager(
      * אנדרואיד מחליף חבילה רק כשה-APK החדש חתום באותה תעודה, וכשל בשלב ה-commit הוא קוד סטטוס בלבד.
      * ההשוואה כאן הופכת "נחתם במפתח אחר" למשהו שאפשר להבין ולפעול לפיו.
      */
-    @SuppressLint("PackageManagerGetSignatures") // משווים תעודות שלמות, לא סומכים על אחת מהן.
     private fun verifySignature(file: File, manifest: UpdateManifest): Result<Unit> = try {
         val pm = context.packageManager
-        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            PackageManager.GET_SIGNING_CERTIFICATES
-        } else {
-            @Suppress("DEPRECATION") PackageManager.GET_SIGNATURES
-        }
-        // ב-API 28–29 ‏getPackageArchiveInfo אוסף תעודות רק עם GET_SIGNATURES (ה-parser החדש תיקן ב-30);
-        // בלעדיו signingInfo ריק, וכל עדכון היה נדחה כ"חתום במפתח אחר".
-        @Suppress("DEPRECATION")
-        val withLegacySignatures = flags or PackageManager.GET_SIGNATURES
-        val archiveFlags = if (Build.VERSION.SDK_INT in Build.VERSION_CODES.P..Build.VERSION_CODES.Q) withLegacySignatures else flags
-        val candidate = pm.getPackageArchiveInfo(file.absolutePath, archiveFlags)
-        val installed = pm.getPackageInfo(context.packageName, flags)
-        val candidateCerts = candidate?.let { certificates(it) }.orEmpty()
+        val candidate = pm.getPackageArchiveInfo(file.absolutePath, PackageSigners.archiveFlags)
+        val installed = pm.getPackageInfo(context.packageName, PackageSigners.installedFlags)
+        val candidateCerts = candidate?.let { PackageSigners.of(it) }.orEmpty()
         when {
             candidate == null -> Result.failure(UpdateException("הקובץ שירד אינו APK תקין"))
             candidate.packageName != context.packageName -> Result.failure(UpdateException("הקובץ שייך לאפליקציה אחרת"))
@@ -396,22 +383,12 @@ class UpdateManager(
             PackageInfoCompat.getLongVersionCode(candidate) != manifest.versionCode.toLong() ->
                 Result.failure(UpdateException("גרסת הקובץ לא תואמת למניפסט"))
             candidateCerts.isEmpty() -> Result.failure(UpdateException("לא נמצאה חתימה בקובץ שירד"))
-            candidateCerts != certificates(installed) ->
+            candidateCerts != PackageSigners.of(installed) ->
                 Result.failure(UpdateException("העדכון חתום במפתח אחר מהגרסה המותקנת"))
             else -> Result.success(Unit)
         }
     } catch (e: Exception) {
         Result.failure(UpdateException("לא ניתן לאמת את החתימה", e))
-    }
-
-    private fun certificates(info: PackageInfo): Set<String> {
-        val signatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            info.signingInfo?.let { if (it.hasMultipleSigners()) it.apkContentsSigners else it.signingCertificateHistory }
-        } else {
-            @Suppress("DEPRECATION") info.signatures
-        }
-        val digest = MessageDigest.getInstance("SHA-256")
-        return signatures.orEmpty().mapNotNull { it?.toByteArray()?.let { bytes -> digest.digest(bytes).hex() } }.toSet()
     }
 
     private fun commit(file: File): Result<Unit> {

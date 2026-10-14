@@ -37,6 +37,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
+import com.idanck.nexplorer.core.ArchiveFormat
+import com.idanck.nexplorer.core.ArchiveFormats
 import com.idanck.nexplorer.core.ArchivePaths
 import com.idanck.nexplorer.core.BatchRename
 import com.idanck.nexplorer.core.CaseChange
@@ -46,7 +48,7 @@ import com.idanck.nexplorer.core.FileNames
 import com.idanck.nexplorer.core.RenamePattern
 import com.idanck.nexplorer.core.SizeFormat
 import com.idanck.nexplorer.core.isolated
-import com.idanck.nexplorer.data.archive.ZipArchives
+import com.idanck.nexplorer.data.archive.Archives
 import com.idanck.nexplorer.ui.theme.FileNameTextStyle
 import com.idanck.nexplorer.ui.theme.MonoTextStyle
 import com.idanck.nexplorer.ui.theme.NexplorerDimens
@@ -73,10 +75,16 @@ private fun PasswordField(value: String, onChange: (String) -> Unit, label: Stri
     )
 }
 
-/** "הוסף לארכיון": שם ה-ZIP, וסיסמה אופציונלית (AES-256). */
+/** "הוסף לארכיון": ZIP או 7z, השם, וסיסמה אופציונלית (AES-256 בשניהם). */
 @Composable
-fun CompressDialog(defaultName: String, count: Int, onConfirm: (String, CharArray?) -> Unit, onDismiss: () -> Unit) {
-    var name by rememberSaveable { mutableStateOf(defaultName) }
+fun CompressDialog(
+    defaultName: (ArchiveFormat) -> String,
+    count: Int,
+    onConfirm: (String, ArchiveFormat, CharArray?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var format by rememberSaveable { mutableStateOf(ArchiveFormat.Zip) }
+    var name by rememberSaveable { mutableStateOf(defaultName(ArchiveFormat.Zip)) }
     // הסיסמה לא נשמרת ב-Bundle (rememberSaveable) — רק בזיכרון של החלון.
     var password by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
@@ -89,6 +97,18 @@ fun CompressDialog(defaultName: String, count: Int, onConfirm: (String, CharArra
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(NexplorerDimens.Space3)) {
                 Text(Counts.items(count), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(horizontalArrangement = Arrangement.spacedBy(NexplorerDimens.Space2)) {
+                    ArchiveFormat.entries.filter { it.creatable }.forEach { option ->
+                        FilterChip(
+                            selected = format == option,
+                            onClick = {
+                                format = option
+                                name = ArchiveFormats.withExtension(name.ifBlank { defaultName(option) }, option)
+                            },
+                            label = { Text(option.label) },
+                        )
+                    }
+                }
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
@@ -107,8 +127,11 @@ fun CompressDialog(defaultName: String, count: Int, onConfirm: (String, CharArra
                     }
                 }
                 Text(
-                    if (password.isEmpty()) "בלי סיסמה — ZIP רגיל שכל מערכת פותחת"
-                    else "AES-256. בלי הסיסמה אי אפשר לפתוח את הארכיון — אין שחזור",
+                    when {
+                        password.isNotEmpty() -> "AES-256. בלי הסיסמה אי אפשר לפתוח את הארכיון — אין שחזור"
+                        format == ArchiveFormat.SevenZ -> "7z — קטן יותר, אבל לא כל מערכת פותחת אותו בלי תוכנה"
+                        else -> "בלי סיסמה — ZIP רגיל שכל מערכת פותחת"
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = if (password.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
                 )
@@ -116,7 +139,7 @@ fun CompressDialog(defaultName: String, count: Int, onConfirm: (String, CharArra
         },
         confirmButton = {
             TextButton(
-                onClick = { onConfirm(name.trim(), password.takeIf { it.isNotEmpty() }?.toCharArray()) },
+                onClick = { onConfirm(name.trim(), format, password.takeIf { it.isNotEmpty() }?.toCharArray()) },
                 enabled = name.isNotBlank() && error == null && passwordOk,
             ) { Text("צור") }
         },
@@ -125,18 +148,18 @@ fun CompressDialog(defaultName: String, count: Int, onConfirm: (String, CharArra
 }
 
 /**
- * פתיחת ZIP: מה יש בו, ולאן לחלץ. סיסמה — רק אם הוא מוצפן.
- * [inspect] רץ פעם אחת כשהחלון נפתח (קריאת הספרייה המרכזית בלבד, מהיר).
+ * פתיחת ארכיון: מה יש בו, ולאן לחלץ. סיסמה — רק אם הוא מוצפן.
+ * [inspect] רץ פעם אחת כשהחלון נפתח (ב-ZIP ו-7z רק הספרייה המרכזית — מהיר).
  */
 @Composable
 fun ExtractDialog(
     entry: Entry,
-    inspect: suspend () -> Result<ZipArchives.Info>,
+    inspect: suspend () -> Result<Archives.Info>,
     onExtract: (intoFolder: Boolean, password: CharArray?) -> Unit,
     onOpenWith: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var info by remember { mutableStateOf<Result<ZipArchives.Info>?>(null) }
+    var info by remember { mutableStateOf<Result<Archives.Info>?>(null) }
     var password by remember { mutableStateOf("") }
     LaunchedEffect(entry.path) { info = inspect() }
     val loaded = info?.getOrNull()
@@ -152,8 +175,12 @@ fun ExtractDialog(
                     when {
                         info == null -> "קורא את הארכיון…"
                         loaded == null -> info?.exceptionOrNull()?.message ?: "לא ניתן לקרוא את הארכיון"
-                        else -> "${Counts.files(loaded.entries)} · ${SizeFormat.short(loaded.totalBytes).isolated()} אחרי חילוץ" +
-                            if (loaded.encrypted) " · מוגן בסיסמה" else ""
+                        else -> listOfNotNull(
+                            loaded.format.label.isolated(),
+                            loaded.entries?.let { Counts.files(it) },
+                            loaded.totalBytes?.let { "${SizeFormat.short(it).isolated()} אחרי חילוץ" },
+                            "מוגן בסיסמה".takeIf { loaded.encrypted },
+                        ).joinToString(" · ")
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     color = if (info != null && loaded == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,

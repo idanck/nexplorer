@@ -16,6 +16,8 @@ androidxTestRules = "1.6.1"
 androidxTestExtJunit = "1.2.1"
 uiautomator = "2.3.0"
 zip4j = "2.11.5"
+commonsCompress = "1.28.0"
+xz = "1.10"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidxCore" }
@@ -36,6 +38,9 @@ coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coil" }
 coil-video = { module = "io.coil-kt:coil-video", version.ref = "coil" }
 # ZIP עם AES-256 (java.util.zip לא תומך בהצפנה). Apache 2.0.
 zip4j = { module = "net.lingala.zip4j:zip4j", version.ref = "zip4j" }
+# 7z (כולל AES), TAR ו-GZ/BZ2/XZ. Apache 2.0. xz — LZMA/LZMA2 ל-7z ול-XZ (public domain).
+commons-compress = { module = "org.apache.commons:commons-compress", version.ref = "commonsCompress" }
+xz = { module = "org.tukaani:xz", version.ref = "xz" }
 junit = { module = "junit:junit", version.ref = "junit" }
 org-json = { module = "org.json:json", version.ref = "orgJson" }
 # בדיקות על אמולטור (QA): ‏.github/workflows/qa.yml

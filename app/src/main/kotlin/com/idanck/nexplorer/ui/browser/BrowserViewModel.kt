@@ -5,6 +5,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.idanck.nexplorer.NexplorerApp
+import com.idanck.nexplorer.core.ArchiveFormat
+import com.idanck.nexplorer.core.ArchiveFormats
 import com.idanck.nexplorer.core.ArchivePaths
 import com.idanck.nexplorer.core.BatchRename
 import com.idanck.nexplorer.core.Entry
@@ -14,7 +16,7 @@ import com.idanck.nexplorer.core.Section
 import com.idanck.nexplorer.core.ViewOptions
 import com.idanck.nexplorer.core.sectionsFor
 import com.idanck.nexplorer.core.sortedFor
-import com.idanck.nexplorer.data.archive.ZipArchives
+import com.idanck.nexplorer.data.archive.Archives
 import com.idanck.nexplorer.data.files.LocalFiles
 import com.idanck.nexplorer.data.files.MediaCollection
 import com.idanck.nexplorer.data.files.MediaCollections
@@ -106,8 +108,11 @@ data class BrowserState(
 sealed interface BrowserEvent {
     data class Message(val text: String) : BrowserEvent
     data class OpenFile(val entry: Entry) : BrowserEvent
-    /** ZIP נפתח בתוך האפליקציה: חלון "חלץ". */
+    /** ארכיון שנפתח בתוך האפליקציה (ZIP, 7z, TAR…): חלון "חלץ". */
     data class OpenArchive(val entry: Entry) : BrowserEvent
+
+    /** ‏APK: גיליון הפרטים וההתקנה. */
+    data class OpenApk(val entry: Entry) : BrowserEvent
 }
 
 /** תוצאה של שינוי שם מרובה. */
@@ -235,7 +240,8 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
         }
         when {
             entry.isDirectory -> navigate(Location.Folder(entry.path))
-            entry.extension == "zip" -> emitEvent(BrowserEvent.OpenArchive(entry))
+            ArchiveFormats.of(entry.name) != null -> emitEvent(BrowserEvent.OpenArchive(entry))
+            entry.extension == "apk" -> emitEvent(BrowserEvent.OpenApk(entry))
             else -> emitEvent(BrowserEvent.OpenFile(entry))
         }
     }
@@ -458,9 +464,9 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
 
     // ---------- ארכיונים ושינוי שם מרובה ----------
 
-    fun compress(paths: List<String>, zipName: String, password: CharArray?) {
+    fun compress(paths: List<String>, archiveName: String, format: ArchiveFormat, password: CharArray?) {
         val folder = _state.value.folderPath ?: return
-        val name = zipName.trim().let { if (it.endsWith(".zip", ignoreCase = true)) it else "$it.zip" }
+        val name = ArchiveFormats.withExtension(archiveName, format)
         transfers.enqueue(TransferKind.Compress, paths, folder, archiveName = name, password = password)
         clearSelection()
     }
@@ -473,8 +479,8 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
         clearSelection()
     }
 
-    suspend fun inspectArchive(path: String): Result<ZipArchives.Info> =
-        withContext(Dispatchers.IO) { runCatching { ZipArchives.inspect(File(path)) } }
+    suspend fun inspectArchive(path: String): Result<Archives.Info> =
+        withContext(Dispatchers.IO) { runCatching { Archives.inspect(File(path)) } }
 
     /** שמות אחרים בתיקייה — מה שהתבנית לא יכולה לקבל. */
     suspend fun namesBesides(entries: List<Entry>): Set<String> = withContext(Dispatchers.IO) {

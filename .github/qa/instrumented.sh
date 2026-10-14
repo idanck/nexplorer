@@ -52,6 +52,7 @@ run_class BrowserFlowTest
 run_class SearchAndSettingsTest
 run_class Phase2Test
 run_class Phase2bTest
+run_class Phase3Test
 # Phase2bTest מדמה טאבלט; אם התהליך קרס לפני tearDown — שהמונקי ירוץ על המסך הרגיל.
 adb shell wm size reset || true
 adb shell wm density reset || true

@@ -141,7 +141,7 @@ fun PropertiesSheet(entries: List<Entry>, onCopy: (String) -> Unit, onDismiss: (
 }
 
 @Composable
-private fun Detail(label: String, value: String, mono: Boolean = false, onCopy: ((String) -> Unit)? = null) {
+internal fun Detail(label: String, value: String, mono: Boolean = false, onCopy: ((String) -> Unit)? = null) {
     Row(verticalAlignment = Alignment.Top) {
         Text(
             label,
