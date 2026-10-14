@@ -69,12 +69,14 @@ import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.idanck.nexplorer.core.ArchiveFormats
 import com.idanck.nexplorer.core.ArchivePaths
 import com.idanck.nexplorer.core.Counts
 import com.idanck.nexplorer.core.Entry
 import com.idanck.nexplorer.core.FileKind
 import com.idanck.nexplorer.core.SizeFormat
 import com.idanck.nexplorer.core.isolated
+import com.idanck.nexplorer.data.apk.ApkInspector
 import com.idanck.nexplorer.data.files.FileIntents
 import com.idanck.nexplorer.data.files.LocalFiles
 import com.idanck.nexplorer.data.files.StorageVolumes
@@ -82,6 +84,7 @@ import com.idanck.nexplorer.data.files.TextFiles
 import com.idanck.nexplorer.data.settings.AppSettings
 import com.idanck.nexplorer.data.transfer.TransferManager
 import com.idanck.nexplorer.data.transfer.TransferStatus
+import com.idanck.nexplorer.ui.apk.ApkSheet
 import com.idanck.nexplorer.ui.drawer.DrawerModel
 import com.idanck.nexplorer.ui.drawer.PlacesDrawer
 import com.idanck.nexplorer.ui.properties.PropertiesSheet
@@ -174,6 +177,7 @@ fun BrowserScreen(
     var dialog by rememberSaveable(stateSaver = BrowserDialogSaver) { mutableStateOf<BrowserDialog?>(null) }
     var showTransfers by rememberSaveable { mutableStateOf(false) }
     var properties by remember { mutableStateOf<List<Entry>?>(null) }
+    var apk by remember { mutableStateOf<Entry?>(null) }
     val canPin = remember(context) { FileIntents.canPinShortcut(context) }
 
     fun message(text: String) {
@@ -206,6 +210,7 @@ fun BrowserScreen(
                     else launch { snackbar.showSnackbar("אין אפליקציה שפותחת קבצים מסוג זה") }
                 }
                 is BrowserEvent.OpenArchive -> dialog = BrowserDialog.Extract(event.entry)
+                is BrowserEvent.OpenApk -> apk = event.entry
             }
         }
     }
@@ -259,7 +264,7 @@ fun BrowserScreen(
 
     // מקלדת פיזית: רק המסך שמוצג — ובשני חלונות רק החלון הפעיל — מקבל פקודות.
     val onKey by rememberUpdatedState<(KeyCommand) -> Boolean> { command ->
-        if (dialog != null || properties != null || showTransfers || fabOpen) return@rememberUpdatedState false
+        if (dialog != null || properties != null || apk != null || showTransfers || fabOpen) return@rememberUpdatedState false
         val current = vm.selectedEntries()
         when (command) {
             KeyCommand.SelectAll -> true.also { vm.selectAll() }
@@ -491,7 +496,7 @@ fun BrowserScreen(
                                     onToggleFavorite = { single?.let { vm.toggleFavorite(it.path) } },
                                     onProperties = { properties = selected },
                                     canEditText = single?.canEditAsText() == true,
-                                    isZip = single?.extension == "zip",
+                                    isArchive = single?.let { ArchiveFormats.of(it.name) } != null,
                                     onEditText = { single?.let { onEditText(it.path) } },
                                     canCompress = state.location is Location.Folder,
                                     onCompress = { dialog = BrowserDialog.Compress(selected) },
@@ -578,11 +583,13 @@ fun BrowserScreen(
             ClipboardDialog(clip, onClear = vm::cancelClipboard, onDismiss = { dialog = null })
         }
         is BrowserDialog.Compress -> CompressDialog(
-            defaultName = ArchivePaths.defaultZipName(d.entries.map { it.name }, state.folderPath?.let { File(it).name }.orEmpty()),
+            defaultName = { format ->
+                ArchivePaths.defaultArchiveName(d.entries.map { it.name }, state.folderPath?.let { File(it).name }.orEmpty(), format)
+            },
             count = d.entries.size,
-            onConfirm = { name, password ->
+            onConfirm = { name, format, password ->
                 beforeTransfer()
-                vm.compress(d.entries.map { it.path }, name, password)
+                vm.compress(d.entries.map { it.path }, name, format, password)
                 dialog = null
             },
             onDismiss = { dialog = null },
@@ -619,6 +626,25 @@ fun BrowserScreen(
             onCancel = transfers::cancel,
             onClear = transfers::clearFinished,
             onDismiss = { showTransfers = false },
+        )
+    }
+    apk?.let { entry ->
+        ApkSheet(
+            entry = entry,
+            // המתקין של המערכת: אישור, והרשאת "התקנה ממקור לא ידוע" בפעם הראשונה.
+            onInstall = { if (!FileIntents.open(context, entry.path, entry.name)) message("אין במכשיר מתקין חבילות") },
+            onLaunch = { pkg ->
+                val launch = ApkInspector.launchIntent(context, pkg)
+                if (launch == null || !runCatching { context.startActivity(launch) }.isSuccess) message("לא ניתן לפתוח את האפליקציה")
+            },
+            onOpenWith = {
+                if (!FileIntents.openWith(context, entry.path, entry.name)) message("אין אפליקציה מתאימה")
+            },
+            onCopy = { text ->
+                clipboardManager.setText(AnnotatedString(text))
+                message("הועתק")
+            },
+            onDismiss = { apk = null },
         )
     }
     properties?.let { list ->

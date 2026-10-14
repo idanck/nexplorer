@@ -1,6 +1,6 @@
 package com.idanck.nexplorer.data.archive
 
-import com.idanck.nexplorer.core.ArchivePaths
+import com.idanck.nexplorer.core.ArchiveFormat
 import com.idanck.nexplorer.core.FileNames
 import net.lingala.zip4j.ZipFile
 import net.lingala.zip4j.exception.ZipException
@@ -17,21 +17,15 @@ import java.io.IOException
 import java.nio.file.Files
 
 /**
- * ZIP בלי אנדרואיד (נבדק ב-JVM). [checkpoint] — ביטול/השהיה של תור ההעברות; [onBytes] — התקדמות.
+ * ZIP ב-zip4j (דרך [Archives]). [checkpoint] — ביטול/השהיה של תור ההעברות; [onBytes] — התקדמות.
  * אותם כללים כמו בהעתקה: לא דורסים כלום, כותבים לשם זמני ומשנים שם בסוף, לא עוקבים אחרי קישורים.
  */
-object ZipArchives {
+internal object ZipArchives {
 
-    data class Info(val entries: Int, val totalBytes: Long, val encrypted: Boolean)
-
-    data class Extracted(val created: List<File>, val skipped: Int)
-
-    class WrongPassword : IOException("סיסמה שגויה")
-
-    fun inspect(archive: File): Info = ZipFile(archive).use { zip ->
+    fun inspect(archive: File): Archives.Info = ZipFile(archive).use { zip ->
         if (!zip.isValidZipFile) throw IOException("זה לא קובץ ZIP תקין")
         val headers = zip.fileHeaders
-        Info(headers.count { !it.isDirectory }, headers.sumOf { it.uncompressedSize }, zip.isEncrypted)
+        Archives.Info(ArchiveFormat.Zip, headers.count { !it.isDirectory }, headers.sumOf { it.uncompressedSize }, zip.isEncrypted)
     }
 
     /**
@@ -125,83 +119,38 @@ object ZipArchives {
         zip.closeEntry()
     }
 
-    /**
-     * מחלץ לתוך [targetDir] (קיימת). רשומה שהנתיב שלה יוצא מהתיקייה (zip slip) — מדולגת ונספרת.
-     * קובץ שכבר קיים לא נדרס: מקבל שם פנוי. בכשל או ביטול נמחק מה שנוצר כאן.
-     */
+    /** רשומה מוצפנת בלי סיסמה — [Archives.WrongPassword]; הסיסמה עצמה נבדקת בקריאה הראשונה. */
     suspend fun extract(
         archive: File,
-        targetDir: File,
+        target: ExtractTarget,
         password: CharArray?,
         checkpoint: suspend () -> Unit,
+        onTotal: (Long) -> Unit,
         onBytes: (Long) -> Unit,
-    ): Extracted {
-        val root = targetDir.canonicalFile
-        val created = mutableListOf<File>()
-        var skipped = 0
+    ) {
         try {
             ZipFile(archive, password?.takeIf { it.isNotEmpty() }).use { zip ->
                 if (!zip.isValidZipFile) throw IOException("זה לא קובץ ZIP תקין")
-                if (zip.isEncrypted && (password == null || password.isEmpty())) throw WrongPassword()
+                if (zip.isEncrypted && (password == null || password.isEmpty())) throw Archives.WrongPassword()
+                onTotal(zip.fileHeaders.sumOf { it.uncompressedSize })
                 for (header in zip.fileHeaders) {
                     checkpoint()
-                    val relative = ArchivePaths.safeRelative(header.fileName)
-                    val out = relative?.let { File(root, it) }
-                    if (out == null || !out.canonicalPath.startsWith(root.path + File.separator)) {
-                        skipped++
-                        continue
-                    }
+                    val out = target.resolve(header.fileName) ?: continue
                     if (header.isDirectory) {
-                        if (!out.exists()) {
-                            if (!out.mkdirs()) throw IOException("לא ניתן ליצור את \"${out.name}\"")
-                            created += out
-                        }
+                        target.directory(out)
                         continue
                     }
-                    val parent = out.parentFile!!
-                    if (!parent.exists()) {
-                        // כל רמה שחסרה נרשמת — רוב ה-ZIP-ים בלי רשומות תיקייה, וביטול צריך לנקות את כולן.
-                        val missing = generateSequence(parent) { it.parentFile }.takeWhile { !it.exists() }.toList().asReversed()
-                        if (!parent.mkdirs()) throw IOException("לא ניתן ליצור את \"${parent.name}\"")
-                        created += missing
-                    }
-                    val part = File(parent, ".${out.name}.nexplorer-part")
-                    try {
-                        zip.getInputStream(header).use { input ->
-                            FileOutputStream(part).use { output ->
-                                val buffer = ByteArray(BUFFER)
-                                while (true) {
-                                    checkpoint()
-                                    val read = input.read(buffer)
-                                    if (read < 0) break
-                                    output.write(buffer, 0, read)
-                                    onBytes(read.toLong())
-                                }
-                                output.fd.sync()
-                            }
-                        }
-                        // השם נבדק רק עכשיו, ממש לפני ה-rename: קובץ שנוצר באמצע הכתיבה לא נדרס.
-                        val dest = freeName(parent, out.name)
-                        if (!part.renameTo(dest)) throw IOException("לא ניתן לשמור את \"${dest.name}\"")
-                        created += dest
-                        if (header.lastModifiedTimeEpoch > 0) dest.setLastModified(header.lastModifiedTimeEpoch)
-                    } finally {
-                        part.delete()
+                    zip.getInputStream(header).use { input ->
+                        target.file(out, input, header.lastModifiedTimeEpoch, checkpoint, onBytes)
                     }
                     // zip4j שומר כל זרם שנפתח (עם החוצצים שלו) עד close — בארכיון של עשרות אלפי רשומות זה
                     // מאות MB. close משחרר, וגישה לרשומה הבאה פותחת מחדש.
                     zip.close()
                 }
             }
-        } catch (e: Throwable) {
-            // מהעמוק לרדוד: קבצים, ואז התיקיות שיצרנו (רק אם התרוקנו). Throwable — גם OutOfMemoryError.
-            created.asReversed().forEach { it.delete() }
-            throw when {
-                e is ZipException && e.type == ZipException.Type.WRONG_PASSWORD -> WrongPassword()
-                else -> e
-            }
+        } catch (e: ZipException) {
+            throw if (e.type == ZipException.Type.WRONG_PASSWORD) Archives.WrongPassword() else e
         }
-        return Extracted(created, skipped)
     }
 
     private fun isLink(file: File): Boolean = runCatching { Files.isSymbolicLink(file.toPath()) }.getOrDefault(false)

@@ -43,7 +43,7 @@ object FileKinds {
             "txt", "md", "csv", "json", "xml", "yml", "yaml", "log", "cfg", "conf", "ini", "toml",
             "kt", "kts", "java", "js", "py", "sh", "html", "css", "properties", "gradle",
         ).forEach { put(it, FileKind.Text) }
-        listOf("zip", "7z", "rar", "tar", "gz", "tgz", "bz2", "xz", "zst")
+        listOf("zip", "7z", "rar", "tar", "gz", "tgz", "bz2", "tbz2", "tbz", "xz", "txz", "zst")
             .forEach { put(it, FileKind.Archive) }
         put("apk", FileKind.Apk)
         put("apks", FileKind.Apk)

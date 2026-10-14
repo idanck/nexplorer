@@ -25,6 +25,17 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!--
+      גיליון ה-APK: מה מותקן באותה חבילה. רק אפליקציות עם סמל במסך הבית נראות לנו —
+      בלי ההרשאה הרגישה QUERY_ALL_PACKAGES.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
     <application
         android:name=".NexplorerApp"
         android:allowBackup="false"

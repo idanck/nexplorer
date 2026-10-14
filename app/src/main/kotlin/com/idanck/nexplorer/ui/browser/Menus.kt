@@ -206,7 +206,8 @@ class ItemMenuModel(
     val onProperties: () -> Unit,
     /** קובץ בודד עד 1 MB. */
     val canEditText: Boolean = false,
-    val isZip: Boolean = false,
+    /** ארכיון שנפתח כאן (ZIP, 7z, TAR…). */
+    val isArchive: Boolean = false,
     /** הארכיון נוצר בתיקייה הנוכחית — באוסף אין כזו. */
     val canCompress: Boolean = false,
     val onEditText: () -> Unit = {},
@@ -220,7 +221,7 @@ fun ItemMenu(expanded: Boolean, onDismiss: () -> Unit, model: ItemMenuModel) {
     NexplorerMenu(expanded, onDismiss) {
         if (model.single && !model.isFolder) MenuRow("פתיחה באמצעות", Icons.AutoMirrored.Outlined.OpenInNew, act(model.onOpenWith))
         if (model.canEditText) MenuRow("ערוך כטקסט", Icons.Outlined.EditNote, act(model.onEditText))
-        if (model.isZip) MenuRow("חלץ", Icons.Outlined.Unarchive, act(model.onExtract))
+        if (model.isArchive) MenuRow("חלץ", Icons.Outlined.Unarchive, act(model.onExtract))
         if (model.canCompress) MenuRow("הוסף לארכיון", Icons.Outlined.Archive, act(model.onCompress))
         MenuRow("העבר", Icons.AutoMirrored.Outlined.DriveFileMove, act(model.onMove))
         if (model.single) MenuRow("העתק נתיב", Icons.Outlined.Link, act(model.onCopyPath))

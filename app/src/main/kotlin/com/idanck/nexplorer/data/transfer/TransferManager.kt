@@ -3,7 +3,7 @@ package com.idanck.nexplorer.data.transfer
 import android.content.Context
 import android.os.Build
 import com.idanck.nexplorer.core.FileNames
-import com.idanck.nexplorer.data.archive.ZipArchives
+import com.idanck.nexplorer.data.archive.Archives
 import com.idanck.nexplorer.data.files.LocalFiles
 import com.idanck.nexplorer.data.files.MediaScan
 import kotlinx.coroutines.CoroutineScope
@@ -275,7 +275,7 @@ class TransferManager(private val context: Context, private val scope: Coroutine
         val dest = File(targetDir, uniqueIn(targetDir, requireNotNull(job.archiveName)))
         set(job.id) { it.copy(status = TransferStatus.Running, totalBytes = total, currentName = dest.name) }
         val progress = Progress(job.id)
-        val created = ZipArchives.compress(sources, dest, secrets[job.id], checkpoint = { checkpoint(job.id) }, onBytes = progress::add)
+        val created = Archives.compress(sources, dest, secrets[job.id], checkpoint = { checkpoint(job.id) }, onBytes = progress::add)
         touched(null, created)
     }
 
@@ -283,24 +283,32 @@ class TransferManager(private val context: Context, private val scope: Coroutine
         val archive = File(job.sources.single())
         val parent = File(requireNotNull(job.targetDir))
         if (!parent.canWrite()) throw IOException("אין הרשאת כתיבה בתיקיית היעד")
-        val info = ZipArchives.inspect(archive)
-        set(job.id) { it.copy(status = TransferStatus.Running, totalBytes = info.totalBytes, currentName = archive.name) }
+        set(job.id) { it.copy(status = TransferStatus.Running, currentName = archive.name) }
         // "חלץ לתיקייה": תיקייה חדשה בשם פנוי — היא שלנו, ולכן בכשל אפשר למחוק אותה כולה.
         val folder = job.archiveName?.let { name ->
             File(parent, uniqueIn(parent, name)).also { if (!it.mkdirs()) throw IOException("לא ניתן ליצור את \"${it.name}\"") }
         }
         val progress = Progress(job.id)
         val result = try {
-            ZipArchives.extract(archive, folder ?: parent, secrets[job.id], checkpoint = { checkpoint(job.id) }, onBytes = progress::add)
+            Archives.extract(
+                archive,
+                folder ?: parent,
+                secrets[job.id],
+                checkpoint = { checkpoint(job.id) },
+                onTotal = { total -> set(job.id) { it.copy(totalBytes = total) } },
+                onBytes = progress::add,
+            )
         } catch (e: Exception) {
             folder?.deleteRecursively()
             throw e
         }
         folder?.let { touched(null, it) }
         result.created.forEach { touched(null, it) }
-        if (result.skipped > 0) {
-            set(job.id) { it.copy(note = "${result.skipped} רשומות בארכיון דולגו — הנתיב שלהן יוצא מתיקיית החילוץ") }
-        }
+        val notes = listOfNotNull(
+            "${result.unsafe} רשומות דולגו — הנתיב שלהן יוצא מתיקיית החילוץ".takeIf { result.unsafe > 0 },
+            "${result.special} קישורים או קבצים מיוחדים לא נוצרו".takeIf { result.special > 0 },
+        )
+        if (notes.isNotEmpty()) set(job.id) { it.copy(note = notes.joinToString(" · ")) }
     }
 
     private fun recordMove(id: Long, from: File, to: File) {

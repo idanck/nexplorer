@@ -15,20 +15,17 @@ object ArchivePaths {
         return parts.joinToString("/")
     }
 
-    /** שם ה-ZIP כברירת מחדל: הפריט היחיד, או שם התיקייה שבה הם נמצאים. */
-    fun defaultZipName(names: List<String>, folderName: String): String {
+    /** שם הארכיון כברירת מחדל: הפריט היחיד, או שם התיקייה שבה הם נמצאים. */
+    fun defaultArchiveName(names: List<String>, folderName: String, format: ArchiveFormat): String {
         val base = names.singleOrNull()?.let { name ->
             val dot = name.lastIndexOf('.')
             if (dot > 0) name.substring(0, dot) else name
         } ?: folderName.ifBlank { "archive" }
-        return "$base.zip"
+        return "$base.${format.extension}"
     }
 
-    /** תיקיית החילוץ: שם הארכיון בלי `.zip`. */
-    fun extractFolderName(archiveName: String): String {
-        val dot = archiveName.lastIndexOf('.')
-        return (if (dot > 0) archiveName.substring(0, dot) else archiveName).ifBlank { "archive" }
-    }
+    /** תיקיית החילוץ: שם הארכיון בלי הסיומת שלו (`a.tar.gz` ← `a`). */
+    fun extractFolderName(archiveName: String): String = ArchiveFormats.baseName(archiveName).ifBlank { "archive" }
 
     private val DRIVE = Regex("^[A-Za-z]:$")
 }

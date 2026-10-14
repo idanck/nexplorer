@@ -99,6 +99,8 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.video)
     implementation(libs.zip4j)
+    implementation(libs.commons.compress)
+    implementation(libs.xz)
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
