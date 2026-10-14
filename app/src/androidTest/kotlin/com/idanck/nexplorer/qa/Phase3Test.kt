@@ -98,9 +98,12 @@ class Phase3Test {
         Qa.screenshot(compose, "71-extract-7z")
         compose.onNodeWithText("חלץ לתיקייה", substring = true).performClick()
         val extracted = File(root, "Documents (1)/Documents")
-        compose.waitForDisk(60_000) { File(extracted, "notes.txt").isFile && File(extracted, "דוח שנתי 2026.txt").isFile }
+        // החילוץ רץ רשומה אחרי רשומה: מחכים לכל השלוש, כל אחת בגודל המלא שלה.
+        compose.waitForDisk(60_000) {
+            File(extracted, "notes.txt").isFile && File(extracted, "דוח שנתי 2026.txt").isFile &&
+                File(extracted, "report.pdf").length() == 48 * 1024L
+        }
         assertTrue(File(extracted, "דוח שנתי 2026.txt").readText().startsWith("שלום"))
-        assertEquals(48 * 1024L, File(extracted, "report.pdf").length())
     }
 
     @Test
