@@ -14,24 +14,29 @@ import java.util.UUID
 
 /**
  * כל המקומות ברשת: לפי המזהה שבנתיב ([NetPaths]) מוצא את החיבור השמור, ופותח לו [RemoteFs] אחד שנשמר
- * עד שהחיבור משתנה או נמחק. [connectionOf] ו-[passwordOf] — מההעדפות ומה-Keystore (באפליקציה), או
- * ישירות (בבדיקות מול שרת).
+ * עד שהחיבור משתנה או נמחק. [connectionOf] — מההעדפות; [decrypt] — פותח את הצפנים שבחיבור (הסיסמה
+ * והמפתח הפרטי) ב-Keystore. בבדיקות מול שרת — ישירות.
  */
 class RemoteFiles(
     private val connectionOf: (String) -> NetConnection?,
-    private val passwordOf: (NetConnection) -> CharArray?,
+    private val decrypt: (String) -> CharArray,
 ) {
     private val open = HashMap<String, Pair<NetConnection, RemoteFs>>()
 
-    /** [IOException] כשהחיבור נמחק (מועדף ישן) או שהסיסמה שלו לא נקראת. */
+    /** [IOException] כשהחיבור נמחק (מועדף ישן) או שהסיסמה או המפתח שלו לא נקראים. */
     fun fsFor(path: String): RemoteFs {
         val id = NetPaths.connectionId(path) ?: throw IOException("נתיב רשת לא תקין")
         val connection = connectionOf(id) ?: throw IOException("החיבור הזה נמחק מהמגירה")
         synchronized(open) {
             open[id]?.let { (known, fs) -> if (known == connection) return fs else fs.close() }
-            val password = connection.secret?.let { passwordOf(connection) }
+            val password = connection.secret?.let(decrypt)
             val fs = try {
-                create(connection, password)
+                val key = connection.keySecret?.let(decrypt)
+                try {
+                    create(connection, password, key)
+                } finally {
+                    key?.fill('\u0000')
+                }
             } finally {
                 password?.fill('\u0000')
             }
@@ -72,8 +77,8 @@ class RemoteFiles(
     }
 
     suspend fun rename(path: String, newName: String): Result<String> = io {
-        val parent = NetPaths.parent(path) ?: throw IOException("אי אפשר לשנות שם של שיתוף")
-        if (NetPaths.segments(path).size < 2) throw IOException("אי אפשר לשנות שם של שיתוף")
+        val parent = NetPaths.parent(path) ?: throw IOException(if (NetPaths.isShareList(path)) "אי אפשר לשנות שם של שיתוף" else "אי אפשר לשנות את השם של השורש בשרת")
+        if (NetPaths.isShare(path)) throw IOException("אי אפשר לשנות שם של שיתוף")
         validate(parent, newName)
         val target = NetPaths.child(parent, newName)
         if (target == path) return@io path
@@ -93,19 +98,20 @@ class RemoteFiles(
         for (path in paths) {
             val fs = fsFor(path)
             // רשימת השיתופים: לא סורקים את כל השרת — רק סופרים שיתופים.
-            if (NetPaths.segments(path).isEmpty()) {
+            if (NetPaths.isShareList(path)) {
                 folders += fs.list(path).size
                 continue
             }
             val root = fs.stat(path) ?: continue
-            if (root.isDirectory) stack.addLast(path) else {
+            if (root.isDirectory && !root.isLink) stack.addLast(path) else {
                 files++
                 bytes += root.size
             }
             while (stack.isNotEmpty()) {
                 currentCoroutineContext().ensureActive()
                 for (child in fs.list(stack.removeLast())) {
-                    if (child.isDirectory) {
+                    // קישור — לא נכנסים דרכו (קישור ל-/ היה סורק את כל השרת).
+                    if (child.isDirectory && !child.isLink) {
                         folders++
                         stack.addLast(child.path)
                     } else {
@@ -164,7 +170,7 @@ class RemoteFiles(
     private fun validate(parent: String, name: String) {
         val protocol = NetPaths.protocolOf(parent) ?: NetProtocol.Smb
         NetPaths.validateName(protocol, name)?.let { throw IOException(it) }
-        if (NetPaths.segments(parent).isEmpty()) throw IOException("פתח שיתוף כדי ליצור בו")
+        if (NetPaths.isShareList(parent)) throw IOException("פתח שיתוף כדי ליצור בו")
     }
 
     private suspend fun <T> io(block: () -> T): Result<T> = withContext(Dispatchers.IO) {
@@ -179,23 +185,40 @@ class RemoteFiles(
         const val CACHE_DIR = "remote"
         private const val BUFFER = 256 * 1024
 
-        fun create(connection: NetConnection, password: CharArray?): RemoteFs = when (connection.protocol) {
+        fun create(connection: NetConnection, password: CharArray?, privateKey: CharArray? = null): RemoteFs = when (connection.protocol) {
             NetProtocol.Smb -> SmbFs(connection, password)
+            NetProtocol.Sftp -> SftpFs(connection, password, privateKey)
         }
 
         /**
-         * "בדוק והתחבר": חיבור זמני בפרטים שהוזנו — רשימת השורש (השיתופים, או השיתוף שנבחר).
-         * null — הצליח; אחרת ההודעה.
+         * "בדוק והתחבר": חיבור זמני בפרטים שהוזנו — רשימת השורש (השיתופים, השיתוף שנבחר, או התיקייה ב-SFTP).
+         * SFTP עם [NetConnection.HOME] — נפתח בתיקיית הבית, והחיבור שחוזר כבר מכיל אותה.
          */
-        suspend fun test(connection: NetConnection, password: CharArray?): String? = withContext(Dispatchers.IO) {
+        suspend fun test(connection: NetConnection, password: CharArray?, privateKey: CharArray? = null): ConnectCheck = withContext(Dispatchers.IO) {
             try {
-                create(connection, password).use { it.list(connection.root) }
-                null
+                create(connection, password, privateKey).use { fs ->
+                    val resolved = if (fs is SftpFs && connection.share == NetConnection.HOME) connection.copy(share = fs.home()) else connection
+                    fs.list(resolved.root)
+                    ConnectCheck.Ok(resolved)
+                }
+            } catch (e: HostKeyUntrusted) {
+                ConnectCheck.TrustHost(e.offered, e.changed)
             } catch (e: IOException) {
-                e.message ?: "החיבור נכשל"
+                ConnectCheck.Failed(e.message ?: "החיבור נכשל")
             } catch (e: RuntimeException) {
-                e.message ?: "החיבור נכשל"
+                ConnectCheck.Failed(e.message ?: "החיבור נכשל")
             }
         }
     }
+}
+
+/** התוצאה של "בדוק והתחבר". */
+sealed interface ConnectCheck {
+    /** הצליח. [connection] — עם מה שהבדיקה השלימה (תיקיית הבית ב-SFTP). */
+    data class Ok(val connection: NetConnection) : ConnectCheck
+
+    data class Failed(val message: String) : ConnectCheck
+
+    /** SFTP: שרת שעוד לא אושר, או שהמפתח שלו השתנה — שואלים את המשתמש לפני שממשיכים. */
+    data class TrustHost(val hostKey: String, val changed: Boolean) : ConnectCheck
 }

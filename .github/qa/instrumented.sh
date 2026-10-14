@@ -74,6 +74,12 @@ run_class Phase4Test
 run_class Phase4bTest
 run_class Phase4cTest
 run_class Phase5aTest
+# המפתחות של sftp-server.sh (וטביעת האצבע של השרת) — Phase5bTest קורא אותם מהמכשיר.
+if [ -d /tmp/nexplorer-sftp/keys ]; then
+  adb shell mkdir -p /sdcard/nexplorer-qa-keys
+  adb push /tmp/nexplorer-sftp/keys/. /sdcard/nexplorer-qa-keys/ > /dev/null
+fi
+run_class Phase5bTest
 # Phase2bTest מדמה טאבלט ו-Phase3bTest מסובב; אם התהליך קרס לפני tearDown — שהמונקי ירוץ על המסך הרגיל.
 adb shell wm size reset || true
 adb shell wm density reset || true

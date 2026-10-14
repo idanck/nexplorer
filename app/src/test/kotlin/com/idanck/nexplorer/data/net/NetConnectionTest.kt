@@ -54,4 +54,34 @@ class NetConnectionTest {
         assertNotEquals(a, b)
         assertTrue(a.matches(Regex("[0-9a-f]{12}")))
     }
+
+    private val pi = NetConnection(
+        id = "0f0f0f0f0f0f",
+        protocol = NetProtocol.Sftp,
+        name = "",
+        host = "192.168.50.83",
+        port = 41725,
+        share = "home/idan",
+        user = "idan",
+        secret = "aXY=:cGs=",
+        hostKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIARk2H5Oiday1HWmOEmiYJHdVqW5oLiGDoUrxA4N8FWP",
+        keySecret = "aXY=:a2V5",
+    )
+
+    @Test
+    fun `sftp keeps the host key and the private key`() {
+        assertEquals(listOf(pi), NetConnection.decode(NetConnection.encode(listOf(pi))))
+        assertEquals("sftp://0f0f0f0f0f0f/home/idan", pi.root)
+        assertEquals("sftp://0f0f0f0f0f0f", pi.copy(share = "").root)
+        assertEquals("idan@192.168.50.83:41725", pi.subtitle)
+        assertEquals("sftp://192.168.50.83:41725/home/idan/x", pi.displayUrl("${pi.root}/x"))
+        assertEquals("sftp://192.168.50.83:41725/", pi.displayUrl("sftp://0f0f0f0f0f0f"))
+        assertEquals(22, pi.copy(port = null).effectivePort)
+    }
+
+    @Test
+    fun `records saved before sftp have no keys`() {
+        val old = """[{"id":"a1b2c3d4e5f6","protocol":"Smb","name":"NAS","host":"192.168.50.171","port":null,"share":"volume2","user":"idanc","domain":"","secret":"aXY=:c2Vh"}]"""
+        assertEquals(listOf(nas), NetConnection.decode(old))
+    }
 }

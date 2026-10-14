@@ -38,6 +38,18 @@ internal object SmbErrors {
             }
             return IOException(message, e)
         }
+        NetErrors.network(e, connection)?.let { return it }
+        return e as? IOException ?: IOException(e.message ?: "שגיאת רשת", e)
+    }
+}
+
+/** שגיאות רשת שמשותפות לכל הפרוטוקולים: שרת שלא נמצא, שלא עונה, או שלא מקבל חיבורים. */
+internal object NetErrors {
+
+    /** null — זו לא שגיאת רשת. */
+    fun network(e: Throwable, connection: NetConnection): IOException? {
+        val server = connection.subtitle.substringAfter('@')
+        val chain = generateSequence(e) { it.cause }.toList()
         val message = when (chain.firstOrNull { it is UnknownHostException || it is ConnectException || it is NoRouteToHostException || it is SocketTimeoutException || it is TimeoutException }) {
             is UnknownHostException -> "השרת $server לא נמצא — בדוק את הכתובת"
             is ConnectException -> "השרת $server לא מקבל חיבורים (פורט ${connection.effectivePort})"
@@ -45,7 +57,6 @@ internal object SmbErrors {
             is SocketTimeoutException, is TimeoutException -> "השרת $server לא עונה"
             else -> null
         }
-        if (message != null) return IOException(message, e)
-        return e as? IOException ?: IOException(e.message ?: "שגיאת רשת", e)
+        return message?.let { IOException(it, e) }
     }
 }

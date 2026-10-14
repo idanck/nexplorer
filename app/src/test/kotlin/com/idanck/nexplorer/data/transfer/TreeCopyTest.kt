@@ -22,19 +22,23 @@ private class MemorySide : Side {
     val dirs = sortedSetOf("mem:")
     val files = sortedMapOf<String, ByteArray>()
     val modified = HashMap<String, Long>()
+    /** קישורים (כמו בשרת SFTP): הנתיב ← התיקייה שהוא מצביע עליה. רשימה דרכו — של היעד. */
+    val links = HashMap<String, String>()
     /** שם קובץ שהכתיבה אליו נכשלת באמצע. */
     var failOn: String? = null
 
     override fun stat(path: String): Node? = when {
+        path in links -> Node(path, path.substringAfterLast('/'), true, 0, 0, isLink = true)
         path in dirs -> Node(path, path.substringAfterLast('/'), true, 0, modified[path] ?: 0)
         path in files -> Node(path, path.substringAfterLast('/'), false, files.getValue(path).size.toLong(), modified[path] ?: 0)
         else -> null
     }
 
     override fun list(dir: String): List<Node> {
+        links[dir]?.let { target -> return list(target).map { it.copy(path = "$dir/${it.name}") } }
         if (dir !in dirs) throw IOException("no dir $dir")
         val prefix = "$dir/"
-        return (dirs + files.keys).filter { it.startsWith(prefix) && '/' !in it.removePrefix(prefix) }.map { stat(it)!! }
+        return (dirs + files.keys + links.keys).filter { it.startsWith(prefix) && '/' !in it.removePrefix(prefix) }.map { stat(it)!! }
     }
 
     override fun child(dir: String, name: String) = "$dir/$name"
@@ -67,6 +71,12 @@ private class MemorySide : Side {
     }
 
     override fun delete(path: String, isDirectory: Boolean) {
+        if (path in links) {
+            // קישור נמחק כקישור (rm), לא כתיקייה.
+            if (isDirectory) throw IOException("rmdir on a link")
+            links -= path
+            return
+        }
         if (isDirectory) {
             if (list(path).isNotEmpty()) throw IOException("not empty")
             dirs -= path
@@ -209,5 +219,35 @@ class TreeCopyTest {
         }
         assertTrue(File(target, "D/1").isFile)
         assertTrue("mem:/share/D/late" in server.files)
+    }
+
+    @Test
+    fun `links are never followed - delete removes the link, copy and counts skip it`() = runBlocking {
+        val server = MemorySide()
+        server.dirs += listOf("mem:/outside", "mem:/victim")
+        server.files["mem:/outside/keep.txt"] = "keep".toByteArray()
+        server.files["mem:/victim/f"] = "x".toByteArray()
+        server.links["mem:/victim/data"] = "mem:/outside"
+        // לולאה: קישור לשורש.
+        server.links["mem:/victim/loop"] = "mem:"
+        val copy = TreeCopy(checkpoint = {}, onBytes = {}, onName = {})
+        val victim = server.stat("mem:/victim")!!
+        assertEquals(4, copy.countOf(server, victim))
+        assertEquals(1L, copy.sizeOf(server, victim))
+
+        val other = MemorySide()
+        copy.copy(server, victim, other, "mem:", "victim", move = false)
+        assertEquals(setOf("mem:/victim/f"), other.files.keys)
+        try {
+            copy.copy(server, server.stat("mem:/victim/data")!!, other, "mem:", "data", move = false)
+            fail("copying a link to a folder")
+        } catch (e: IOException) {
+            assertTrue(e.message!!.contains("קישור לתיקייה"))
+        }
+
+        copy.delete(server, victim) {}
+        assertFalse("mem:/victim" in server.dirs)
+        assertTrue(server.links.isEmpty())
+        assertArrayEquals("keep".toByteArray(), server.files["mem:/outside/keep.txt"])
     }
 }

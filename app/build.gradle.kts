@@ -108,6 +108,8 @@ dependencies {
     implementation(libs.androidx.media3.session)
     implementation(libs.smbj)
     implementation(libs.dcerpc)
+    implementation(libs.sshj)
+    implementation(libs.bcpkix)
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
