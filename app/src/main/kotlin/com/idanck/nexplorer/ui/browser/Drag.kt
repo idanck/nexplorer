@@ -63,20 +63,23 @@ internal fun Modifier.dragSource(entry: Entry, drag: FileDrag, onTap: () -> Unit
         drawDragDecoration = {
             drawRoundRect(drag.decoration, cornerRadius = CornerRadius(NexplorerDimens.Space3.toPx()))
         },
-    ) {
-        detectTapGestures(
-            onTap = { onTap() },
-            onLongPress = {
-                val paths = drag.selectedPaths().ifEmpty { listOf(entry.path) }
-                startTransfer(
-                    DragAndDropTransferData(
-                        clipData = ClipData.newPlainText("nexplorer", paths.joinToString("\n")),
-                        localState = DragPayload(drag.pane, paths),
-                    ),
-                )
-            },
-        )
-    }
+        // block בשמו: מ-Compose 1.8 יש גם overload עם transferData, וגלאי ההתחלה שלו בפנים — למבדה
+        // בסוף הקריאה נקשרת אליו, וההקשה והלחיצה הארוכה לא עוברות דרך הגלאי שלנו.
+        block = {
+            detectTapGestures(
+                onTap = { onTap() },
+                onLongPress = {
+                    val paths = drag.selectedPaths().ifEmpty { listOf(entry.path) }
+                    startTransfer(
+                        DragAndDropTransferData(
+                            clipData = ClipData.newPlainText("nexplorer", paths.joinToString("\n")),
+                            localState = DragPayload(drag.pane, paths),
+                        ),
+                    )
+                },
+            )
+        },
+    )
 
 /** מצב יעד השחרור של שורה/חלון: המודיפייר שמחבר אותו, והאם גרירה מרחפת מעליו עכשיו. */
 class DropZone(val modifier: Modifier, val hovering: Boolean)
