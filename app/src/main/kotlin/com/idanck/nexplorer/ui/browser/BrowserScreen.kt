@@ -371,7 +371,7 @@ fun BrowserScreen(
                     }
                     if (pane == null) {
                         UpdateBanner(updateState, updateActions)
-                        Breadcrumbs(state.crumbs) { crumb -> openCrumb(vm, state, crumb) }
+                        Breadcrumbs(state.crumbs, onCrumb = { crumb -> openCrumb(vm, state, crumb) })
                     }
                     if (state.filter != null) {
                         FilterBar(state.filter.orEmpty(), onChange = vm::setFilter, onClose = { vm.setFilter(null) })

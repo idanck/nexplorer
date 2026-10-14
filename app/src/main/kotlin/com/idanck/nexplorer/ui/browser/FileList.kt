@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -200,7 +201,7 @@ private fun FileRow(entry: Entry, state: BrowserState, actions: FileListActions,
                 modifier = Modifier.fillMaxWidth(),
             )
             Text(
-                if (drop.hovering) DROP_HINT else metaLine(entry, now),
+                if (drop.hovering) AnnotatedString(DROP_HINT) else metaLine(entry, now),
                 style = if (drop.hovering) MaterialTheme.typography.labelMedium else MaterialTheme.typography.bodySmall,
                 color = if (drop.hovering) NexplorerTheme.colors.onAmberContainer else MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
