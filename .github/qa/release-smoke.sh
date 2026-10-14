@@ -35,6 +35,10 @@ else
   adb shell pm grant "$pkg" android.permission.READ_EXTERNAL_STORAGE
   adb shell pm grant "$pkg" android.permission.WRITE_EXTERNAL_STORAGE
 fi
+# ה-monkey שרץ לפני (instrumented.sh) יכול למשוך את ההגדרות המהירות ולפתוח דיאלוג של המערכת
+# (Bluetooth ב-API 35): האפליקציה נפתחת מתחתיהם ו-uiautomator לא רואה אותה. HOME סוגר את שניהם.
+adb shell input keyevent KEYCODE_HOME
+adb shell cmd statusbar collapse > /dev/null 2>&1 || true
 # בלי logcat -c: הסקריפט הראשי אוסף את ה-logcat של כל הבדיקות אחרי זה.
 adb shell am start -W -n "$pkg/.MainActivity" > /dev/null
 
