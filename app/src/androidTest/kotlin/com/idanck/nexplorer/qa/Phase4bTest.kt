@@ -25,6 +25,7 @@ import com.idanck.nexplorer.data.crypto.KeyRing
 import com.idanck.nexplorer.data.transfer.TransferKind
 import com.idanck.nexplorer.qa.Qa.waitFor
 import com.idanck.nexplorer.qa.Qa.waitForDisk
+import com.idanck.nexplorer.qa.Qa.waitGone
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
@@ -161,6 +162,8 @@ class Phase4bTest {
         compose.waitFor(hasText("סיסמה שגויה", substring = true), 30_000)
         Qa.screenshot(compose, "100-decrypt-wrong-password")
         assertTrue((0..3).all { File(photos, "shot-$it.png.enc").isFile })
+        // ההודעה יושבת מעל סרגל הבחירה — הקשה על ⋮ לפני שהיא נעלמת נוחתת עליה.
+        compose.waitGone(hasText("סיסמה שגויה", substring = true), 15_000)
 
         itemMenu("Photos", "פענח")
         compose.onNodeWithText("פענח").performClick()
