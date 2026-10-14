@@ -12,6 +12,7 @@ import com.idanck.nexplorer.core.BatchRename
 import com.idanck.nexplorer.core.Entry
 import com.idanck.nexplorer.core.FileNames
 import com.idanck.nexplorer.core.FolderSizes
+import com.idanck.nexplorer.core.NetPaths
 import com.idanck.nexplorer.core.RenamePattern
 import com.idanck.nexplorer.core.Section
 import com.idanck.nexplorer.core.ViewOptions
@@ -28,6 +29,8 @@ import com.idanck.nexplorer.data.files.MediaCollections
 import com.idanck.nexplorer.data.files.MediaScan
 import com.idanck.nexplorer.data.files.StorageVolumeInfo
 import com.idanck.nexplorer.data.files.StorageVolumes
+import com.idanck.nexplorer.data.net.NetConnection
+import com.idanck.nexplorer.data.net.RemoteSpace
 import com.idanck.nexplorer.data.transfer.TransferKind
 import com.idanck.nexplorer.data.settings.relocated
 import com.idanck.nexplorer.data.transfer.TransferStatus
@@ -81,21 +84,47 @@ data class BrowserState(
     val folderSizes: Map<String, Long> = emptyMap(),
     /** התיקייה המוצפנת (הפתוחה) שהתיקייה הנוכחית בתוכה. */
     val vaultRoot: String? = null,
+    /** המקומות ברשת שבמגירה (D3). */
+    val connections: List<NetConnection> = emptyList(),
+    /** מקום פנוי בשיתוף האחרון שנפתח בכל חיבור (מזהה → מקום), כשהשרת מדווח. */
+    val remoteSpaces: Map<String, RemoteSpace> = emptyMap(),
 ) {
     val folderPath: String? get() = (location as? Location.Folder)?.path
-    val volume: StorageVolumeInfo? get() = folderPath?.let { StorageVolumes.volumeOf(it, volumes) }
+
+    /** התיקייה הנוכחית במקום ברשת. */
+    val isRemote: Boolean get() = folderPath?.let(NetPaths::isRemote) == true
+
+    /** החיבור של התיקייה הנוכחית; null — במכשיר (או חיבור שנמחק). */
+    val connection: NetConnection?
+        get() = folderPath?.let(NetPaths::connectionId)?.let { id -> connections.firstOrNull { it.id == id } }
+
+    /** רשימת השיתופים של שרת: אין כאן תיקייה ליצור או להדביק בה. */
+    val atShareList: Boolean get() = isRemote && NetPaths.segments(folderPath.orEmpty()).isEmpty()
+
+    val remoteSpace: RemoteSpace? get() = folderPath?.let(NetPaths::connectionId)?.let(remoteSpaces::get)
+
+    val volume: StorageVolumeInfo? get() = folderPath?.takeIf { !NetPaths.isRemote(it) }?.let { StorageVolumes.volumeOf(it, volumes) }
     val inSelection: Boolean get() = selection.isNotEmpty()
     val isFavorite: Boolean get() = folderPath != null && folderPath in favorites
     val isAtRoot: Boolean
         get() = when (val loc = location) {
             is Location.Media -> false
-            is Location.Folder -> volume?.path == loc.path || loc.path == "/"
+            is Location.Folder -> if (isRemote) {
+                loc.path == connection?.root || NetPaths.segments(loc.path).isEmpty()
+            } else {
+                volume?.path == loc.path || loc.path == "/"
+            }
         }
 
     val title: String
         get() = when (val loc = location) {
             is Location.Media -> loc.collection.label
-            is Location.Folder -> if (isAtRoot) volume?.label ?: "/" else File(loc.path).name
+            is Location.Folder -> when {
+                isRemote && isAtRoot -> connection?.label ?: NetPaths.name(loc.path)
+                isRemote -> NetPaths.name(loc.path)
+                isAtRoot -> volume?.label ?: "/"
+                else -> File(loc.path).name
+            }
         }
 
     val titleIsLtr: Boolean get() = location is Location.Folder && !isAtRoot
@@ -103,7 +132,7 @@ data class BrowserState(
     val crumbs: List<Crumb>
         get() = when (val loc = location) {
             is Location.Media -> listOf(Crumb(loc.collection.label, "", isLtr = false))
-            is Location.Folder -> {
+            is Location.Folder -> if (isRemote) remoteCrumbs(loc.path) else {
                 val root = volume
                 val rootPath = root?.path ?: ""
                 val rest = loc.path.removePrefix(rootPath).trim('/').split('/').filter { it.isNotEmpty() }
@@ -117,6 +146,22 @@ data class BrowserState(
                 }
             }
         }
+
+    /** החיבור (בשמו מהמגירה), ואחריו השיתוף והתיקיות. */
+    private fun remoteCrumbs(path: String): List<Crumb> {
+        val c = connection
+        val root = c?.root?.takeIf { FileNames.isInside(path, it) } ?: NetPaths.connectionId(path)?.let { id ->
+            NetPaths.protocolOf(path)?.let { NetPaths.root(it, id) }
+        } ?: return emptyList()
+        return buildList {
+            add(Crumb(c?.label ?: NetPaths.name(root), root, isLtr = false))
+            var acc = root
+            path.removePrefix(root).trim('/').split('/').filter { it.isNotEmpty() }.forEach { segment ->
+                acc = NetPaths.child(acc, segment)
+                add(Crumb(segment, acc, isLtr = true))
+            }
+        }
+    }
 }
 
 sealed interface BrowserEvent {
@@ -133,7 +178,13 @@ sealed interface BrowserEvent {
 
     /** כניסה לתיקייה מוצפנת נעולה: הסיסמה, ואז ל-[then] (התיקייה עצמה או משהו בתוכה). */
     data class UnlockVault(val vault: Entry, val then: String) : BrowserEvent
+
+    /** קבצים ברשת: הורדה לעותק זמני (חלון עם התקדמות), ואז [purpose] על העותק. */
+    data class Fetch(val entries: List<Entry>, val purpose: FetchPurpose) : BrowserEvent
 }
+
+/** מה עושים עם קובץ מהרשת אחרי שהורד לעותק זמני. */
+enum class FetchPurpose { Open, OpenWith, Share }
 
 /** תוצאה של שינוי שם מרובה. */
 data class BatchRenameResult(val renamed: Int, val failed: List<String>, val moved: List<Pair<String, String>>)
@@ -148,6 +199,7 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
     private val settings = container.settings
     private val transfers = container.transfers
     private val vaults = container.vaults
+    private val remote = container.remote
 
     // הנפחים נטענים מייד (StatFs זול): בלעדיהם הפריימים הראשונים מציגים "/ › storage › emulated › 0",
     // ו"חזרה" מיידית יוצאת מהשורש. המיקום ולוח הגזירים שורדים הריגת תהליך ברקע.
@@ -186,7 +238,7 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
         }
         viewModelScope.launch {
             // שינוי בהעדפות (מכאן או מההגדרות) — מיון מחדש; "הצג מוסתרים" — רישום מחדש.
-            settings.state.drop(1).map { Triple(it.viewFor(_state.value.folderPath), it.favorites, it.hiddenFolders) }
+            settings.state.drop(1).map { listOf(it.viewFor(_state.value.folderPath), it.favorites, it.hiddenFolders, it.connections) }
                 .distinctUntilChanged()
                 .collect { applySettings(reload = true) }
         }
@@ -208,6 +260,10 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
         saved.get<String>(KEY_LOCATION)?.let { key ->
             if (key.startsWith(MEDIA_PREFIX)) {
                 MediaCollection.entries.firstOrNull { it.name == key.removePrefix(MEDIA_PREFIX) }?.let { return Location.Media(it) }
+            } else if (NetPaths.isRemote(key)) {
+                // אחרי הריגת התהליך — חוזרים לאותה תיקייה ברשת, אם החיבור עוד במגירה.
+                val id = NetPaths.connectionId(key)
+                if (settings.state.value.connections.any { it.id == id }) return Location.Folder(key)
             } else if (File(key).isDirectory) {
                 return Location.Folder(outsideLockedVault(key))
             }
@@ -219,6 +275,7 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
 
     /** תיקייה בתוך תיקייה מוצפנת נעולה (אחרי הפעלה מחדש) — במקומה, התיקייה שמעל התיקייה המוצפנת. */
     private fun outsideLockedVault(path: String): String {
+        if (NetPaths.isRemote(path)) return path
         val root = Vaults.rootOf(File(path)) ?: return path
         return if (vaults.isUnlocked(root)) path else root.parent ?: StorageVolumes.primaryPath()
     }
@@ -276,6 +333,12 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
         }
         when {
             entry.isDirectory -> navigate(Location.Folder(entry.path))
+            // ברשת: עותק זמני במכשיר, ואז פתיחה רגילה. קובץ מוצפן, ארכיון ו-APK — מהעותק, כקובץ.
+            NetPaths.isRemote(entry.path) -> if (EncryptedFiles.hasEncryptedName(entry.name)) {
+                emit("קובץ מוצפן ברשת — העתק אותו למכשיר כדי לפתוח או לפענח")
+            } else {
+                emitEvent(BrowserEvent.Fetch(listOf(entry), FetchPurpose.Open))
+            }
             EncryptedFiles.hasEncryptedName(entry.name) -> {
                 val vault = Vaults.rootOf(File(entry.path))
                 emitEvent(BrowserEvent.OpenEncrypted(entry, inVault = vault != null && vaults.isUnlocked(vault)))
@@ -287,7 +350,7 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
     }
 
     fun navigate(location: Location) {
-        val vault = (location as? Location.Folder)?.let { Vaults.rootOf(File(it.path)) }
+        val vault = (location as? Location.Folder)?.takeIf { !NetPaths.isRemote(it.path) }?.let { Vaults.rootOf(File(it.path)) }
         if (vault != null && !vaults.isUnlocked(vault)) {
             emitEvent(BrowserEvent.UnlockVault(LocalFiles.entryOf(vault, countChildren = false), (location as Location.Folder).path))
             return
@@ -305,12 +368,15 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
         sizesJob?.cancel()
         applySettings(reload = false)
         load()
-        if (location is Location.Folder) {
+        // "פתח בתיקייה האחרונה" — רק במכשיר: הפעלה לא מתחילה בהתחברות לשרת (ואולי מחוץ לבית).
+        if (location is Location.Folder && !NetPaths.isRemote(location.path)) {
             viewModelScope.launch { settings.update { it.copy(lastFolder = location.path) } }
         }
     }
 
     fun openPath(path: String) {
+        // מועדף ברשת — תיקייה (מועדפים הם תמיד תיקיות).
+        if (NetPaths.isRemote(path)) return navigate(Location.Folder(path))
         val file = File(path)
         when {
             file.isDirectory -> navigate(Location.Folder(file.absolutePath))
@@ -325,9 +391,14 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
         when (val loc = s.location) {
             is Location.Media -> navigate(Location.Folder(s.volumes.firstOrNull()?.path ?: StorageVolumes.primaryPath()))
             is Location.Folder -> {
+                // בשורש של חיבור ברשת "למעלה" חוזר למכשיר — לא יוצא מהאפליקציה.
+                if (s.isRemote && s.isAtRoot) {
+                    navigate(Location.Folder(StorageVolumes.primaryPath()))
+                    return true
+                }
                 if (s.isAtRoot) return false
-                val parent = File(loc.path).parentFile?.absolutePath ?: return false
-                navigate(Location.Folder(parent))
+                val parent = NetPaths.parentOf(loc.path) ?: return false
+                navigate(Location.Folder(if (s.isRemote) parent else File(parent).absolutePath))
             }
         }
         return true
@@ -342,7 +413,11 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
         _state.update { it.copy(loading = true) }
         loadJob = viewModelScope.launch {
             val result = when (location) {
-                is Location.Folder -> LocalFiles.list(location.path, showHidden)
+                is Location.Folder -> if (NetPaths.isRemote(location.path)) {
+                    remote.list(location.path).map { list -> if (showHidden) list else list.filter { !it.isHidden } }
+                } else {
+                    LocalFiles.list(location.path, showHidden)
+                }
                 is Location.Media -> MediaCollections.list(getApplication(), location.collection)
                     .map { list -> if (showHidden) list else list.filter { !it.isHidden } }
             }
@@ -359,12 +434,22 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
                         )
                     }
                     computeFolderSizes()
+                    if (location is Location.Folder && NetPaths.isRemote(location.path)) loadSpace(location.path)
                 }
                 .onFailure { e ->
                     _state.update {
                         it.copy(listed = emptyList(), entries = emptyList(), sections = emptyList(), loading = false, error = e.message)
                     }
                 }
+        }
+    }
+
+    /** מקום פנוי בשיתוף — בקשה נפרדת, אחרי שהרשימה כבר מוצגת. */
+    private fun loadSpace(path: String) {
+        val id = NetPaths.connectionId(path) ?: return
+        viewModelScope.launch {
+            val space = remote.space(path) ?: return@launch
+            _state.update { it.copy(remoteSpaces = it.remoteSpaces + (id to space)) }
         }
     }
 
@@ -380,6 +465,7 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
                 viewIsFolderScoped = path != null && path in s.folderViews,
                 favorites = s.favorites,
                 hiddenFolders = s.hiddenFolders,
+                connections = s.connections,
             )
         }
         if (reload && hiddenChanged) {
@@ -398,7 +484,8 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
         sizesJob?.cancel()
         val s = _state.value
         val location = s.location
-        if (!s.view.showFolderSizes || location !is Location.Folder) {
+        // ברשת: חישוב גודל של כל תיקייה הוא סריקה של השרת — לא ברקע, בלי שביקשו.
+        if (!s.view.showFolderSizes || location !is Location.Folder || NetPaths.isRemote(location.path)) {
             if (s.folderSizes.isNotEmpty()) {
                 _state.update { it.copy(folderSizes = emptyMap()) }
                 arrange()
@@ -578,7 +665,7 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
     fun sendTo(paths: List<String>, targetDir: String, move: Boolean) {
         if (paths.isEmpty()) return
         // לאותה תיקייה: העברה היא כלום, והעתקה רק משכפלת בשם אחר — לא מה שהתכוונו בגרירה בין חלונות.
-        if (paths.all { File(it).parent == targetDir }) {
+        if (paths.all { NetPaths.parentOf(it) == targetDir }) {
             emit("הפריטים כבר בתיקייה הזו")
             return
         }
@@ -589,7 +676,7 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
     // ---------- ארכיונים ושינוי שם מרובה ----------
 
     fun compress(paths: List<String>, archiveName: String, format: ArchiveFormat, password: CharArray?) {
-        val folder = _state.value.folderPath ?: return
+        val folder = _state.value.folderPath?.takeIf { !NetPaths.isRemote(it) } ?: return
         val name = ArchiveFormats.withExtension(archiveName, format)
         transfers.enqueue(TransferKind.Compress, paths, folder, archiveName = name, password = password)
         clearSelection()
@@ -648,7 +735,7 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
 
     /** "תיקייה מוצפנת" בכפתור "חדש": נוצרת פתוחה. */
     fun createVault(name: String, password: CharArray) {
-        val folder = _state.value.folderPath ?: return
+        val folder = _state.value.folderPath?.takeIf { !NetPaths.isRemote(it) } ?: return
         viewModelScope.launch {
             val created = withContext(Dispatchers.IO) { runCatching { Vaults.create(File(folder), name, password) } }
             password.fill('\u0000')
@@ -693,7 +780,7 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
      * כך שגם אם התהליך נהרג באמצע, הקובץ נשאר גלוי ואפשר לזהות מה הוא היה.
      */
     fun batchRename(entries: List<Entry>, pattern: RenamePattern) {
-        val folder = _state.value.folderPath ?: return
+        val folder = _state.value.folderPath?.takeIf { !NetPaths.isRemote(it) } ?: return
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) { renameAll(File(folder), entries, pattern) }
             clearSelection()
@@ -751,17 +838,68 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
         return BatchRenameResult(renamed, failed, moved)
     }
 
-    fun createFolder(name: String) = runOp { LocalFiles.createFolder(requireNotNull(_state.value.folderPath), name) }
+    fun createFolder(name: String) = runOp {
+        val folder = requireNotNull(_state.value.folderPath)
+        if (NetPaths.isRemote(folder)) remote.createFolder(folder, name) else LocalFiles.createFolder(folder, name)
+    }
 
-    fun createFile(name: String) = runOp { LocalFiles.createFile(requireNotNull(_state.value.folderPath), name) }
+    fun createFile(name: String) = runOp {
+        val folder = requireNotNull(_state.value.folderPath)
+        if (NetPaths.isRemote(folder)) remote.createFile(folder, name) else LocalFiles.createFile(folder, name)
+    }
 
     fun rename(path: String, newName: String) = runOp {
-        LocalFiles.rename(path, newName).onSuccess { newPath ->
+        val isRemote = NetPaths.isRemote(path)
+        (if (isRemote) remote.rename(path, newName) else LocalFiles.rename(path, newName)).onSuccess { newPath ->
             clearSelection()
             if (newPath != path) {
-                MediaScan.changed(getApplication(), listOf(path, newPath))
+                if (!isRemote) MediaScan.changed(getApplication(), listOf(path, newPath))
                 settings.update { it.relocated(path, newPath) }
             }
+        }
+    }
+
+    // ---------- רשת ----------
+
+    /**
+     * קבצים ברשת לעותקים זמניים במכשיר (ראה [com.idanck.nexplorer.data.net.RemoteFiles.download]). מחזיר את
+     * העותקים, או הודעת שגיאה. סגירת החלון מבטלת (והעותק החלקי נמחק). [onProgress] — מ-0 עד 1.
+     */
+    suspend fun fetch(entries: List<Entry>, onProgress: (Float) -> Unit): Result<List<Entry>> {
+        val total = entries.sumOf { it.size }.coerceAtLeast(1)
+        var done = 0L
+        return try {
+            val local = entries.map { entry ->
+                val file = remote.download(getApplication<Application>().cacheDir, entry.path) { bytes ->
+                    done += bytes
+                    onProgress((done.toFloat() / total).coerceIn(0f, 1f))
+                }
+                LocalFiles.entryOf(file, countChildren = false)
+            }
+            clearSelection()
+            Result.success(local)
+        } catch (e: IOException) {
+            Result.failure(e)
+        }
+    }
+
+    /** "הסר" במגירה: החיבור, הסיסמה שלו, והמועדפים והתצוגות בתוכו. */
+    fun removeConnection(id: String) {
+        val connection = _state.value.connections.firstOrNull { it.id == id } ?: return
+        val root = NetPaths.root(connection.protocol, id)
+        fun inside(path: String) = FileNames.isInside(path, root)
+        viewModelScope.launch {
+            settings.update { s ->
+                s.copy(
+                    connections = s.connections.filterNot { it.id == id },
+                    favorites = s.favorites.filterNot(::inside),
+                    hiddenFolders = s.hiddenFolders.filterNot(::inside).toSet(),
+                    folderViews = s.folderViews.filterKeys { !inside(it) },
+                )
+            }
+            remote.forget(id)
+            if (_state.value.folderPath?.let(::inside) == true) navigate(Location.Folder(StorageVolumes.primaryPath()))
+            emit("\"${connection.label}\" הוסר מהמגירה")
         }
     }
 

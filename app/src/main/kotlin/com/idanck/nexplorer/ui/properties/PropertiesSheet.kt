@@ -35,9 +35,13 @@ import androidx.compose.ui.text.style.TextDirection
 import com.idanck.nexplorer.core.Counts
 import com.idanck.nexplorer.core.Entry
 import com.idanck.nexplorer.core.HebrewDates
+import com.idanck.nexplorer.core.NetPaths
 import com.idanck.nexplorer.core.SizeFormat
 import com.idanck.nexplorer.core.isolated
 import com.idanck.nexplorer.data.files.LocalFiles
+import com.idanck.nexplorer.data.net.NetConnection
+import com.idanck.nexplorer.data.net.RemoteFiles
+import java.io.InputStream
 import com.idanck.nexplorer.ui.components.FileIconTile
 import com.idanck.nexplorer.ui.theme.FileNameTextStyle
 import com.idanck.nexplorer.ui.theme.MonoTextStyle
@@ -53,13 +57,29 @@ import java.security.MessageDigest
 import java.time.ZoneId
 import java.util.Locale
 
-/** מאפיינים לפריט אחד או לבחירה: פרטים, גודל מחושב (גם לתיקיות), ו-checksums לקובץ. */
+/**
+ * מאפיינים לפריט אחד או לבחירה: פרטים, גודל מחושב (גם לתיקיות), ו-checksums לקובץ. במקום ברשת
+ * ([connection]) הגודל והסכומים נקראים מהשרת ([remote]), והמיקום מוצג בכתובת של השרת.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PropertiesSheet(entries: List<Entry>, onCopy: (String) -> Unit, onDismiss: () -> Unit) {
+fun PropertiesSheet(entries: List<Entry>, remote: RemoteFiles, connection: NetConnection?, onCopy: (String) -> Unit, onDismiss: () -> Unit) {
     val single = entries.singleOrNull()
+    val isRemote = entries.firstOrNull()?.path?.let(NetPaths::isRemote) == true
     var stats by remember(entries) { mutableStateOf<LocalFiles.TreeStats?>(null) }
-    LaunchedEffect(entries) { stats = LocalFiles.treeStats(entries.map { it.path }) }
+    var statsError by remember(entries) { mutableStateOf<String?>(null) }
+    LaunchedEffect(entries) {
+        val paths = entries.map { it.path }
+        if (!isRemote) {
+            stats = LocalFiles.treeStats(paths)
+            return@LaunchedEffect
+        }
+        try {
+            stats = remote.treeStats(paths).let { LocalFiles.TreeStats(it.bytes, it.files, it.folders) }
+        } catch (e: java.io.IOException) {
+            statsError = e.message ?: "לא ניתן לקרוא מהשרת"
+        }
+    }
     val sums = remember(entries) { mutableStateMapOf<String, String>() }
     val scope = rememberCoroutineScope()
     val zone = ZoneId.systemDefault()
@@ -98,12 +118,23 @@ fun PropertiesSheet(entries: List<Entry>, onCopy: (String) -> Unit, onDismiss: (
                         else -> "${single.kind.label} · ${".${single.extension}".isolated()}"
                     },
                 )
-                Detail("מיקום", File(single.path).parent ?: "/", mono = true, onCopy = onCopy)
+                val parent = NetPaths.parentOf(single.path)
+                Detail(
+                    "מיקום",
+                    when {
+                        !isRemote -> parent ?: "/"
+                        parent == null -> connection?.displayUrl(single.path) ?: single.path
+                        else -> connection?.displayUrl(parent) ?: parent
+                    },
+                    mono = true,
+                    onCopy = onCopy,
+                )
             }
             val s = stats
             Detail(
                 "גודל",
                 when {
+                    statsError != null -> statsError.orEmpty()
                     s == null -> "מחשב…"
                     entries.any { it.isDirectory } ->
                         "${SizeFormat.short(s.bytes).isolated()} · ${Counts.files(s.files)} · ${Counts.folders(s.folders)}"
@@ -112,10 +143,12 @@ fun PropertiesSheet(entries: List<Entry>, onCopy: (String) -> Unit, onDismiss: (
                 },
             )
             if (single != null) {
-                Detail("שונה", HebrewDates.full(single.lastModified, zone))
-                val file = File(single.path)
-                Detail("הרשאות", listOfNotNull("קריאה".takeIf { file.canRead() }, "כתיבה".takeIf { file.canWrite() }).joinToString(" · ").ifEmpty { "אין" })
-                if (single.isHidden) Detail("מוסתר", "כן (מתחיל בנקודה)")
+                if (single.lastModified > 0) Detail("שונה", HebrewDates.full(single.lastModified, zone))
+                if (!isRemote) {
+                    val file = File(single.path)
+                    Detail("הרשאות", listOfNotNull("קריאה".takeIf { file.canRead() }, "כתיבה".takeIf { file.canWrite() }).joinToString(" · ").ifEmpty { "אין" })
+                }
+                if (single.isHidden) Detail("מוסתר", if (isRemote) "כן" else "כן (מתחיל בנקודה)")
             }
 
             if (single != null && !single.isDirectory) {
@@ -127,7 +160,11 @@ fun PropertiesSheet(entries: List<Entry>, onCopy: (String) -> Unit, onDismiss: (
                             onClick = {
                                 if (algorithm !in sums) {
                                     sums[algorithm] = "מחשב…"
-                                    scope.launch { sums[algorithm] = checksum(single.path, algorithm) }
+                                    scope.launch {
+                                        sums[algorithm] = checksum(algorithm) {
+                                            if (isRemote) remote.fsFor(single.path).openRead(single.path) else File(single.path).inputStream()
+                                        }
+                                    }
                                 }
                             },
                             label = { Text(algorithm) },
@@ -169,10 +206,10 @@ internal fun Detail(label: String, value: String, mono: Boolean = false, onCopy:
 }
 
 /** קובץ של כמה GB: הלולאה בודקת ביטול בכל חוצץ, כך שסגירת הגיליון עוצרת את הקריאה. */
-private suspend fun checksum(path: String, algorithm: String): String = withContext(Dispatchers.IO) {
+private suspend fun checksum(algorithm: String, open: () -> InputStream): String = withContext(Dispatchers.IO) {
     try {
         val digest = MessageDigest.getInstance(algorithm)
-        File(path).inputStream().use { input ->
+        open().use { input ->
             val buffer = ByteArray(256 * 1024)
             while (true) {
                 ensureActive()

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """עזר קטן ל-UiAutomator מהמארח, לבדיקה על build ‏release (בלי instrumentation).
 
-    ui.py has <text>   — יציאה 0 אם יש על המסך צומת עם הטקסט / התיאור הזה
-    ui.py tap <text>   — לוחץ על מרכז הצומת
+    ui.py has <text>        — יציאה 0 אם יש על המסך צומת עם הטקסט / התיאור הזה
+    ui.py tap <text>        — לוחץ על מרכז הצומת
+    ui.py tap-desc <text>   — כמו tap, לפי התיאור בלבד (שדה שהתווית שלו מופיעה גם כטקסט מעליו)
 """
 import re
 import subprocess
@@ -21,9 +22,9 @@ def dump():
     return None
 
 
-def find(root, text):
+def find(root, text, by_desc=False):
     for node in root.iter("node"):
-        if node.get("text") == text or node.get("content-desc") == text:
+        if node.get("content-desc") == text or (not by_desc and node.get("text") == text):
             return node
     return None
 
@@ -31,10 +32,10 @@ def find(root, text):
 def main():
     command, text = sys.argv[1], sys.argv[2]
     root = dump()
-    node = find(root, text) if root is not None else None
+    node = find(root, text, by_desc=command == "tap-desc") if root is not None else None
     if node is None:
         sys.exit(1)
-    if command == "tap":
+    if command in ("tap", "tap-desc"):
         x1, y1, x2, y2 = map(int, re.findall(r"\d+", node.get("bounds")))
         subprocess.run(["adb", "shell", "input", "tap", str((x1 + x2) // 2), str((y1 + y2) // 2)], check=True)
 

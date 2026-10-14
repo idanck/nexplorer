@@ -48,6 +48,7 @@ import coil.request.ImageRequest
 import com.idanck.nexplorer.core.Counts
 import com.idanck.nexplorer.core.Entry
 import com.idanck.nexplorer.core.FileKind
+import com.idanck.nexplorer.core.NetPaths
 import com.idanck.nexplorer.core.HebrewDates
 import com.idanck.nexplorer.core.SizeFormat
 import com.idanck.nexplorer.core.isolated
@@ -101,7 +102,8 @@ fun FileIconTile(entry: Entry, modifier: Modifier = Modifier, size: Dp = Nexplor
     }
 }
 
-val Entry.hasThumbnail: Boolean get() = kind == FileKind.Image || kind == FileKind.Video
+/** ברשת אין תמונות ממוזערות (שלב 5א): כל אחת הייתה הורדה של הקובץ כולו. */
+val Entry.hasThumbnail: Boolean get() = (kind == FileKind.Image || kind == FileKind.Video) && !NetPaths.isRemote(path)
 
 /** תמונה ממוזערת (Coil, כולל פריים מווידאו) על רקע האריח; עד שנטענת — האייקון. */
 @Composable

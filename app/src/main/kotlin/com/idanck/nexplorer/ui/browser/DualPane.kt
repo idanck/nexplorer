@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.outlined.Dns
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.SdCard
 import androidx.compose.material.icons.outlined.Settings
@@ -56,7 +57,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.idanck.nexplorer.core.Entry
+import com.idanck.nexplorer.core.NetPaths
 import com.idanck.nexplorer.data.files.StorageVolumeInfo
+import com.idanck.nexplorer.data.net.NetConnection
+import com.idanck.nexplorer.data.net.RemoteFiles
 import com.idanck.nexplorer.data.settings.AppSettings
 import com.idanck.nexplorer.data.transfer.TransferManager
 import com.idanck.nexplorer.ui.drawer.PlacesDrawer
@@ -88,6 +92,8 @@ fun DualPaneScreen(
     onOpenAnalyzer: (String?) -> Unit,
     onEditText: (String) -> Unit,
     onOpenMedia: (Entry) -> Unit,
+    remote: RemoteFiles,
+    onOpenConnect: (BrowserViewModel, NetConnection?) -> Unit,
 ) {
     require(panes.size == 2)
     var active by rememberSaveable { mutableIntStateOf(0) }
@@ -139,6 +145,7 @@ fun DualPaneScreen(
                     onTransfers = { showTransfers = true },
                     onSettings = onOpenSettings,
                     onAnalyzer = onOpenAnalyzer,
+                    onOpenConnect = { connection -> onOpenConnect(activeVm, connection) },
                     message = activeVm::emit,
                 ),
             )
@@ -153,9 +160,12 @@ fun DualPaneScreen(
             PaneRail(
                 volumes = activeState.volumes,
                 activeVolumePath = if (activeState.location is Location.Folder) activeState.volume?.path else null,
+                connections = activeState.connections,
+                activeConnectionId = activeState.folderPath?.let(NetPaths::connectionId),
                 transfers = activeTransfers.size,
                 onMenu = { scope.launch { drawerState.open() } },
                 onVolume = { volume -> activeVm.navigate(Location.Folder(volume.path)) },
+                onConnection = { connection -> activeVm.navigate(Location.Folder(connection.root)) },
                 onTransfers = { showTransfers = true },
                 onSettings = onOpenSettings,
             )
@@ -205,6 +215,8 @@ fun DualPaneScreen(
                                 onEditText = onEditText,
                                 onOpenMedia = onOpenMedia,
                                 keys = keys,
+                                remote = remote,
+                                onOpenConnect = onOpenConnect,
                                 pane = PaneConfig(
                                     index = index,
                                     active = isActive,
@@ -230,14 +242,17 @@ fun DualPaneScreen(
     }
 }
 
-/** מסילת הניווט: ☰ (המגירה), אחסונים, ובתחתית העברות והגדרות. */
+/** מסילת הניווט: ☰ (המגירה), אחסונים ומקומות ברשת, ובתחתית העברות והגדרות. */
 @Composable
 private fun PaneRail(
     volumes: List<StorageVolumeInfo>,
     activeVolumePath: String?,
+    connections: List<NetConnection>,
+    activeConnectionId: String?,
     transfers: Int,
     onMenu: () -> Unit,
     onVolume: (StorageVolumeInfo) -> Unit,
+    onConnection: (NetConnection) -> Unit,
     onTransfers: () -> Unit,
     onSettings: () -> Unit,
 ) {
@@ -252,6 +267,9 @@ private fun PaneRail(
         RailButton(Icons.Filled.Menu, "פתח מגירת מקומות", tint = MaterialTheme.colorScheme.primary, onClick = onMenu)
         volumes.forEach { volume ->
             RailVolume(volume, selected = volume.path == activeVolumePath, onClick = { onVolume(volume) })
+        }
+        connections.forEach { connection ->
+            RailPlace(Icons.Outlined.Dns, connection.label, selected = connection.id == activeConnectionId, onClick = { onConnection(connection) })
         }
         Spacer(Modifier.weight(1f))
         RailTransfers(count = transfers, onClick = onTransfers)
@@ -278,6 +296,20 @@ private fun RailButton(icon: ImageVector, label: String, tint: Color, onClick: (
 
 @Composable
 private fun RailVolume(volume: StorageVolumeInfo, selected: Boolean, onClick: () -> Unit) {
+    RailPlace(
+        when {
+            volume.isPrimary -> Icons.Outlined.PhoneAndroid
+            volume.label.contains("USB", ignoreCase = true) -> Icons.Outlined.Usb
+            else -> Icons.Outlined.SdCard
+        },
+        if (volume.isPrimary) "פנימי" else volume.label,
+        selected,
+        onClick,
+    )
+}
+
+@Composable
+private fun RailPlace(icon: ImageVector, label: String, selected: Boolean, onClick: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
     Surface(
         onClick = onClick,
@@ -292,17 +324,9 @@ private fun RailVolume(volume: StorageVolumeInfo, selected: Boolean, onClick: ()
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(NexplorerDimens.Space1 - NexplorerDimens.Space1 / 4, Alignment.CenterVertically),
         ) {
-            Icon(
-                when {
-                    volume.isPrimary -> Icons.Outlined.PhoneAndroid
-                    volume.label.contains("USB", ignoreCase = true) -> Icons.Outlined.Usb
-                    else -> Icons.Outlined.SdCard
-                },
-                contentDescription = null,
-                modifier = Modifier.size(NexplorerDimens.RailItemIcon),
-            )
+            Icon(icon, contentDescription = null, modifier = Modifier.size(NexplorerDimens.RailItemIcon))
             Text(
-                if (volume.isPrimary) "פנימי" else volume.label,
+                label,
                 style = MaterialTheme.typography.labelSmall.let { if (selected) it.copy(fontWeight = FontWeight.SemiBold) else it },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

@@ -75,6 +75,7 @@ import com.idanck.nexplorer.core.Counts
 import com.idanck.nexplorer.core.Entry
 import com.idanck.nexplorer.core.FileKind
 import com.idanck.nexplorer.core.MediaFormats
+import com.idanck.nexplorer.core.NetPaths
 import com.idanck.nexplorer.core.SizeFormat
 import com.idanck.nexplorer.core.isolated
 import com.idanck.nexplorer.data.apk.ApkInspector
@@ -83,12 +84,15 @@ import com.idanck.nexplorer.data.files.FileIntents
 import com.idanck.nexplorer.data.files.LocalFiles
 import com.idanck.nexplorer.data.files.StorageVolumes
 import com.idanck.nexplorer.data.files.TextFiles
+import com.idanck.nexplorer.data.net.NetConnection
+import com.idanck.nexplorer.data.net.RemoteFiles
 import com.idanck.nexplorer.data.settings.AppSettings
 import com.idanck.nexplorer.data.transfer.TransferManager
 import com.idanck.nexplorer.data.transfer.TransferStatus
 import com.idanck.nexplorer.ui.apk.ApkSheet
 import com.idanck.nexplorer.ui.drawer.DrawerModel
 import com.idanck.nexplorer.ui.drawer.PlacesDrawer
+import com.idanck.nexplorer.ui.net.FetchDialog
 import com.idanck.nexplorer.ui.properties.PropertiesSheet
 import com.idanck.nexplorer.ui.theme.NexplorerDimens
 import com.idanck.nexplorer.ui.theme.NexplorerShape
@@ -120,6 +124,7 @@ private sealed interface BrowserDialog {
     data class OpenEncrypted(val entry: Entry, val inVault: Boolean = false) : BrowserDialog
     data object NewVault : BrowserDialog
     data class UnlockVault(val vault: Entry, val then: String) : BrowserDialog
+    data class Fetch(val entries: List<Entry>, val purpose: FetchPurpose) : BrowserDialog
 }
 
 /**
@@ -137,7 +142,7 @@ private val BrowserDialogSaver = Saver<BrowserDialog?, String>(
             // רשימות (ובחלונות החילוץ וההצפנה — סיסמה) לא נשמרות ב-Bundle.
             is BrowserDialog.Delete, is BrowserDialog.Compress, is BrowserDialog.Extract, is BrowserDialog.BatchRename,
             is BrowserDialog.Encrypt, is BrowserDialog.Decrypt, is BrowserDialog.OpenEncrypted,
-            BrowserDialog.NewVault, is BrowserDialog.UnlockVault, null -> null
+            BrowserDialog.NewVault, is BrowserDialog.UnlockVault, is BrowserDialog.Fetch, null -> null
         }
     },
     restore = { saved ->
@@ -170,6 +175,10 @@ fun BrowserScreen(
     /** תמונה, שמע או וידאו שנפתחים בתוך האפליקציה (MediaFormats.opensInApp). */
     onOpenMedia: (Entry) -> Unit,
     keys: KeyBus,
+    /** מקומות ברשת: מאפיינים (גודל, checksums) של קבצים בשרת. */
+    remote: RemoteFiles,
+    /** "הוסף מקום" (null) או "ערוך" חיבור מהמגירה — המסך נפתח מעל, והחיבור נפתח בחלון הזה. */
+    onOpenConnect: (BrowserViewModel, NetConnection?) -> Unit,
     /** שני חלונות: החלון הזה הוא אחד מהם. null — מסך יחיד (טלפון). */
     pane: PaneConfig? = null,
 ) {
@@ -224,6 +233,7 @@ fun BrowserScreen(
                 is BrowserEvent.OpenApk -> apk = event.entry
                 is BrowserEvent.OpenEncrypted -> dialog = BrowserDialog.OpenEncrypted(event.entry, event.inVault)
                 is BrowserEvent.UnlockVault -> dialog = BrowserDialog.UnlockVault(event.vault, event.then)
+                is BrowserEvent.Fetch -> dialog = BrowserDialog.Fetch(event.entries, event.purpose)
             }
         }
     }
@@ -262,7 +272,8 @@ fun BrowserScreen(
 
     // בשני חלונות "חזרה" ומקלדת שייכות לחלון הפעיל בלבד — אחרת החלון שהורכב אחרון תופס אותן.
     val ownsBack = pane == null || pane.active
-    BackHandler(enabled = ownsBack && (fabOpen || drawerState.isOpen || state.filter != null || state.inSelection || !state.isAtRoot)) {
+    // בשורש של חיבור ברשת "חזרה" חוזרת למכשיר (goUp), לא יוצאת מהאפליקציה.
+    BackHandler(enabled = ownsBack && (fabOpen || drawerState.isOpen || state.filter != null || state.inSelection || !state.isAtRoot || state.isRemote)) {
         when {
             fabOpen -> fabOpen = false
             drawerState.isOpen -> scope.launch { drawerState.close() }
@@ -274,6 +285,8 @@ fun BrowserScreen(
 
     val selected = state.entries.filter { it.path in state.selection }
     val activeTransfers = transferList.filter { it.isActive }
+    // ברשת אין חיפוש עמוק (כל תיקייה היא בקשה לשרת) — הסינון ברשימה במקומו.
+    val search: () -> Unit = { if (state.isRemote) vm.setFilter("") else onOpenSearch(state.folderPath) }
 
     // מקלדת פיזית: רק המסך שמוצג — ובשני חלונות רק החלון הפעיל — מקבל פקודות.
     val onKey by rememberUpdatedState<(KeyCommand) -> Boolean> { command ->
@@ -294,7 +307,7 @@ fun BrowserScreen(
             KeyCommand.Rename -> current.singleOrNull()?.let { dialog = BrowserDialog.Rename(it) } != null
             KeyCommand.GoUp -> vm.goUp()
             KeyCommand.Refresh -> true.also { vm.refresh() }
-            KeyCommand.Search -> true.also { onOpenSearch(state.folderPath) }
+            KeyCommand.Search -> true.also { search() }
             KeyCommand.CopyToOther, KeyCommand.MoveToOther -> {
                 val target = pane?.otherFolder
                 if (target == null || current.isEmpty()) {
@@ -323,7 +336,14 @@ fun BrowserScreen(
                 vm = vm,
                 activeTransfers = activeTransfers,
                 canPin = canPin,
-                onProperties = { state.folderPath?.let { properties = listOf(LocalFiles.entryOf(File(it), countChildren = false)) } },
+                onProperties = {
+                    state.folderPath?.let { path ->
+                        properties = listOf(
+                            if (state.isRemote) Entry(path, state.title, true, 0, -1, 0, false, FileKind.Folder)
+                            else LocalFiles.entryOf(File(path), countChildren = false),
+                        )
+                    }
+                },
                 onViewOptions = { dialog = BrowserDialog.ViewOptions },
                 onPinShortcut = {
                     state.folderPath?.let { path ->
@@ -370,7 +390,7 @@ fun BrowserScreen(
                             crumbs = state.crumbs,
                             countText = Counts.items(state.entries.size),
                             onCrumb = { crumb -> openCrumb(vm, state, crumb) },
-                            onSearch = { onOpenSearch(state.folderPath) },
+                            onSearch = search,
                             onMore = { overflowOpen = true },
                             moreMenu = moreMenu,
                         )
@@ -381,7 +401,7 @@ fun BrowserScreen(
                             summary = summary(state),
                             clipboardCount = state.clipboard?.paths?.size ?: 0,
                             onMenu = { scope.launch { drawerState.open() } },
-                            onSearch = { onOpenSearch(state.folderPath) },
+                            onSearch = search,
                             onMore = { overflowOpen = true },
                             onClipboard = { dialog = BrowserDialog.Clipboard },
                             moreMenu = moreMenu,
@@ -418,6 +438,7 @@ fun BrowserScreen(
                             count = state.clipboard?.paths?.size ?: 0,
                             blockedReason = when {
                                 state.location !is Location.Folder -> "פתח תיקייה כדי להדביק"
+                                state.atShareList -> "פתח שיתוף כדי להדביק"
                                 state.volume?.writable == false -> "אין הרשאת כתיבה כאן"
                                 else -> null
                             },
@@ -462,7 +483,7 @@ fun BrowserScreen(
                         onRename = when {
                             single != null -> { { dialog = BrowserDialog.Rename(single) } }
                             // באוסף (תמונות, וידאו) הפריטים מתיקיות שונות — אין "תיקייה" לשנות בה שמות יחד.
-                            selected.size > 1 && state.location is Location.Folder -> { { dialog = BrowserDialog.BatchRename(selected) } }
+                            selected.size > 1 && state.location is Location.Folder && !state.isRemote -> { { dialog = BrowserDialog.BatchRename(selected) } }
                             else -> null
                         },
                         onShare = {
@@ -471,6 +492,8 @@ fun BrowserScreen(
                                 files.isEmpty() -> message("אי אפשר לשתף תיקיות — בחר קבצים")
                                 // כל URI עובר שלוש פעמים ב-Intent; אלפים חורגים ממגבלת ה-Binder ומפילים את השליחה.
                                 files.size > FileIntents.MAX_SHARE -> message("אפשר לשתף עד ${FileIntents.MAX_SHARE} קבצים בבת אחת")
+                                // מהרשת: קודם עותק במכשיר — אפליקציה אחרת לא קוראת מהשרת.
+                                state.isRemote -> dialog = BrowserDialog.Fetch(files, FetchPurpose.Share)
                                 FileIntents.share(context, files.map { it.path to it.name }) == 0 -> message("אין אפליקציה לשיתוף")
                             }
                         },
@@ -492,14 +515,19 @@ fun BrowserScreen(
                                     single = single != null,
                                     isFolder = single?.isDirectory == true,
                                     isFavorite = single != null && single.path in state.favorites,
-                                    canPinShortcut = canPin,
+                                    // קיצור דרך פותח נתיב במכשיר; לחיבור ברשת — מהמגירה.
+                                    canPinShortcut = canPin && !state.isRemote,
                                     onOpenWith = {
-                                        single?.let { if (!FileIntents.openWith(context, it.path, it.name)) message("אין אפליקציה מתאימה") }
+                                        single?.let {
+                                            if (state.isRemote) dialog = BrowserDialog.Fetch(listOf(it), FetchPurpose.OpenWith)
+                                            else if (!FileIntents.openWith(context, it.path, it.name)) message("אין אפליקציה מתאימה")
+                                        }
                                     },
                                     onMove = { vm.copyToClipboard(selected.map { it.path }, cut = true) },
                                     onCopyPath = {
                                         single?.let {
-                                            clipboardManager.setText(AnnotatedString(it.path))
+                                            // ברשת: הכתובת בשרת (smb://192.168.50.171/volume2/…), לא המזהה הפנימי.
+                                            clipboardManager.setText(AnnotatedString(state.connection?.displayUrl(it.path) ?: it.path))
                                             message("הנתיב הועתק")
                                         }
                                     },
@@ -508,14 +536,15 @@ fun BrowserScreen(
                                     },
                                     onToggleFavorite = { single?.let { vm.toggleFavorite(it.path) } },
                                     onProperties = { properties = selected },
-                                    canEditText = single?.canEditAsText() == true,
-                                    isArchive = single?.let { ArchiveFormats.of(it.name) } != null,
+                                    // ברשת (שלב 5א): עריכה, ארכיונים והצפנה — דרך עותק במכשיר.
+                                    canEditText = !state.isRemote && single?.canEditAsText() == true,
+                                    isArchive = !state.isRemote && single?.let { ArchiveFormats.of(it.name) } != null,
                                     onEditText = { single?.let { onEditText(it.path) } },
-                                    canCompress = state.location is Location.Folder,
+                                    canCompress = state.location is Location.Folder && !state.isRemote,
                                     onCompress = { dialog = BrowserDialog.Compress(selected) },
                                     onExtract = { single?.let { dialog = BrowserDialog.Extract(it) } },
-                                    canEncrypt = selected.any { it.isDirectory || !EncryptedFiles.hasEncryptedName(it.name) },
-                                    canDecrypt = selected.any { it.isDirectory || EncryptedFiles.hasEncryptedName(it.name) },
+                                    canEncrypt = !state.isRemote && selected.any { it.isDirectory || !EncryptedFiles.hasEncryptedName(it.name) },
+                                    canDecrypt = !state.isRemote && selected.any { it.isDirectory || EncryptedFiles.hasEncryptedName(it.name) },
                                     onEncrypt = { dialog = BrowserDialog.Encrypt(selected) },
                                     onDecrypt = {
                                         // קובץ מוצפן אחד: אותו חלון כמו בהקשה עליו, עם "פתח".
@@ -550,7 +579,10 @@ fun BrowserScreen(
                             onNewFolder = { dialog = BrowserDialog.NewFolder },
                             onNewFile = { dialog = BrowserDialog.NewFile },
                             onNewVault = { dialog = BrowserDialog.NewVault },
+                            onNewConnection = { onOpenConnect(vm, null) },
                             inVault = state.vaultRoot != null,
+                            remote = state.isRemote,
+                            createBlocked = if (state.atShareList) "פתח שיתוף כדי ליצור בו" else null,
                             onUnavailable = { what -> message(what) },
                         )
                     }
@@ -572,6 +604,7 @@ fun BrowserScreen(
                         onTransfers = { showTransfers = true },
                         onSettings = onOpenSettings,
                         onAnalyzer = onOpenAnalyzer,
+                        onOpenConnect = { connection -> onOpenConnect(vm, connection) },
                         message = ::message,
                     ),
                 )
@@ -598,7 +631,7 @@ fun BrowserScreen(
         BrowserDialog.ViewOptions -> ViewOptionsDialog(
             initial = state.view,
             initialOnlyThisFolder = state.viewIsFolderScoped,
-            folderName = state.folderPath?.let { File(it).name.ifEmpty { it } },
+            folderName = state.folderPath?.let { if (state.isRemote) state.title else File(it).name.ifEmpty { it } },
             onChange = { view, onlyHere -> vm.setView(view, onlyHere) },
             onDismiss = { dialog = null },
         )
@@ -677,6 +710,24 @@ fun BrowserScreen(
             onUnlock = { password -> vm.unlockVault(d.vault, d.then, password) },
             onDismiss = { dialog = null },
         )
+        is BrowserDialog.Fetch -> FetchDialog(
+            entries = d.entries,
+            fetch = { onProgress -> vm.fetch(d.entries, onProgress) },
+            onFetched = { local ->
+                when (d.purpose) {
+                    FetchPurpose.Open -> local.singleOrNull()?.let { copy ->
+                        when {
+                            MediaFormats.opensInApp(copy) -> onOpenMedia(copy)
+                            copy.extension == "apk" -> apk = copy
+                            !FileIntents.open(context, copy.path, copy.name) -> message("אין אפליקציה שפותחת קבצים מסוג זה")
+                        }
+                    }
+                    FetchPurpose.OpenWith -> local.singleOrNull()?.let { if (!FileIntents.openWith(context, it.path, it.name)) message("אין אפליקציה מתאימה") }
+                    FetchPurpose.Share -> if (FileIntents.share(context, local.map { it.path to it.name }) == 0) message("אין אפליקציה לשיתוף")
+                }
+            },
+            onDismiss = { dialog = null },
+        )
         is BrowserDialog.BatchRename -> BatchRenameDialog(
             entries = d.entries,
             others = { vm.namesBesides(d.entries) },
@@ -719,6 +770,8 @@ fun BrowserScreen(
     properties?.let { list ->
         PropertiesSheet(
             entries = list,
+            remote = remote,
+            connection = state.connection,
             onCopy = { text ->
                 clipboardManager.setText(AnnotatedString(text))
                 message("הועתק")
@@ -763,10 +816,17 @@ internal fun placesDrawerModel(
     onTransfers: () -> Unit,
     onSettings: () -> Unit,
     onAnalyzer: (String?) -> Unit,
+    onOpenConnect: (NetConnection?) -> Unit,
     message: (String) -> Unit,
 ): DrawerModel = DrawerModel(
     volumes = state.volumes,
     activeVolumePath = if (state.location is Location.Folder) state.volume?.path else null,
+    connections = state.connections,
+    activeConnectionId = state.folderPath?.let(NetPaths::connectionId),
+    spaces = state.remoteSpaces,
+    onConnection = { c -> close(); vm.navigate(Location.Folder(c.root)) },
+    onEditConnection = { c -> close(); onOpenConnect(c) },
+    onRemoveConnection = { c -> vm.removeConnection(c.id) },
     activeCollection = (state.location as? Location.Media)?.collection,
     favorites = state.favorites,
     activeTransfers = activeTransfers,
@@ -779,18 +839,21 @@ internal fun placesDrawerModel(
         close()
         vm.openPath(File(StorageVolumes.primaryPath(), android.os.Environment.DIRECTORY_DOWNLOADS).absolutePath)
     },
-    onAddPlace = { message("חיבורי רשת וענן יגיעו בשלב הבא (החלטות D3, D4)") },
+    onAddPlace = { close(); onOpenConnect(null) },
     onTransfers = { close(); onTransfers() },
     onSettings = { close(); onSettings() },
-    onAnalyzer = { close(); onAnalyzer(state.folderPath) },
+    // המנתח סורק את המכשיר; מתוך מקום ברשת — את האחסון הראשי.
+    onAnalyzer = { close(); onAnalyzer(state.folderPath?.takeIf { !NetPaths.isRemote(it) }) },
 )
 
 private fun summary(state: BrowserState): String = when (state.location) {
     is Location.Media -> Counts.items(state.listed.size)
-    is Location.Folder -> {
+    // רשימת השיתופים של שרת: אין קבצים ואין "פנויים" — רק כמה שיתופים.
+    is Location.Folder -> if (state.atShareList) Counts.items(state.listed.size) else {
         val folders = state.listed.count { it.isDirectory }
         val files = state.listed.size - folders
-        val free = state.volume?.let { " · ${SizeFormat.short(it.freeBytes).isolated()} פנויים" }.orEmpty()
+        val freeBytes = if (state.isRemote) state.remoteSpace?.free else state.volume?.freeBytes
+        val free = freeBytes?.let { " · ${SizeFormat.short(it).isolated()} פנויים" }.orEmpty()
         "${Counts.folders(folders)} · ${Counts.files(files)}$free"
     }
 }
@@ -817,7 +880,10 @@ private fun overflowModel(
         isFolder = state.location is Location.Folder,
         canHideFolder = state.location is Location.Folder && !state.isAtRoot,
         isFavorite = state.isFavorite,
-        canPinShortcut = canPin,
+        canPinShortcut = canPin && !state.isRemote,
+        // ברשת: גודל תיקיות סורק את השרת, והמנתח — את המכשיר.
+        canFolderSizes = !state.isRemote,
+        canAnalyze = !state.isRemote,
         transfersLabel = if (activeTransfers.isEmpty()) null
         else (running?.let { "${(it.fraction * 100).toInt()}% · " }.orEmpty()) + activeTransfers.size,
         onSelectAll = vm::selectAll,

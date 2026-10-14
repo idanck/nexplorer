@@ -73,6 +73,7 @@ run_class Phase3bTest
 run_class Phase4Test
 run_class Phase4bTest
 run_class Phase4cTest
+run_class Phase5aTest
 # Phase2bTest מדמה טאבלט ו-Phase3bTest מסובב; אם התהליך קרס לפני tearDown — שהמונקי ירוץ על המסך הרגיל.
 adb shell wm size reset || true
 adb shell wm density reset || true
@@ -106,6 +107,13 @@ elif grep -qE 'CRASH|NOT RESPONDING' "$out/monkey.txt" || ! grep -q 'Monkey fini
   status=1
 fi
 adb exec-out screencap -p > "$out/screens/90-after-monkey.png"
+
+# R8: ה-release המכווץ מתחבר ל-SMB (שלב 5א). רק אם נבנה — ב-workflow ‏QA.
+if [ -f app/build/outputs/apk/release/app-release.apk ]; then
+  echo "::group::release smoke (API $api)"
+  bash .github/qa/release-smoke.sh app/build/outputs/apk/release/app-release.apk "$out" || status=1
+  echo "::endgroup::"
+fi
 
 adb pull /sdcard/Download/nexplorer-qa/. "$out/screens/" > /dev/null || true
 adb logcat -d > "$out/logcat.txt"

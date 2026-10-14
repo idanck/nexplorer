@@ -73,7 +73,9 @@ android {
     }
 
     packaging {
-        resources.excludes += setOf("/META-INF/{AL2.0,LGPL2.1}")
+        // רישיונות ו-multi-release (‏META-INF/versions — אנדרואיד לא טוען אותם) של ספריות ה-JVM:
+        // כמה ספריות מביאות את אותו קובץ, וזה מכשיל את האריזה.
+        resources.excludes += setOf("/META-INF/{AL2.0,LGPL2.1}", "/META-INF/LICENSE*", "/META-INF/NOTICE*", "/META-INF/DEPENDENCIES", "/META-INF/versions/**")
     }
 
     lint {
@@ -104,6 +106,8 @@ dependencies {
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.ui)
     implementation(libs.androidx.media3.session)
+    implementation(libs.smbj)
+    implementation(libs.dcerpc)
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
