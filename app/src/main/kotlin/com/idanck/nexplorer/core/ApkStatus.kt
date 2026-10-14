@@ -24,10 +24,10 @@ object ApkStatus {
         else -> ApkInstallState.Downgrade
     }
 
-    /** "API 26 · Android 8.0". */
+    /** "Android 8.0 (API 26)" — בלי "·", שמפריד בשורה בין המינימום ליעד. */
     fun sdkLabel(api: Int): String {
         val name = ANDROID_VERSIONS[api]
-        return if (name != null) "API $api · Android $name" else "API $api"
+        return if (name != null) "Android $name (API $api)" else "API $api"
     }
 
     private val ANDROID_VERSIONS = mapOf(

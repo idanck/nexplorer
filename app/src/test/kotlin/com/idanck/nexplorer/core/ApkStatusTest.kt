@@ -27,8 +27,8 @@ class ApkStatusTest {
 
     @Test
     fun `sdk labels`() {
-        assertEquals("API 26 · Android 8.0", ApkStatus.sdkLabel(26))
-        assertEquals("API 35 · Android 15", ApkStatus.sdkLabel(35))
+        assertEquals("Android 8.0 (API 26)", ApkStatus.sdkLabel(26))
+        assertEquals("Android 15 (API 35)", ApkStatus.sdkLabel(35))
         assertEquals("API 99", ApkStatus.sdkLabel(99))
     }
 }
