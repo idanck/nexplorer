@@ -10,7 +10,7 @@
 
 ## מצב ותיעוד
 
-שלב 1 ממומש (`docs/plan/01-phase1.md`): מנהל קבצים מקומי + עדכון מתוך האפליקציה. שלב 2א (`docs/plan/02-phase2.md`): מנתח, ZIP, עורך, שינוי שם מרובה. שלב 2ב: שני חלונות (מרוחב 840), גרירה, קיצורי מקלדת, מציג תמונות. לפני כל עבודה קרא את `docs/README.md`.
+שלב 1 ממומש (`docs/plan/01-phase1.md`): מנהל קבצים מקומי + עדכון מתוך האפליקציה. שלב 2א (`docs/plan/02-phase2.md`): מנתח, ZIP, עורך, שינוי שם מרובה. שלב 2ב: שני חלונות (טאבלט: 840×480 ומעלה), גרירה, קיצורי מקלדת, מציג תמונות. לפני כל עבודה קרא את `docs/README.md`.
 - **שפת העיצוב של nexplorer (מחייבת):** `docs/design/design-language.md` + `docs/design/tokens.json`. צילומי המסכים ב-`docs/design/screens/` — בנה מסכים לפיהם.
 - הקוד של העיצוב: `app/src/main/kotlin/com/idanck/nexplorer/ui/theme/`. **אל תכתוב hex או גדלים בתוך מסכים** — רק דרך `MaterialTheme`, `NexplorerTheme.colors`, `NexplorerDimens`, `NexplorerShape`.
 - שינוי ערך עיצוב = עדכון `tokens.json` + הקוד + `design-language.md` באותו PR.

@@ -93,7 +93,8 @@ fun AnalyzerScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(startPath) { viewModel.start(startPath) }
     val finding = state.finding
-    BackHandler { if (finding != null) viewModel.close() else onBack() }
+    // המצב הנוכחי, לא זה שנלכד בהרכבה: "חזרה" כפולה מהירה הייתה סוגרת את הרשימה פעמיים ולא יוצאת.
+    BackHandler { if (viewModel.state.value.finding != null) viewModel.close() else onBack() }
 
     Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {

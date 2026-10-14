@@ -37,7 +37,10 @@ import org.junit.runner.RunWith
 import org.junit.runners.MethodSorters
 import java.io.File
 
-/** שלב 2ב: מציג התמונות, שני חלונות (טלפון לרוחב = 914dp), קיצורי מקלדת וגרירה בין החלונות. */
+/**
+ * שלב 2ב: מציג התמונות, שני חלונות, קיצורי מקלדת וגרירה בין החלונות.
+ * האמולטור (pixel_6) מדמה טאבלט: 800×1280dp לאורך (חלון אחד), 1280×800dp לרוחב (שני חלונות).
+ */
 @RunWith(AndroidJUnit4::class)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 class Phase2bTest {
@@ -52,6 +55,8 @@ class Phase2bTest {
     fun setUp() {
         Qa.grantStorage()
         QaData.seed()
+        Qa.shell("wm size $TABLET_SIZE")
+        Qa.shell("wm density $TABLET_DENSITY")
         scenario = Qa.launch(root.absolutePath)
         compose.waitFor(hasText("readme.md"), 15_000)
     }
@@ -59,6 +64,8 @@ class Phase2bTest {
     @After
     fun tearDown() {
         Qa.device.setOrientationNatural()
+        Qa.shell("wm size reset")
+        Qa.shell("wm density reset")
         scenario.close()
     }
 
@@ -95,7 +102,7 @@ class Phase2bTest {
     fun t02_dualPaneCopyMoveDeleteWithKeys() {
         enterDualPane()
         Qa.screenshot(compose, "63-dual-pane")
-        // החלון השני → Empty (שורה רביעית — לרוחב Documents, האחרונה, לא נכנסת בחלון עם שורת הרמז).
+        // החלון השני → Empty.
         compose.onAllNodesWithText("Empty")[1].performClick()
         compose.waitFor(hasText("התיקייה ריקה"))
         compose.onNodeWithText("readme.md").performTouchInput { longClick() }
@@ -135,7 +142,7 @@ class Phase2bTest {
         compose.onAllNodesWithText("readme.md")[0].performTouchInput { longClick() }
         // שני החלונות באותה תיקייה: בתחתית "שני החלונות באותה תיקייה", לא כפתורים — היעד הוא תיקייה.
         compose.waitFor(hasText("שני החלונות באותה תיקייה"))
-        // לרוחב נכנסות רק כמה שורות; היעד צריך להיות כולו על המסך.
+        // היעד צריך להיות כולו על המסך.
         compose.onAllNodesWithText("Empty")[1].performScrollTo()
         val from = screenCenter(compose.onAllNodesWithText("readme.md")[0].fetchSemanticsNode().boundsInWindow.center)
         val to = screenCenter(compose.onAllNodesWithText("Empty")[1].fetchSemanticsNode().boundsInWindow.center)
@@ -179,5 +186,11 @@ class Phase2bTest {
         hovering()
         inject(MotionEvent.ACTION_MOVE, to)
         inject(MotionEvent.ACTION_UP, to)
+    }
+
+    private companion object {
+        /** 1600×2560 ב-320dpi = 800×1280dp — טאבלט 10 אינץ'. */
+        const val TABLET_SIZE = "1600x2560"
+        const val TABLET_DENSITY = 320
     }
 }

@@ -121,8 +121,8 @@ fun NexplorerRoot(container: AppContainer, pendingPath: String?, onPendingPathCo
                 editorPath = path
                 screen = Screen.Editor
             }
-            // טאבלט, או טלפון לרוחב: שני חלונות (לוח Tablet). החלון הראשון הוא אותו חלון של הטלפון.
-            if (maxWidth >= NexplorerDimens.DualPaneMinWidth) {
+            // טאבלט: שני חלונות (לוח Tablet). החלון הראשון הוא אותו חלון של הטלפון.
+            if (maxWidth >= NexplorerDimens.DualPaneMinWidth && maxHeight >= NexplorerDimens.DualPaneMinHeight) {
                 DualPaneScreen(
                     panes = listOf(browser, viewModel<BrowserViewModel>(key = SECOND_PANE)),
                     transfers = container.transfers,

@@ -48,6 +48,11 @@ run_class BrowserFlowTest
 run_class SearchAndSettingsTest
 run_class Phase2Test
 run_class Phase2bTest
+# Phase2bTest מדמה טאבלט; אם התהליך קרס לפני tearDown — שהמונקי ירוץ על המסך הרגיל.
+adb shell wm size reset || true
+adb shell wm density reset || true
+adb shell settings put system accelerometer_rotation 0 || true
+adb shell settings put system user_rotation 0 || true
 
 echo "::group::monkey (API $api)"
 adb shell input keyevent KEYCODE_WAKEUP
