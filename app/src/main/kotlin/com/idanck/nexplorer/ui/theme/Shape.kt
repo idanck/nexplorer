@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
  *   12 — אריח מקום במגירה
  *   7  — תיבת סימון במצב בחירה
  *   20 — חלון בשני חלונות · 18 — פריט במסילה · 12 — יעד שחרור בגרירה
+ *   "הוסף מקום": 16 — אריח סוג · 20 — כרטיס · 12 — שדה
  */
 val NexplorerShapes = Shapes(
     extraSmall = RoundedCornerShape(8.dp),
@@ -55,6 +56,11 @@ object NexplorerShape {
     val Pane = RoundedCornerShape(20.dp)
     val RailItem = RoundedCornerShape(18.dp)
     val DropTarget = RoundedCornerShape(12.dp)
+
+    /** "הוסף מקום" (לוח "חיבור חדש"). */
+    val ConnectTypeTile = RoundedCornerShape(16.dp)
+    val ConnectCard = RoundedCornerShape(20.dp)
+    val ConnectField = RoundedCornerShape(12.dp)
 
     val Pill = CircleShape
     val Fab = CircleShape

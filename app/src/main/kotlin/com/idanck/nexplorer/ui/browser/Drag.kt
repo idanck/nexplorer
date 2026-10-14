@@ -124,7 +124,7 @@ internal fun rememberDropZone(folder: String?, drag: FileDrag?, accepts: (DragPa
 /** תיקייה שאפשר לשחרר עליה: לא אחת מהנגררות, ולא התיקייה שהן כבר בה (העתקה לאותו מקום). */
 internal fun acceptsInto(folder: String): (DragPayload) -> Boolean = { payload ->
     folder !in payload.paths && payload.paths.none { folder.startsWith("$it/") } &&
-        payload.paths.any { java.io.File(it).parent != folder }
+        payload.paths.any { com.idanck.nexplorer.core.NetPaths.parentOf(it) != folder }
 }
 
 /** הדגשת יעד: מילוי dropTarget ומסגרת מקווקוות ב-amber (לוח Tablet: "שחרר כאן להעתקה"). */

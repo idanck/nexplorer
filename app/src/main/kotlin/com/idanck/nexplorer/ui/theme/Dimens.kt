@@ -133,4 +133,18 @@ object NexplorerDimens {
     val PlayerPlayButton = 72.dp
     val PlayerPlayIcon = 36.dp
     val PlayerControl = 56.dp
+
+    /**
+     * "הוסף מקום" (לוח "חיבור חדש"): אריח סוג (אייקון 22, מסגרת 1 — ובנבחר 2), שדה (גובה 44, ריפוד 14),
+     * שורת שרת שנמצא (52, נקודה 8, כפתור "בחר" 32), ואייקון המנעול שליד ההסבר (18).
+     */
+    val ConnectTypeIcon = 22.dp
+    val ConnectTypeBorder = 1.dp
+    val ConnectTypeBorderSelected = 2.dp
+    val ConnectField = 44.dp
+    val ConnectFieldPadding = 14.dp
+    val ConnectFoundRow = 52.dp
+    val ConnectStatusDot = 8.dp
+    val ConnectChooseButton = 32.dp
+    val ConnectHintIcon = 18.dp
 }

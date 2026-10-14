@@ -17,6 +17,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.idanck.nexplorer.AppContainer
 import com.idanck.nexplorer.data.crypto.EncryptedFiles
 import com.idanck.nexplorer.data.files.FileIntents
+import com.idanck.nexplorer.data.net.ConnectionSecrets
+import com.idanck.nexplorer.data.net.NetConnection
+import com.idanck.nexplorer.data.net.NetDiscovery
+import com.idanck.nexplorer.data.net.RemoteFiles
+import com.idanck.nexplorer.ui.net.ConnectScreen
+import kotlinx.coroutines.flow.first
 import com.idanck.nexplorer.ui.analyzer.AnalyzerScreen
 import com.idanck.nexplorer.ui.analyzer.AnalyzerViewModel
 import com.idanck.nexplorer.ui.browser.BrowserScreen
@@ -47,7 +53,7 @@ import com.idanck.nexplorer.ui.viewer.ImageViewerScreen
 import com.idanck.nexplorer.ui.viewer.ViewerViewModel
 import kotlinx.coroutines.launch
 
-private enum class Screen { Browser, Search, Settings, Analyzer, Editor, Viewer, Audio, Video }
+private enum class Screen { Browser, Search, Settings, Analyzer, Editor, Viewer, Audio, Video, Connect }
 
 /**
  * השורש: בלי גישה לקבצים — מסך הגישה; אחרת חלון הקבצים, ומעליו חיפוש או הגדרות.
@@ -109,6 +115,16 @@ fun NexplorerRoot(
             }
             else -> openImage(entry.path)
         }
+    }
+
+    // "הוסף מקום" / "ערוך": החיבור שנערך (null — חדש), והחלון שבו ייפתח אחרי שהתחבר.
+    var connectEditing by rememberSaveable { mutableStateOf<String?>(null) }
+    var connectTarget by remember { mutableStateOf<BrowserViewModel?>(null) }
+    val discovery = remember(context) { NetDiscovery(context) }
+    val onOpenConnect: (BrowserViewModel, NetConnection?) -> Unit = { target, editing ->
+        connectTarget = target
+        connectEditing = editing?.id
+        screen = Screen.Connect
     }
 
     LaunchedEffect(pendingPath) {
@@ -173,6 +189,8 @@ fun NexplorerRoot(
                     onOpenAnalyzer = onOpenAnalyzer,
                     onEditText = onEditText,
                     onOpenMedia = ::openMedia,
+                    remote = container.remote,
+                    onOpenConnect = onOpenConnect,
                 )
             } else {
                 BrowserScreen(
@@ -187,8 +205,27 @@ fun NexplorerRoot(
                     onEditText = onEditText,
                     onOpenMedia = ::openMedia,
                     keys = container.keys,
+                    remote = container.remote,
+                    onOpenConnect = onOpenConnect,
                 )
             }
+        }
+
+        Screen.Connect -> {
+            val editing = connectEditing?.let { id -> settings.connections.firstOrNull { it.id == id } }
+            ConnectScreen(
+                editing = editing,
+                discovery = discovery,
+                onConnect = { draft, password ->
+                    val failure = connectAndSave(container, draft, password, editing)
+                    if (failure == null) (connectTarget ?: browser).navigate(Location.Folder(draft.root))
+                    failure
+                },
+                onClose = {
+                    connectEditing = null
+                    screen = Screen.Browser
+                },
+            )
         }
 
         Screen.Viewer -> {
@@ -313,3 +350,43 @@ fun NexplorerRoot(
 
 /** המפתח של ה-ViewModel של החלון השני (הראשון הוא ברירת המחדל, משותף עם תצוגת הטלפון). */
 private const val SECOND_PANE = "pane-2"
+
+/**
+ * "בדוק והתחבר": מתחבר בפרטים שהוזנו, ורק אם הצליח — שומר (הסיסמה מוצפנת ב-Keystore) ומחכה שהחיבור
+ * כבר בהעדפות, כדי שהרשימה שנפתחת אחריו תמצא אותו. בעריכה, סיסמה ריקה = השמורה. null — הצליח.
+ */
+private suspend fun connectAndSave(container: AppContainer, draft: NetConnection, password: CharArray?, editing: NetConnection?): String? {
+    val kept = if (password == null && draft.user.isNotBlank()) {
+        editing?.secret?.let { secret ->
+            try {
+                ConnectionSecrets.decrypt(secret)
+            } catch (e: java.io.IOException) {
+                return e.message
+            }
+        }
+    } else {
+        null
+    }
+    try {
+        RemoteFiles.test(draft, password ?: kept)?.let { return it }
+        val secret = when {
+            draft.user.isBlank() -> null
+            password != null -> try {
+                ConnectionSecrets.encrypt(password)
+            } catch (e: Exception) {
+                return "לא ניתן לשמור את הסיסמה ב-Keystore: ${e.message}"
+            }
+            else -> editing?.secret
+        }
+        val saved = draft.copy(secret = secret)
+        container.settings.update { s ->
+            val exists = s.connections.any { it.id == saved.id }
+            s.copy(connections = if (exists) s.connections.map { if (it.id == saved.id) saved else it } else s.connections + saved)
+        }
+        container.settings.state.first { s -> saved in s.connections }
+        container.remote.forget(saved.id)
+        return null
+    } finally {
+        kept?.fill('\u0000')
+    }
+}

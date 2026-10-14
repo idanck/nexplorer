@@ -11,6 +11,7 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.idanck.nexplorer.core.ViewOptions
+import com.idanck.nexplorer.data.net.NetConnection
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -39,6 +40,8 @@ data class AppSettings(
     val updateLastCheckUtc: Long = 0,
     val updateSkippedVersionCode: Int = 0,
     val updateLastManifest: String? = null,
+    /** מקומות ברשת שנוספו ב"הוסף מקום" (D3), בסדר ההוספה. */
+    val connections: List<NetConnection> = emptyList(),
 ) {
     fun viewFor(path: String?): ViewOptions = path?.let { folderViews[it] } ?: defaultView
 }
@@ -104,6 +107,7 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
             prefs[UPDATE_LAST_CHECK] = next.updateLastCheckUtc
             prefs[UPDATE_SKIPPED] = next.updateSkippedVersionCode
             next.updateLastManifest?.let { prefs[UPDATE_MANIFEST] = it } ?: prefs.remove(UPDATE_MANIFEST)
+            prefs[CONNECTIONS] = NetConnection.encode(next.connections)
         }
     }
 
@@ -128,6 +132,7 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
             updateLastCheckUtc = prefs[UPDATE_LAST_CHECK] ?: 0,
             updateSkippedVersionCode = prefs[UPDATE_SKIPPED] ?: 0,
             updateLastManifest = prefs[UPDATE_MANIFEST],
+            connections = NetConnection.decode(prefs[CONNECTIONS]),
         )
     }
 
@@ -145,5 +150,6 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
         val UPDATE_LAST_CHECK = longPreferencesKey("update_last_check_utc")
         val UPDATE_SKIPPED = intPreferencesKey("update_skipped_version_code")
         val UPDATE_MANIFEST = stringPreferencesKey("update_last_manifest")
+        val CONNECTIONS = stringPreferencesKey("net_connections")
     }
 }

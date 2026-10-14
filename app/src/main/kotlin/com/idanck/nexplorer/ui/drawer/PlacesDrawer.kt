@@ -26,6 +26,9 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.DeleteOutline
+import androidx.compose.material.icons.outlined.Dns
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.MusicNote
@@ -37,6 +40,8 @@ import androidx.compose.material.icons.outlined.SwapVert
 import androidx.compose.material.icons.outlined.Usb
 import androidx.compose.material.icons.outlined.VideoLibrary
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -50,15 +55,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
+import com.idanck.nexplorer.core.NetPaths
 import com.idanck.nexplorer.core.SizeFormat
 import com.idanck.nexplorer.data.files.MediaCollection
 import com.idanck.nexplorer.data.files.StorageVolumeInfo
+import com.idanck.nexplorer.data.net.NetConnection
+import com.idanck.nexplorer.data.net.RemoteSpace
 import com.idanck.nexplorer.ui.browser.AmberBadge
 import com.idanck.nexplorer.ui.components.DrawerBanner
 import com.idanck.nexplorer.ui.theme.FileNameTextStyle
@@ -69,6 +76,14 @@ import com.idanck.nexplorer.ui.theme.NexplorerShape
 class DrawerModel(
     val volumes: List<StorageVolumeInfo>,
     val activeVolumePath: String?,
+    /** מקומות ברשת (D3), אחרי האחסונים של המכשיר. */
+    val connections: List<NetConnection>,
+    val activeConnectionId: String?,
+    /** מקום פנוי שהשרת דיווח (לפי מזהה החיבור) — פס תפוסה כמו באחסון מקומי. */
+    val spaces: Map<String, RemoteSpace>,
+    val onConnection: (NetConnection) -> Unit,
+    val onEditConnection: (NetConnection) -> Unit,
+    val onRemoveConnection: (NetConnection) -> Unit,
     val activeCollection: MediaCollection?,
     val favorites: List<String>,
     val activeTransfers: Int,
@@ -104,6 +119,16 @@ fun PlacesDrawer(model: DrawerModel) {
         ) {
             DrawerSection("מקומות")
             model.volumes.forEach { volume -> PlaceRow(volume, active = volume.path == model.activeVolumePath) { model.onVolume(volume) } }
+            model.connections.forEach { connection ->
+                ConnectionRow(
+                    connection = connection,
+                    space = model.spaces[connection.id],
+                    active = connection.id == model.activeConnectionId,
+                    onClick = { model.onConnection(connection) },
+                    onEdit = { model.onEditConnection(connection) },
+                    onRemove = { model.onRemoveConnection(connection) },
+                )
+            }
             AddPlaceRow(model.onAddPlace)
 
             var managingFavorites by remember { mutableStateOf(false) }
@@ -116,6 +141,7 @@ fun PlacesDrawer(model: DrawerModel) {
             if (managingFavorites) {
                 FavoritesDialog(
                     favorites = model.favorites,
+                    connections = model.connections,
                     onDone = { paths ->
                         managingFavorites = false
                         if (paths != model.favorites) model.onSetFavorites(paths)
@@ -165,7 +191,7 @@ private fun DrawerSection(title: String, action: (@Composable () -> Unit)? = nul
 
 /** "סדר" מועדפים: הזזה למעלה ולמטה והסרה; נשמר ב"סיום". */
 @Composable
-private fun FavoritesDialog(favorites: List<String>, onDone: (List<String>) -> Unit, onDismiss: () -> Unit) {
+private fun FavoritesDialog(favorites: List<String>, connections: List<NetConnection>, onDone: (List<String>) -> Unit, onDismiss: () -> Unit) {
     var items by remember { mutableStateOf(favorites) }
     fun move(from: Int, to: Int) {
         items = items.toMutableList().apply { add(to, removeAt(from)) }
@@ -181,9 +207,9 @@ private fun FavoritesDialog(favorites: List<String>, onDone: (List<String>) -> U
                 items.forEachIndexed { index, path ->
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text(path.substringAfterLast('/').ifEmpty { path }, style = FileNameTextStyle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(favoriteLabel(path, connections), style = FileNameTextStyle, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(
-                                path,
+                                displayPath(path, connections),
                                 style = MonoTextStyle,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 maxLines = 1,
@@ -287,6 +313,83 @@ private fun UsageBar(fraction: Float, active: Boolean) {
     }
 }
 
+/**
+ * מקום ברשת (לוח "מגירת מקומות": "NAS · SMB" עם פס תפוסה, או "Pi · SFTP" עם המשתמש והשרת).
+ * לחיצה ארוכה — "ערוך" ו"הסר".
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun ConnectionRow(connection: NetConnection, space: RemoteSpace?, active: Boolean, onClick: () -> Unit, onEdit: () -> Unit, onRemove: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    val accent = if (active) scheme.onPrimaryContainer else scheme.onSurface
+    var menu by remember { mutableStateOf(false) }
+    Box {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(MaterialTheme.shapes.medium)
+                .background(if (active) scheme.primaryContainer else androidx.compose.ui.graphics.Color.Transparent)
+                .combinedClickable(onClick = onClick, onLongClick = { menu = true })
+                .padding(NexplorerDimens.Space2 + NexplorerDimens.Space1 / 2),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(NexplorerDimens.Space3),
+        ) {
+            Box(
+                Modifier
+                    .size(NexplorerDimens.PlaceTile)
+                    .clip(NexplorerShape.PlaceTile)
+                    .background(if (active) scheme.primary else scheme.surfaceVariant),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Outlined.Dns, contentDescription = null, tint = if (active) scheme.onPrimary else scheme.onSurface)
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NexplorerDimens.Space1)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "${connection.label} · ${connection.protocol.label}",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium),
+                        color = accent,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (space != null) {
+                        Text(
+                            "${SizeFormat.short(space.used)} / ${SizeFormat.short(space.total)}",
+                            style = MonoTextStyle.copy(fontSize = MaterialTheme.typography.labelSmall.fontSize),
+                            color = if (active) scheme.onPrimaryContainer else scheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                if (space != null) {
+                    UsageBar(space.usedFraction, active)
+                } else {
+                    Text(
+                        connection.subtitle,
+                        style = MonoTextStyle.copy(fontSize = MaterialTheme.typography.labelSmall.fontSize),
+                        color = if (active) scheme.onPrimaryContainer else scheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        }
+        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, shape = NexplorerShape.Menu) {
+            DropdownMenuItem(
+                text = { Text("ערוך") },
+                leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null, tint = scheme.primary) },
+                onClick = { menu = false; onEdit() },
+            )
+            DropdownMenuItem(
+                text = { Text("הסר מהמגירה", color = scheme.error) },
+                leadingIcon = { Icon(Icons.Outlined.DeleteOutline, contentDescription = null, tint = scheme.error) },
+                onClick = { menu = false; onRemove() },
+            )
+        }
+    }
+}
+
 @Composable
 private fun AddPlaceRow(onClick: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
@@ -295,7 +398,6 @@ private fun AddPlaceRow(onClick: () -> Unit) {
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.medium)
             .clickable(onClick = onClick)
-            .alpha(0.6f)
             .padding(horizontal = NexplorerDimens.Space2 + NexplorerDimens.Space1 / 2, vertical = NexplorerDimens.Space2),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(NexplorerDimens.Space3),
@@ -309,7 +411,6 @@ private fun AddPlaceRow(onClick: () -> Unit) {
             Icon(Icons.Outlined.Add, contentDescription = null, tint = scheme.primary)
         }
         Text("הוסף מקום", style = MaterialTheme.typography.labelLarge, color = scheme.primary, modifier = Modifier.weight(1f))
-        Text("בקרוב", style = MaterialTheme.typography.labelSmall, color = scheme.onSurfaceVariant)
     }
 }
 
@@ -332,7 +433,7 @@ private fun Favorites(model: DrawerModel) {
     ) {
         model.favorites.forEach { path ->
             Text(
-                path.substringAfterLast('/').ifEmpty { path },
+                favoriteLabel(path, model.connections),
                 style = MaterialTheme.typography.titleSmall.copy(textDirection = TextDirection.Ltr),
                 maxLines = 1,
                 modifier = Modifier
@@ -378,4 +479,16 @@ private fun ToolRow(label: String, icon: ImageVector, onClick: () -> Unit, trail
         Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
         trailing()
     }
+}
+
+/** שם המועדף: התיקייה האחרונה; בשורש של חיבור ברשת — שם החיבור. */
+private fun favoriteLabel(path: String, connections: List<NetConnection>): String {
+    if (!NetPaths.isRemote(path)) return path.substringAfterLast('/').ifEmpty { path }
+    return NetPaths.name(path).ifEmpty { connections.firstOrNull { it.id == NetPaths.connectionId(path) }?.label ?: path }
+}
+
+/** הנתיב בשורה השנייה: ברשת — "NAS › volume2 › Photos" במקום המזהה של החיבור. */
+private fun displayPath(path: String, connections: List<NetConnection>): String {
+    if (!NetPaths.isRemote(path)) return path
+    return connections.firstOrNull { it.id == NetPaths.connectionId(path) }?.displayPath(path) ?: path
 }

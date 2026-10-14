@@ -3,6 +3,7 @@ package com.idanck.nexplorer.data.transfer
 import android.content.Context
 import android.os.Build
 import com.idanck.nexplorer.core.FileNames
+import com.idanck.nexplorer.core.NetPaths
 import com.idanck.nexplorer.data.archive.Archives
 import com.idanck.nexplorer.data.crypto.EncryptedFiles
 import com.idanck.nexplorer.data.crypto.KeyRing
@@ -10,6 +11,7 @@ import com.idanck.nexplorer.data.crypto.VaultKeys
 import com.idanck.nexplorer.data.crypto.Vaults
 import com.idanck.nexplorer.data.files.LocalFiles
 import com.idanck.nexplorer.data.files.MediaScan
+import com.idanck.nexplorer.data.net.RemoteFiles
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
@@ -91,7 +93,12 @@ data class Transfer(
  * [TransferService] מחזיק את התהליך בחיים כל עוד יש משהו פעיל.
  * אף פעולה לא דורסת קובץ קיים: התנגשות מקבלת שם פנוי ("name (1).ext").
  */
-class TransferManager(private val context: Context, private val scope: CoroutineScope, private val vaults: VaultKeys) {
+class TransferManager(
+    private val context: Context,
+    private val scope: CoroutineScope,
+    private val vaults: VaultKeys,
+    private val remote: RemoteFiles,
+) {
 
     private val _transfers = MutableStateFlow<List<Transfer>>(emptyList())
     val transfers: StateFlow<List<Transfer>> = _transfers
@@ -170,9 +177,13 @@ class TransferManager(private val context: Context, private val scope: Coroutine
         }
         set(id) { it.copy(status = TransferStatus.Preparing) }
         val outcome = try {
+            val overNetwork = (job.sources + listOfNotNull(job.targetDir)).any(NetPaths::isRemote)
+            if (overNetwork && job.kind !in NETWORK_KINDS) {
+                throw IOException("${job.kind.verb} ${job.kind.past("לא זמין", "לא זמינה")} במקום ברשת — העתק קודם למכשיר")
+            }
             when (job.kind) {
-                TransferKind.Delete -> delete(job)
-                TransferKind.Copy, TransferKind.Move -> copyOrMove(job)
+                TransferKind.Delete -> if (overNetwork) deleteOverNetwork(job) else delete(job)
+                TransferKind.Copy, TransferKind.Move -> if (overNetwork) copyOverNetwork(job) else copyOrMove(job)
                 TransferKind.Compress -> compress(job)
                 TransferKind.Extract -> extract(job)
                 TransferKind.Encrypt -> encrypt(job)
@@ -331,6 +342,115 @@ class TransferManager(private val context: Context, private val scope: Coroutine
         val sealed = EncryptedFiles.encryptFile(source, destDir, keys, { checkpoint(id) }, progress::add)
         if (move && !source.delete()) throw IOException("ההצפנה הצליחה, אבל לא ניתן למחוק את המקור \"${source.name}\"")
         touched(if (move) source else null, sealed)
+    }
+
+    // ---------- ברשת (שלב 5א) ----------
+
+    private fun sideFor(path: String): Side = if (NetPaths.isRemote(path)) RemoteSide(remote.fsFor(path)) else LocalSide
+
+    private fun copierFor(id: Long, progress: Progress) = TreeCopy(
+        checkpoint = { checkpoint(id) },
+        onBytes = progress::add,
+        onName = { name -> set(id) { it.copy(currentName = name) } },
+        onFile = { dest, removed ->
+            touched(removed?.takeIf { !NetPaths.isRemote(it) }?.let(::File), dest.takeIf { !NetPaths.isRemote(it) }?.let(::File))
+        },
+    )
+
+    /**
+     * העתקה או העברה שאחד הצדדים שלה ברשת ([TreeCopy]). בתוך אותו שיתוף העברה היא שינוי שם בשרת.
+     * לתוך תיקייה מוצפנת אין מכאן הצפנה — הבקשה נדחית לפני שנכתב משהו לא מוצפן.
+     */
+    private suspend fun copyOverNetwork(job: Transfer) {
+        val target = requireNotNull(job.targetDir)
+        if (NetPaths.isRemote(target) && NetPaths.segments(target).isEmpty()) throw IOException("פתח שיתוף כדי להעתיק אליו")
+        if (!NetPaths.isRemote(target) && Vaults.rootOf(File(target)) != null) {
+            throw IOException("מהרשת לתוך תיקייה מוצפנת — העתק קודם לתיקייה רגילה במכשיר, ומשם לתוכה")
+        }
+        val to = sideFor(target)
+        val targetNode = to.stat(target)
+        if (targetNode == null || !targetNode.isDirectory) throw IOException("תיקיית היעד לא קיימת")
+        if (to is LocalSide && !File(target).canWrite()) throw IOException("אין הרשאת כתיבה בתיקיית היעד")
+        val move = job.kind == TransferKind.Move
+        val progress = Progress(job.id)
+        val copier = copierFor(job.id, progress)
+
+        val pending = mutableListOf<Pair<Side, Node>>()
+        var doneItems = 0
+        for (source in job.sources) {
+            checkpoint(job.id)
+            if (NetPaths.isRemote(source) == NetPaths.isRemote(target) && FileNames.isInside(target, source)) {
+                throw IOException("אי אפשר להעתיק את \"${NetPaths.nameOf(source)}\" לתוך עצמה")
+            }
+            if (!NetPaths.isRemote(source) && LocalFiles.isLink(File(source)) && File(source).isDirectory) {
+                throw IOException("\"${File(source).name}\" הוא קישור לתיקייה — פתח את היעד שלו והעתק משם")
+            }
+            if (NetPaths.isRemote(source) && NetPaths.segments(source).size < 2) {
+                throw IOException("אי אפשר ${if (move) "להעביר" else "להעתיק"} שיתוף שלם — פתח אותו ובחר את מה שבתוכו")
+            }
+            val from = sideFor(source)
+            val node = from.stat(source) ?: throw IOException("\"${NetPaths.nameOf(source)}\" כבר לא קיים")
+            if (move) {
+                if (NetPaths.parentOf(source) == target) {
+                    doneItems++
+                    continue
+                }
+                if (from is RemoteSide && to is RemoteSide && from.fs === to.fs) {
+                    val dest = to.child(target, copier.uniqueIn(to, target, node.name))
+                    if (from.move(source, dest)) {
+                        if (node.isDirectory) set(job.id) { it.copy(moved = it.moved + (source to dest)) }
+                        doneItems++
+                        continue
+                    }
+                }
+            }
+            pending += from to node
+        }
+        set(job.id) { it.copy(doneItems = doneItems) }
+        if (pending.isEmpty()) return
+
+        var total = 0L
+        for ((from, node) in pending) total += copier.sizeOf(from, node)
+        set(job.id) { it.copy(status = TransferStatus.Running, totalBytes = total) }
+        for ((from, node) in pending) {
+            val name = copier.uniqueIn(to, target, node.name)
+            val dest = to.child(target, name)
+            try {
+                copier.copy(from, node, to, target, name, move)
+            } catch (e: Exception) {
+                // כמו בהעתקה מקומית: עותק חלקי נמחק; בהעברה הוא המקום היחיד של מה שכבר הועבר.
+                if (!move) copier.discard(to, dest)
+                throw e
+            }
+            if (move && node.isDirectory) set(job.id) { it.copy(moved = it.moved + (node.path to dest)) }
+            doneItems++
+            set(job.id) { it.copy(doneItems = doneItems) }
+        }
+    }
+
+    private suspend fun deleteOverNetwork(job: Transfer) {
+        val copier = copierFor(job.id, Progress(job.id))
+        val roots = job.sources.map { source ->
+            if (NetPaths.segments(source).size < 2) throw IOException("אי אפשר למחוק שיתוף")
+            val side = sideFor(source)
+            side to (side.stat(source) ?: throw IOException("\"${NetPaths.nameOf(source)}\" כבר לא קיים"))
+        }
+        var total = 0
+        for ((side, node) in roots) total += copier.countOf(side, node)
+        set(job.id) { it.copy(status = TransferStatus.Running, totalItems = total, doneItems = 0) }
+        var done = 0
+        var lastPublish = 0L
+        for ((side, node) in roots) {
+            copier.delete(side, node) { item ->
+                done++
+                val now = System.currentTimeMillis()
+                if (now - lastPublish > PUBLISH_MS) {
+                    lastPublish = now
+                    set(job.id) { it.copy(doneItems = done, currentName = item.name) }
+                }
+            }
+        }
+        set(job.id) { it.copy(doneItems = done) }
     }
 
     private suspend fun compress(job: Transfer) {
@@ -654,6 +774,8 @@ class TransferManager(private val context: Context, private val scope: Coroutine
     }
 
     private companion object {
+        /** מה שעובד מול מקום ברשת בשלב 5א. דחיסה, חילוץ והצפנה — דרך עותק במכשיר. */
+        val NETWORK_KINDS = setOf(TransferKind.Copy, TransferKind.Move, TransferKind.Delete)
         const val BUFFER = 256 * 1024
         const val PUBLISH_MS = 150L
         const val MAX_SCAN = 5_000

@@ -7,6 +7,8 @@ import coil.ImageLoaderFactory
 import coil.decode.VideoFrameDecoder
 import com.idanck.nexplorer.data.crypto.EncryptedPreview
 import com.idanck.nexplorer.data.crypto.VaultKeys
+import com.idanck.nexplorer.data.net.ConnectionSecrets
+import com.idanck.nexplorer.data.net.RemoteFiles
 import com.idanck.nexplorer.data.settings.SettingsRepository
 import com.idanck.nexplorer.data.transfer.TransferManager
 import com.idanck.nexplorer.ui.keys.KeyBus
@@ -26,7 +28,12 @@ class AppContainer(app: Application) {
     val settings = SettingsRepository(app, scope)
     /** תיקיות מוצפנות שנפתחו — בזיכרון בלבד. */
     val vaults = VaultKeys()
-    val transfers = TransferManager(app, scope, vaults)
+    /** מקומות ברשת (D3): החיבורים מההעדפות, והסיסמאות מה-Keystore — רק כשמתחברים. */
+    val remote = RemoteFiles(
+        connectionOf = { id -> settings.state.value.connections.firstOrNull { it.id == id } },
+        passwordOf = { connection -> connection.secret?.let(ConnectionSecrets::decrypt) },
+    )
+    val transfers = TransferManager(app, scope, vaults, remote)
     val updates = UpdateManager(app, settings, transfers)
     val keys = KeyBus()
 }
@@ -39,8 +46,11 @@ class NexplorerApp : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
-        // עותקים מפוענחים זמניים ("פתח" בקובץ מוצפן) מהריצה הקודמת.
-        container.scope.launch(Dispatchers.IO) { EncryptedPreview.clearStale(cacheDir) }
+        // עותקים זמניים מהריצה הקודמת: מפוענחים ("פתח" בקובץ מוצפן) ומהרשת.
+        container.scope.launch(Dispatchers.IO) {
+            EncryptedPreview.clearStale(cacheDir)
+            container.remote.clearStale(cacheDir)
+        }
     }
 
     /** תמונות ממוזערות ברשת ובגלריה, כולל פריים ראשון של וידאו. */

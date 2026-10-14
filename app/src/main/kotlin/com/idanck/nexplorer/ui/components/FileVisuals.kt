@@ -48,6 +48,7 @@ import coil.request.ImageRequest
 import com.idanck.nexplorer.core.Counts
 import com.idanck.nexplorer.core.Entry
 import com.idanck.nexplorer.core.FileKind
+import com.idanck.nexplorer.core.NetPaths
 import com.idanck.nexplorer.core.HebrewDates
 import com.idanck.nexplorer.core.SizeFormat
 import com.idanck.nexplorer.core.isolated
@@ -101,7 +102,8 @@ fun FileIconTile(entry: Entry, modifier: Modifier = Modifier, size: Dp = Nexplor
     }
 }
 
-val Entry.hasThumbnail: Boolean get() = kind == FileKind.Image || kind == FileKind.Video
+/** ברשת אין תמונות ממוזערות (שלב 5א): כל אחת הייתה הורדה של הקובץ כולו. */
+val Entry.hasThumbnail: Boolean get() = (kind == FileKind.Image || kind == FileKind.Video) && !NetPaths.isRemote(path)
 
 /** תמונה ממוזערת (Coil, כולל פריים מווידאו) על רקע האריח; עד שנטענת — האייקון. */
 @Composable
@@ -168,20 +170,29 @@ fun SectionHeader(title: String, modifier: Modifier = Modifier, trailing: String
 /** "670 פריטים · 12 באוק׳, 10:12" או "3.2 MB · 12 באוק׳, 10:34" — הגודל ב-JetBrains Mono ומבודד. */
 /** [folderSize] — "גודל תיקיות": הגודל שחושב לתיקייה (null — לא מוצג או עוד לא חושב). */
 fun metaLine(entry: Entry, now: Long, zone: ZoneId = ZoneId.systemDefault(), folderSize: Long? = null): AnnotatedString = buildAnnotatedString {
+    fun separate() {
+        if (length > 0) append(" · ")
+    }
     if (entry.isDirectory) {
-        if (entry.childCount >= 0) {
-            append(Counts.items(entry.childCount))
-            append(" · ")
-        }
+        if (entry.childCount >= 0) append(Counts.items(entry.childCount))
         if (folderSize != null) {
+            separate()
             withStyle(SpanStyle(fontFamily = JetBrainsMono)) { append(SizeFormat.short(folderSize).isolated()) }
-            append(" · ")
         }
     } else {
         withStyle(SpanStyle(fontFamily = JetBrainsMono)) { append(SizeFormat.short(entry.size).isolated()) }
-        append(" · ")
     }
-    append(HebrewDates.short(entry.lastModified, now, zone))
+    when {
+        entry.lastModified > 0 -> {
+            separate()
+            append(HebrewDates.short(entry.lastModified, now, zone))
+        }
+        // שיתוף ברשת: לשיתוף אין תאריך (השרת מחזיר 0 — "1 בינו׳ 1970").
+        NetPaths.isRemote(entry.path) && NetPaths.segments(entry.path).size == 1 -> {
+            separate()
+            append("שיתוף")
+        }
+    }
 }
 
 /** טקסט עם קטעים מודגשים בענבר — התאמת חיפוש (לוח "חיפוש"). */
