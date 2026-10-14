@@ -15,6 +15,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.idanck.nexplorer.AppContainer
+import com.idanck.nexplorer.data.crypto.EncryptedFiles
 import com.idanck.nexplorer.data.files.FileIntents
 import com.idanck.nexplorer.ui.analyzer.AnalyzerScreen
 import com.idanck.nexplorer.ui.analyzer.AnalyzerViewModel
@@ -241,6 +242,11 @@ fun NexplorerRoot(
                         screen = Screen.Browser
                     } else if (MediaFormats.opensInApp(entry)) {
                         openMedia(entry)
+                    } else if (EncryptedFiles.hasEncryptedName(entry.name)) {
+                        // חלון הסיסמה של מסך הקבצים, בתיקייה של הקובץ.
+                        browser.openPath(entry.path)
+                        browser.open(entry)
+                        screen = Screen.Browser
                     } else if (!FileIntents.open(context, entry.path, entry.name)) {
                         Toast.makeText(context, "אין אפליקציה שפותחת קבצים מסוג זה", Toast.LENGTH_SHORT).show()
                     }

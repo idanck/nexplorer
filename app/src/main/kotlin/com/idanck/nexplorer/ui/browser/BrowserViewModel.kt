@@ -18,6 +18,8 @@ import com.idanck.nexplorer.core.ViewOptions
 import com.idanck.nexplorer.core.sectionsFor
 import com.idanck.nexplorer.core.sortedFor
 import com.idanck.nexplorer.data.archive.Archives
+import com.idanck.nexplorer.data.crypto.EncryptedFiles
+import com.idanck.nexplorer.data.crypto.EncryptedPreview
 import com.idanck.nexplorer.data.files.LocalFiles
 import com.idanck.nexplorer.data.files.MediaCollection
 import com.idanck.nexplorer.data.files.MediaCollections
@@ -42,6 +44,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.IOException
 import java.time.ZoneId
 
 sealed interface Location {
@@ -120,6 +123,9 @@ sealed interface BrowserEvent {
 
     /** ‏APK: גיליון הפרטים וההתקנה. */
     data class OpenApk(val entry: Entry) : BrowserEvent
+
+    /** קובץ ‎.enc‎: חלון הסיסמה ("פתח" / "פענח"). */
+    data class OpenEncrypted(val entry: Entry) : BrowserEvent
 }
 
 /** תוצאה של שינוי שם מרובה. */
@@ -248,6 +254,7 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
         }
         when {
             entry.isDirectory -> navigate(Location.Folder(entry.path))
+            EncryptedFiles.hasEncryptedName(entry.name) -> emitEvent(BrowserEvent.OpenEncrypted(entry))
             ArchiveFormats.of(entry.name) != null -> emitEvent(BrowserEvent.OpenArchive(entry))
             entry.extension == "apk" -> emitEvent(BrowserEvent.OpenApk(entry))
             else -> emitEvent(BrowserEvent.OpenFile(entry))
@@ -563,6 +570,41 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
         val folderName = if (intoFolder) ArchivePaths.extractFolderName(archive.name) else null
         transfers.enqueue(TransferKind.Extract, listOf(archive.path), parent, archiveName = folderName, password = password)
         clearSelection()
+    }
+
+    // ---------- הצפנה ----------
+
+    fun encrypt(paths: List<String>, password: CharArray) {
+        transfers.enqueue(TransferKind.Encrypt, paths, null, password = password)
+        clearSelection()
+    }
+
+    fun decrypt(paths: List<String>, password: CharArray) {
+        transfers.enqueue(TransferKind.Decrypt, paths, null, password = password)
+        clearSelection()
+    }
+
+    /**
+     * "פתח": מפענח עותק זמני (ראה [EncryptedPreview]) ופותח אותו כמו כל קובץ — במציג, בנגן או באפליקציה
+     * אחרת; הקובץ המוצפן לא משתנה. מחזיר הודעת שגיאה, או null כשנפתח. [onProgress] — מ-0 עד 1.
+     */
+    suspend fun openEncrypted(entry: Entry, password: CharArray, onProgress: (Float) -> Unit): String? {
+        val opened = try {
+            withContext(Dispatchers.IO) {
+                val total = (entry.size - EncryptedFiles.HEADER_SIZE).coerceAtLeast(1)
+                var done = 0L
+                val file = EncryptedPreview.open(getApplication<Application>().cacheDir, File(entry.path), password) { bytes ->
+                    done += bytes
+                    onProgress((done.toFloat() / total).coerceIn(0f, 1f))
+                }
+                LocalFiles.entryOf(file, countChildren = false)
+            }
+        } catch (e: IOException) {
+            return e.message ?: "לא ניתן לפתוח את הקובץ"
+        }
+        clearSelection()
+        emitEvent(BrowserEvent.OpenFile(opened))
+        return null
     }
 
     suspend fun inspectArchive(path: String): Result<Archives.Info> =

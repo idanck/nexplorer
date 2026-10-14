@@ -19,6 +19,7 @@ import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.FolderZip
 import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.automirrored.outlined.InsertDriveFile
 import androidx.compose.material.icons.outlined.Movie
 import androidx.compose.material.icons.outlined.MusicNote
@@ -50,6 +51,7 @@ import com.idanck.nexplorer.core.FileKind
 import com.idanck.nexplorer.core.HebrewDates
 import com.idanck.nexplorer.core.SizeFormat
 import com.idanck.nexplorer.core.isolated
+import com.idanck.nexplorer.data.crypto.EncryptedFiles
 import com.idanck.nexplorer.ui.theme.JetBrainsMono
 import com.idanck.nexplorer.ui.theme.NexplorerDimens
 import com.idanck.nexplorer.ui.theme.NexplorerShape
@@ -66,7 +68,7 @@ fun iconFor(entry: Entry): ImageVector = when (entry.kind) {
     FileKind.Text -> Icons.AutoMirrored.Outlined.Article
     FileKind.Archive -> Icons.Outlined.FolderZip
     FileKind.Apk -> Icons.Outlined.Android
-    FileKind.Other -> Icons.AutoMirrored.Outlined.InsertDriveFile
+    FileKind.Other -> if (EncryptedFiles.hasEncryptedName(entry.name)) Icons.Outlined.Lock else Icons.AutoMirrored.Outlined.InsertDriveFile
 }
 
 /** צבעי האריח לפי הלוחות: תיקייה בכחול, תמונה/וידאו בענבר, PDF באדום, השאר אפור. */
