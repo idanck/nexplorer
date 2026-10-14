@@ -50,7 +50,7 @@
 - Worker: השוואת טוקן בזמן קבוע, 400 (לא 500) על נתיב פגום. CI: versionCode ו-minSdk נקראים מה-APK; תקלה בערוץ לא נחשבת "עוד לא פורסם"
 
 ### Changed
-- Compose BOM ‏2024.12.01 ← 2026.04.00 ‏(Compose 1.10.6) ו-AGP ‏8.7.3 ← 8.8.2 (ה-lint של Compose 1.9 ומעלה דורש אותה). ב-ui-test של Compose 1.7 ההתאמה לצמתים רצה על חוט הבדיקה במקביל ל-layout, ובאמולטור API 29 בדיקות נפלו לסירוגין ("Detected multithreaded access to SnapshotStateObserver", "performMeasureAndLayout called during measure layout")
+- Compose BOM ‏2024.12.01 ← 2026.03.01 ‏(Compose 1.10.6) ו-AGP ‏8.7.3 ← 8.8.2 (ה-lint של Compose 1.9 ומעלה דורש אותה). ב-ui-test של Compose 1.7 ההתאמה לצמתים רצה על חוט הבדיקה במקביל ל-layout, ובאמולטור API 29 בדיקות נפלו לסירוגין ("Detected multithreaded access to SnapshotStateObserver", "performMeasureAndLayout called during measure layout")
 - מסך הקטלוג הזמני הוסר — המסך הראשי מחליף אותו
 - build ה-debug מקבל `applicationIdSuffix ".debug"` ולא בודק עדכונים, כדי לא להתנגש בגרסה החתומה
 - טוקני Solid הועברו מ-`docs/design/tokens.json` ל-`docs/research/solid-tokens.json`; `docs/design/tokens.json` הוא עכשיו של nexplorer
