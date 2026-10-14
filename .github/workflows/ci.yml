@@ -110,7 +110,7 @@ jobs:
           [ "$actual" = "$RELEASE_CERT_SHA256" ]
 
       - name: Upload APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: nexplorer-apk
           path: dist/*.apk
@@ -199,7 +199,7 @@ jobs:
 
       - name: Upload reports on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: reports
           path: app/build/reports/
