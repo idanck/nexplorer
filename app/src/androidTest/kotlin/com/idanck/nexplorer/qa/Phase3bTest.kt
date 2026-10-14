@@ -2,6 +2,9 @@ package com.idanck.nexplorer.qa
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Color
+import android.os.SystemClock
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasContentDescription
@@ -117,12 +120,15 @@ class Phase3bTest {
         Qa.screenshot(compose, "82-video")
 
         pauseThroughPlayerControls()
+        assertTrue("הפריים המושהה לא מוצג", waitForVideoFrame())
 
         // סיבוב בונה את המסך מחדש; הנגן ב-ViewModel — נשאר מושהה באותה נקודה, ולא נטען מחדש (טעינה מנגנת).
+        // המשטח החדש ריק, והפריים המושהה מצויר עליו מחדש (ב-API 35 בלי זה המסך נשאר שחור).
         Qa.device.setOrientationLeft()
         Thread.sleep(2_000)
         compose.waitFor(playback("מושהה"), 15_000)
         assertFalse("הסרטון נטען מחדש אחרי הסיבוב", compose.exists(playback("מנגן")))
+        assertTrue("אחרי הסיבוב המסך שחור — הפריים המושהה לא צויר מחדש", waitForVideoFrame())
         Qa.screenshot(compose, "83-video-rotated")
 
         Qa.device.setOrientationNatural()
@@ -143,6 +149,34 @@ class Phase3bTest {
             if (runCatching { compose.waitFor(playback("מושהה"), 3_000) }.isSuccess) return
         }
         throw AssertionError("הסרטון לא נעצר דרך הבקרים של הנגן")
+    }
+
+    /**
+     * יש סרטון על המסך: בשורה ב-40% מהגובה יש פיקסלים צבעוניים (פסי הצבע של testsrc). מסך שחור,
+     * הבקרים הלבנים והרקע המוחשך שלהם — אפורים, ולא נספרים.
+     */
+    private fun waitForVideoFrame(timeoutMs: Long = 8_000): Boolean {
+        val deadline = SystemClock.uptimeMillis() + timeoutMs
+        while (SystemClock.uptimeMillis() < deadline) {
+            if (colorfulPixelsOnScreen() > 10) return true
+            Thread.sleep(250)
+        }
+        return false
+    }
+
+    private fun colorfulPixelsOnScreen(): Int {
+        val shot = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot() ?: return 0
+        val pixels = if (shot.config == Bitmap.Config.HARDWARE) shot.copy(Bitmap.Config.ARGB_8888, false) else shot
+        try {
+            val y = pixels.height * 4 / 10
+            return (0 until pixels.width step 8).count { x ->
+                val c = pixels.getPixel(x, y)
+                maxOf(Color.red(c), Color.green(c), Color.blue(c)) - minOf(Color.red(c), Color.green(c), Color.blue(c)) > 40
+            }
+        } finally {
+            if (pixels !== shot) pixels.recycle()
+            shot.recycle()
+        }
     }
 
     /** WAV ‏16 ביט מונו: צליל סינוס, בלי תגיות — הכותרת בנגן היא שם הקובץ. */

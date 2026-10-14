@@ -82,6 +82,14 @@ class VideoPlayerViewModel(app: Application) : AndroidViewModel(app) {
 
     fun pause() = player.pause()
 
+    /**
+     * משטח ציור חדש (סיבוב מסך, חזרה מהרקע) ריק עד הפריים הבא — ובנגן מושהה אין פריים הבא, והמסך
+     * נשאר שחור. חיפוש לאותה נקודה מפענח ומצייר אותה מחדש, בלי להתחיל לנגן.
+     */
+    fun redrawPausedFrame() {
+        if (!player.playWhenReady && player.playbackState == Player.STATE_READY) player.seekTo(player.currentPosition)
+    }
+
     /** לשמירה למקרה של הריגת תהליך. */
     val positionMs: Long get() = player.currentPosition
 

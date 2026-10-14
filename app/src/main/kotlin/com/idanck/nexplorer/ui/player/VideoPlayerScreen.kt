@@ -1,6 +1,8 @@
 package com.idanck.nexplorer.ui.player
 
 import android.app.Activity
+import android.view.SurfaceHolder
+import android.view.SurfaceView
 import android.view.View
 import androidx.activity.compose.BackHandler
 import androidx.annotation.OptIn
@@ -133,6 +135,14 @@ fun VideoPlayerScreen(viewModel: VideoPlayerViewModel, path: String, onPathChang
                     setShowSubtitleButton(true)
                     setControllerVisibilityListener(PlayerView.ControllerVisibilityListener { visibility -> chrome = visibility == View.VISIBLE })
                     player = viewModel.player
+                    // אחרי ש-ExoPlayer קיבל את המשטח (הוא נרשם ראשון, ב-player =): פריים מושהה מצויר עליו מחדש.
+                    (videoSurfaceView as? SurfaceView)?.holder?.addCallback(
+                        object : SurfaceHolder.Callback {
+                            override fun surfaceCreated(holder: SurfaceHolder) = viewModel.redrawPausedFrame()
+                            override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) = Unit
+                            override fun surfaceDestroyed(holder: SurfaceHolder) = Unit
+                        },
+                    )
                     // הסרגל העליון מתחיל גלוי (גם אחרי סיבוב) — הבקרים איתו, ונעלמים יחד אחרי כמה שניות.
                     showController()
                 }
