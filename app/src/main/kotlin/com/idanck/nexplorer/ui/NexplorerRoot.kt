@@ -292,6 +292,7 @@ fun NexplorerRoot(
                     onConfirmDelete = { v -> updateSettings { it.copy(confirmDelete = v) } },
                     onShowHidden = { v -> updateSettings { it.copy(defaultView = it.defaultView.copy(showHidden = v)) } },
                     onReopenLast = { v -> updateSettings { it.copy(reopenLastFolder = v) } },
+                    onUnhideFolder = { path -> updateSettings { it.copy(hiddenFolders = it.hiddenFolders - path) } },
                     onStorageAccess = { StorageAccess.openSettings(context) },
                     onCheckUpdates = { container.scope.launch { container.updates.check(force = true) } },
                     onAutoCheck = { v -> updateSettings { it.copy(updateAutoCheck = v) } },

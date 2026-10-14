@@ -30,6 +30,8 @@ data class ViewOptions(
     val density: Int = 1,
     val showSections: Boolean = true,
     val showHidden: Boolean = false,
+    /** "גודל תיקיות": חישוב הגודל של כל תיקייה ברשימה (ברקע — מאט תיקיות גדולות). */
+    val showFolderSizes: Boolean = false,
 ) {
     /** מחרוזת קומפקטית לשמירה בהעדפות. סדר השדות קבוע; שדה חדש נוסף רק בסוף. */
     fun encode(): String = listOf(
@@ -39,6 +41,7 @@ data class ViewOptions(
         density.toString(),
         if (showSections) "1" else "0",
         if (showHidden) "1" else "0",
+        if (showFolderSizes) "1" else "0",
     ).joinToString("|")
 
     companion object {
@@ -59,6 +62,7 @@ data class ViewOptions(
                 density = parts.getOrNull(3)?.toIntOrNull()?.coerceIn(0, MAX_DENSITY) ?: defaults.density,
                 showSections = flag(4, defaults.showSections),
                 showHidden = flag(5, defaults.showHidden),
+                showFolderSizes = flag(6, defaults.showFolderSizes),
             )
         }
     }

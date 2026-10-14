@@ -22,6 +22,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Image
@@ -33,11 +36,18 @@ import androidx.compose.material.icons.outlined.SdCard
 import androidx.compose.material.icons.outlined.SwapVert
 import androidx.compose.material.icons.outlined.Usb
 import androidx.compose.material.icons.outlined.VideoLibrary
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -51,6 +61,7 @@ import com.idanck.nexplorer.data.files.MediaCollection
 import com.idanck.nexplorer.data.files.StorageVolumeInfo
 import com.idanck.nexplorer.ui.browser.AmberBadge
 import com.idanck.nexplorer.ui.components.DrawerBanner
+import com.idanck.nexplorer.ui.theme.FileNameTextStyle
 import com.idanck.nexplorer.ui.theme.MonoTextStyle
 import com.idanck.nexplorer.ui.theme.NexplorerDimens
 import com.idanck.nexplorer.ui.theme.NexplorerShape
@@ -64,6 +75,8 @@ class DrawerModel(
     val onVolume: (StorageVolumeInfo) -> Unit,
     val onFavorite: (String) -> Unit,
     val onRemoveFavorite: (String) -> Unit,
+    /** "סדר" בכותרת המועדפים: הסדר החדש (ובלי מה שהוסר). */
+    val onSetFavorites: (List<String>) -> Unit,
     val onCollection: (MediaCollection) -> Unit,
     val onDownloads: () -> Unit,
     val onAddPlace: () -> Unit,
@@ -93,8 +106,23 @@ fun PlacesDrawer(model: DrawerModel) {
             model.volumes.forEach { volume -> PlaceRow(volume, active = volume.path == model.activeVolumePath) { model.onVolume(volume) } }
             AddPlaceRow(model.onAddPlace)
 
-            DrawerSection("מועדפים")
+            var managingFavorites by remember { mutableStateOf(false) }
+            DrawerSection("מועדפים") {
+                if (model.favorites.isNotEmpty()) {
+                    TextButton(onClick = { managingFavorites = true }) { Text("סדר", style = MaterialTheme.typography.labelMedium) }
+                }
+            }
             Favorites(model)
+            if (managingFavorites) {
+                FavoritesDialog(
+                    favorites = model.favorites,
+                    onDone = { paths ->
+                        managingFavorites = false
+                        if (paths != model.favorites) model.onSetFavorites(paths)
+                    },
+                    onDismiss = { managingFavorites = false },
+                )
+            }
 
             DrawerSection("אוספים")
             Row(horizontalArrangement = Arrangement.spacedBy(NexplorerDimens.Space2), modifier = Modifier.padding(horizontal = NexplorerDimens.Space1)) {
@@ -121,12 +149,62 @@ fun PlacesDrawer(model: DrawerModel) {
 }
 
 @Composable
-private fun DrawerSection(title: String) {
-    Text(
-        title,
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = NexplorerDimens.Space2, end = NexplorerDimens.Space2, top = NexplorerDimens.Space3, bottom = NexplorerDimens.Space1 + NexplorerDimens.Space1 / 2),
+private fun DrawerSection(title: String, action: (@Composable () -> Unit)? = null) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            title,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = NexplorerDimens.Space2, end = NexplorerDimens.Space2, top = NexplorerDimens.Space3, bottom = NexplorerDimens.Space1 + NexplorerDimens.Space1 / 2),
+        )
+        action?.invoke()
+    }
+}
+
+/** "סדר" מועדפים: הזזה למעלה ולמטה והסרה; נשמר ב"סיום". */
+@Composable
+private fun FavoritesDialog(favorites: List<String>, onDone: (List<String>) -> Unit, onDismiss: () -> Unit) {
+    var items by remember { mutableStateOf(favorites) }
+    fun move(from: Int, to: Int) {
+        items = items.toMutableList().apply { add(to, removeAt(from)) }
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("מועדפים") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                if (items.isEmpty()) {
+                    Text("אין מועדפים", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                items.forEachIndexed { index, path ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(path.substringAfterLast('/').ifEmpty { path }, style = FileNameTextStyle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(
+                                path,
+                                style = MonoTextStyle,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        IconButton(onClick = { move(index, index - 1) }, enabled = index > 0) {
+                            Icon(Icons.Filled.KeyboardArrowUp, contentDescription = "הזז למעלה")
+                        }
+                        IconButton(onClick = { move(index, index + 1) }, enabled = index < items.lastIndex) {
+                            Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "הזז למטה")
+                        }
+                        IconButton(onClick = { items = items - path }) {
+                            Icon(Icons.Filled.Close, contentDescription = "הסר מהמועדפים")
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { onDone(items) }) { Text("סיום") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("ביטול") } },
     )
 }
 

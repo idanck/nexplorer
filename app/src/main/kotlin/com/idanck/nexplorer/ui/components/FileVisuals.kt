@@ -164,10 +164,15 @@ fun SectionHeader(title: String, modifier: Modifier = Modifier, trailing: String
 }
 
 /** "670 פריטים · 12 באוק׳, 10:12" או "3.2 MB · 12 באוק׳, 10:34" — הגודל ב-JetBrains Mono ומבודד. */
-fun metaLine(entry: Entry, now: Long, zone: ZoneId = ZoneId.systemDefault()): AnnotatedString = buildAnnotatedString {
+/** [folderSize] — "גודל תיקיות": הגודל שחושב לתיקייה (null — לא מוצג או עוד לא חושב). */
+fun metaLine(entry: Entry, now: Long, zone: ZoneId = ZoneId.systemDefault(), folderSize: Long? = null): AnnotatedString = buildAnnotatedString {
     if (entry.isDirectory) {
         if (entry.childCount >= 0) {
             append(Counts.items(entry.childCount))
+            append(" · ")
+        }
+        if (folderSize != null) {
+            withStyle(SpanStyle(fontFamily = JetBrainsMono)) { append(SizeFormat.short(folderSize).isolated()) }
             append(" · ")
         }
     } else {

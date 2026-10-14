@@ -29,6 +29,8 @@ data class AppSettings(
     /** "רק בתיקייה זו": נתיב → אפשרויות. */
     val folderViews: Map<String, ViewOptions> = emptyMap(),
     val favorites: List<String> = emptyList(),
+    /** "הסתר תיקייה": לא מוצגות ברשימה (רק כאן — במכשיר הן נשארות). מוחזרות מההגדרות. */
+    val hiddenFolders: Set<String> = emptySet(),
     val confirmDelete: Boolean = true,
     val reopenLastFolder: Boolean = true,
     val lastFolder: String? = null,
@@ -57,6 +59,7 @@ fun AppSettings.relocated(moves: List<Pair<String, String>>): AppSettings {
     }
     return copy(
         favorites = favorites.map(::move).distinct(),
+        hiddenFolders = hiddenFolders.map(::move).toSet(),
         folderViews = folderViews.mapKeys { (path, _) -> move(path) },
         lastFolder = lastFolder?.let(::move),
     )
@@ -92,6 +95,7 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
                 "$path\t${view.encode()}"
             }
             prefs[FAVORITES] = next.favorites.joinToString("\n")
+            prefs[HIDDEN_FOLDERS] = next.hiddenFolders.joinToString("\n")
             prefs[CONFIRM_DELETE] = next.confirmDelete
             prefs[REOPEN_LAST] = next.reopenLastFolder
             next.lastFolder?.let { prefs[LAST_FOLDER] = it } ?: prefs.remove(LAST_FOLDER)
@@ -115,6 +119,7 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
                 }
                 .toMap(),
             favorites = prefs[FAVORITES].orEmpty().lines().filter { it.isNotBlank() },
+            hiddenFolders = prefs[HIDDEN_FOLDERS].orEmpty().lines().filter { it.isNotBlank() }.toSet(),
             confirmDelete = prefs[CONFIRM_DELETE] ?: defaults.confirmDelete,
             reopenLastFolder = prefs[REOPEN_LAST] ?: defaults.reopenLastFolder,
             lastFolder = prefs[LAST_FOLDER],
@@ -131,6 +136,7 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
         val DEFAULT_VIEW = stringPreferencesKey("default_view")
         val FOLDER_VIEWS = stringPreferencesKey("folder_views")
         val FAVORITES = stringPreferencesKey("favorites")
+        val HIDDEN_FOLDERS = stringPreferencesKey("hidden_folders")
         val CONFIRM_DELETE = booleanPreferencesKey("confirm_delete")
         val REOPEN_LAST = booleanPreferencesKey("reopen_last_folder")
         val LAST_FOLDER = stringPreferencesKey("last_folder")

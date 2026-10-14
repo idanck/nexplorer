@@ -705,6 +705,7 @@ internal fun placesDrawerModel(
     onVolume = { v -> close(); vm.navigate(Location.Folder(v.path)) },
     onFavorite = { path -> close(); vm.openPath(path) },
     onRemoveFavorite = { path -> vm.removeFavorite(path); message("הוסר מהמועדפים") },
+    onSetFavorites = vm::setFavorites,
     onCollection = { c -> close(); vm.navigate(Location.Media(c)) },
     onDownloads = {
         close()
@@ -744,7 +745,9 @@ private fun overflowModel(
         viewSummary = "${state.view.mode.label} · ${state.view.sort.key.label}",
         showSections = state.view.showSections,
         showHidden = state.view.showHidden,
+        showFolderSizes = state.view.showFolderSizes,
         isFolder = state.location is Location.Folder,
+        canHideFolder = state.location is Location.Folder && !state.isAtRoot,
         isFavorite = state.isFavorite,
         canPinShortcut = canPin,
         transfersLabel = if (activeTransfers.isEmpty()) null
@@ -755,6 +758,8 @@ private fun overflowModel(
         onFilter = { vm.setFilter("") },
         onToggleSections = { vm.setView(state.view.copy(showSections = !state.view.showSections), state.viewIsFolderScoped) },
         onToggleHidden = { vm.setView(state.view.copy(showHidden = !state.view.showHidden), state.viewIsFolderScoped) },
+        onToggleFolderSizes = { vm.setView(state.view.copy(showFolderSizes = !state.view.showFolderSizes), state.viewIsFolderScoped) },
+        onHideFolder = vm::hideCurrentFolder,
         onToggleFavorite = { vm.toggleFavorite() },
         onPinShortcut = onPinShortcut,
         onTransfers = onTransfers,
