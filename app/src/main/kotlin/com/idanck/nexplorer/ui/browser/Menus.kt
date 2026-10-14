@@ -359,7 +359,6 @@ private fun SpeedDialPill(label: String, icon: ImageVector, available: Boolean =
             Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(NexplorerDimens.Space3))
             Text(label, style = MaterialTheme.typography.titleMedium)
-
         }
     }
 }

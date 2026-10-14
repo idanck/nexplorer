@@ -177,8 +177,10 @@ class SmbFs(private val connection: NetConnection, password: CharArray?) : Remot
         val session = session()
         val shares = try {
             ServerService(SMBTransportFactories.SRVSVC.getTransport(session)).shares1
-        } catch (e: Exception) {
-            if (isStale(e)) throw e
+        } catch (e: Throwable) {
+            // Throwable: על תשובה פגומה dcerpc זורק java.rmi.UnmarshalException, שאין באנדרואיד —
+            // ומה שמגיע הוא NoClassDefFoundError, לא Exception.
+            if (e is Exception && isStale(e)) throw e
             throw IOException("השרת לא מחזיר את רשימת השיתופים — הזן את שם השיתוף בפרטי החיבור", e)
         }
         shares
