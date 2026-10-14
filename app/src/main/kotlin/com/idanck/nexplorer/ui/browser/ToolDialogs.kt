@@ -131,7 +131,7 @@ fun CompressDialog(
                 }
                 Text(
                     when {
-                        password.isNotEmpty() -> "AES-256. בלי הסיסמה אי אפשר לפתוח את הארכיון — אין שחזור"
+                        password.isNotEmpty() -> "הצפנת ${"AES-256".isolated()}. בלי הסיסמה אי אפשר לפתוח את הארכיון — אין שחזור"
                         format == ArchiveFormat.SevenZ -> "7z — קטן יותר, אבל לא כל מערכת פותחת אותו בלי תוכנה"
                         else -> "בלי סיסמה — ZIP רגיל שכל מערכת פותחת"
                     },
@@ -169,7 +169,8 @@ fun EncryptDialog(count: Int, onConfirm: (CharArray) -> Unit, onDismiss: () -> U
                     Text("הסיסמאות לא זהות", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                 }
                 Text(
-                    "AES-256. כל קובץ מקבל את הסיומת ${".enc".isolated()}, והמקור נמחק אחרי שההצפנה נבדקה. " +
+                    // פותח בעברית: משפט שמתחיל ב-"AES" נפרש משמאל לימין, ו-".enc" מתהפך ל-"enc.".
+                    "הצפנת ${"AES-256".isolated()}: כל קובץ מקבל את הסיומת ${".enc".isolated()}, והמקור נמחק אחרי שההצפנה נבדקה. " +
                         "בלי הסיסמה אי אפשר לפתוח את הקבצים — אין שחזור",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
