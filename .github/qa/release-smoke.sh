@@ -51,9 +51,11 @@ wait_for "פרטי חיבור" 10 || fail "the add place screen did not open"
 # המקלדת מכסה את השדות שמתחת לשדה הפעיל — מגוללים עד שהשדה על המסך (uiautomator לא רואה מה שמחוץ לו).
 field() {
   for _ in 1 2 3 4; do
-    # רק אחרי שהשדה קיבל פוקוס: אחרת הטקסט נכתב לשדה הקודם (ראו focus-desc ב-ui.py).
+    # לוחצים רק על מיקום יציב, ובודקים שהטקסט נכתב לשדה הזה ולא לקודם (ראו focus-desc ב-ui.py).
+    # סיסמה לא נקראת מהמסך.
     if ui focus-desc "$1"; then
       adb shell input text "$2"
+      [ "$1" = "סיסמה" ] || ui holds-desc "$1" "$2" || { echo "::error::the text for \"$1\" went to another field"; return 1; }
       return 0
     fi
     adb shell input swipe 540 1300 540 600 300
