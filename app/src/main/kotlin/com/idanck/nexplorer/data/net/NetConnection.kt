@@ -19,8 +19,8 @@ data class NetConnection(
     /** null — ברירת המחדל של הפרוטוקול. */
     val port: Int?,
     /**
-     * SMB: השיתוף שנפתח; ריק — רשימת השיתופים בשרת. SFTP: התיקייה שנפתחת, בלי / בקצוות ("home/idan");
-     * "בדוק והתחבר" ממלא את תיקיית הבית כשהשדה ריק.
+     * SMB: השיתוף שנפתח; ריק — רשימת השיתופים בשרת. SFTP: התיקייה שנפתחת, בלי / בקצוות ("home/idan";
+     * ריק — "/" של השרת). [HOME] — רק בטיוטה: "בדוק והתחבר" שם במקומו את תיקיית הבית.
      */
     val share: String,
     /** ריק — אורח (ב-SMB בלבד). */
@@ -62,6 +62,9 @@ data class NetConnection(
     fun displayPath(path: String): String = (listOf(label) + NetPaths.segments(path)).joinToString(" › ")
 
     companion object {
+        /** SFTP, בטיוטה בלבד: "תיקיית הבית" (שדה "תיקייה" ריק). */
+        const val HOME = "~"
+
         fun newId(): String {
             val bytes = ByteArray(6).also { SecureRandom().nextBytes(it) }
             return bytes.joinToString("") { ((it.toInt() and 0xff) or 0x100).toString(16).substring(1) }

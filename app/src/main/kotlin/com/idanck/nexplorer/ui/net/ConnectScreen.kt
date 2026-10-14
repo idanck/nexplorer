@@ -127,8 +127,8 @@ fun ConnectScreen(
     var protocol by rememberSaveable { mutableStateOf(editing?.protocol ?: NetProtocol.Smb) }
     val sftp = protocol == NetProtocol.Sftp
     var host by rememberSaveable { mutableStateOf(editing?.host.orEmpty()) }
-    // SFTP: התיקייה נשמרת בלי / בקצוות; בשדה — כנתיב מלא.
-    var share by rememberSaveable { mutableStateOf(editing?.let { e -> if (e.protocol == NetProtocol.Sftp && e.share.isNotEmpty()) "/${e.share}" else e.share }.orEmpty()) }
+    // SFTP: התיקייה נשמרת בלי / בקצוות; בשדה — כנתיב מלא ("/" — השורש של השרת; ריק — הבית).
+    var share by rememberSaveable { mutableStateOf(editing?.let { e -> if (e.protocol == NetProtocol.Sftp) "/${e.share}" else e.share }.orEmpty()) }
     var user by rememberSaveable { mutableStateOf(editing?.user.orEmpty()) }
     // הסיסמה והמפתח לא נשמרים ב-Bundle: סיבוב מסך מנקה אותם, וזה בסדר.
     var password by remember { mutableStateOf("") }
@@ -148,8 +148,8 @@ fun ConnectScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val hasKey = sftp && (keyText != null || keepKey)
-    // סיסמה שמורה נשארת רק כשדרך ההתחברות לא השתנתה (סיסמה ↔ מפתח).
-    val keepsPassword = editing != null && editing.secret != null && (editing.keySecret != null) == hasKey
+    // סיסמה שמורה נשארת רק כשדרך ההתחברות לא השתנתה: אותה סיסמה, או אותו מפתח (לא קובץ מפתח חדש).
+    val keepsPassword = editing != null && editing.secret != null && (editing.keySecret != null) == hasKey && (editing.keySecret == null || keepKey)
     val found = allFound.filter { it.protocol == protocol }
 
     val pickKey = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -189,7 +189,7 @@ fun ConnectScreen(
             name = name.trim(),
             host = host.trim(),
             port = portValue?.takeIf { it != protocol.defaultPort },
-            share = share.trim().trim('/'),
+            share = if (sftp && share.isBlank()) NetConnection.HOME else share.trim().trim('/'),
             user = user.trim(),
             domain = if (sftp) "" else domain.trim(),
             secret = editing?.secret?.takeIf { keepsPassword },
@@ -393,7 +393,7 @@ private fun HostKeyDialog(host: String, ask: ConnectCheck.TrustHost, onTrust: ()
                     Text("אם לא התקנת את השרת מחדש ולא החלפת לו מפתח — ייתכן שמישהו מתחזה אליו. אל תמשיך.", color = scheme.error)
                 } else {
                     Text(
-                        "בדוק שזה השרת שלך: בשרת, ${"ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub".isolated()} מציג את אותה טביעה. " +
+                        "בדוק שזה השרת שלך: בשרת, ${"ssh-keygen -lf /etc/ssh/ssh_host_${SshHostKeys.typeLabel(ask.hostKey).lowercase()}_key.pub".isolated()} מציג את אותה טביעה. " +
                             "היא נשמרת, וחיבור לשרת עם מפתח אחר ייחסם.",
                         style = MaterialTheme.typography.bodySmall,
                         color = scheme.onSurfaceVariant,

@@ -14,6 +14,11 @@ data class Entry(
     val kind: FileKind,
     /** "תיקייה מוצפנת" (יש בה קובץ הסימון) — אייקון מנעול, ופתיחה בסיסמה. */
     val isVault: Boolean = false,
+    /**
+     * קישור סימבולי בשרת SFTP: [isDirectory] ו-[size] — של מה שהוא מצביע עליו (לדפדוף). העברות ומחיקה
+     * לא נכנסות דרכו — מחיקה מוחקת את הקישור בלבד. במכשיר הקישורים מזוהים אחרת (`LocalFiles.isLink`).
+     */
+    val isLink: Boolean = false,
 ) {
     val extension: String get() = if (isDirectory) "" else name.substringAfterLast('.', "").lowercase()
 }

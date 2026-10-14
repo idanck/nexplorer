@@ -391,6 +391,10 @@ class TransferManager(
             }
             val from = sideFor(source)
             val node = from.stat(source) ?: throw IOException("\"${NetPaths.nameOf(source)}\" כבר לא קיים")
+            // כמו במכשיר: קישור לתיקייה בשרת לא מועתק דרכו (העברה בשינוי שם — מזיזה רק את הקישור).
+            if (node.isLink && node.isDirectory && !(move && from is RemoteSide && to is RemoteSide && from.fs === to.fs)) {
+                throw IOException("\"${node.name}\" הוא קישור לתיקייה — פתח את היעד שלו והעתק משם")
+            }
             if (move) {
                 if (NetPaths.parentOf(source) == target) {
                     doneItems++

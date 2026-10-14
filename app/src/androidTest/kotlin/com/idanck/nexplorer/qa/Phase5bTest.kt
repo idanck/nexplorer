@@ -92,6 +92,8 @@ class Phase5bTest {
     @After
     fun tearDown() {
         if (::scenario.isInitialized) scenario.close()
+        // monkey ו-release-smoke.sh רצים אחרי זה — בלי חיבור שמור, ה-monkey לא מגיע לשרת.
+        runBlocking { container.settings.update { it.copy(connections = emptyList()) } }
         if (::server.isInitialized) runCatching { SftpFs(server, password.toCharArray(), null).use { wipe(it, base) } }
     }
 

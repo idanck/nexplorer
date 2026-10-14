@@ -3,6 +3,7 @@ package com.idanck.nexplorer.data.net
 import com.idanck.nexplorer.core.Entry
 import com.idanck.nexplorer.core.FileKinds
 import com.idanck.nexplorer.core.NetPaths
+import net.schmizz.keepalive.KeepAliveProvider
 import net.schmizz.sshj.DefaultConfig
 import net.schmizz.sshj.SSHClient
 import net.schmizz.sshj.sftp.FileAttributes
@@ -37,12 +38,13 @@ import java.util.concurrent.TimeUnit
  * [HostKeyUntrusted] עם המפתח שהוצג, ו"בדוק והתחבר" שואל את המשתמש.
  *
  * [password] — סיסמת המשתמש, או של המפתח כשיש [privateKey] (קובץ OpenSSH / PEM / PuTTY). שניהם מועתקים
- * לכאן ונמחקים ב-[close].
+ * לכאן ונמחקים ב-[close]; sshj מקבל את המפתח כטקסט, והעותק שלו נשאר בזיכרון כל עוד החיבור פתוח.
  */
 class SftpFs(private val connection: NetConnection, password: CharArray?, privateKey: CharArray?) : RemoteFs {
 
     private val password: CharArray? = password?.copyOf()
     private val privateKey: CharArray? = privateKey?.copyOf()
+    private val usesKey = privateKey != null
     private val lock = Any()
     private var ssh: SSHClient? = null
     private var sftp: SFTPClient? = null
@@ -56,18 +58,25 @@ class SftpFs(private val connection: NetConnection, password: CharArray?, privat
             val name = info.name
             if (name == "." || name == "..") return@mapNotNull null
             val child = NetPaths.child(path, name)
-            // קישור: מה שהוא מצביע עליו (תיקייה או קובץ). קישור שבור — קובץ ריק, כמו ב-ls.
-            val attributes = if (info.attributes.type == FileMode.Type.SYMLINK) {
-                runCatching { client.stat(remoteOf(child)) }.getOrNull() ?: info.attributes
-            } else {
-                info.attributes
-            }
-            entryOf(child, name, attributes)
+            if (info.attributes.type != FileMode.Type.SYMLINK) return@mapNotNull entryOf(child, name, info.attributes, isLink = false)
+            // קישור: מוצג כמו מה שהוא מצביע עליו (תיקייה או קובץ); קישור שבור — קובץ ריק, כמו ב-ls.
+            entryOf(child, name, runCatching { client.stat(remoteOf(child)) }.getOrNull() ?: info.attributes, isLink = true)
         }
     }
 
     override fun stat(path: String): Entry? = retrying {
-        client().statExistence(remoteOf(path))?.let { entryOf(path, NetPaths.name(path).ifEmpty { connection.label }, it) }
+        val client = client()
+        val remote = remoteOf(path)
+        val own = lstatOrNull(client, remote) ?: return@retrying null
+        val name = NetPaths.name(path).ifEmpty { connection.label }
+        if (own.type != FileMode.Type.SYMLINK) return@retrying entryOf(path, name, own, isLink = false)
+        entryOf(path, name, client.statExistence(remote) ?: own, isLink = true)
+    }
+
+    private fun lstatOrNull(client: SFTPClient, remote: String): FileAttributes? = try {
+        client.lstat(remote)
+    } catch (e: SFTPException) {
+        if (e.statusCode == Response.StatusCode.NO_SUCH_FILE) null else throw e
     }
 
     override fun openRead(path: String): InputStream = retrying {
@@ -153,9 +162,9 @@ class SftpFs(private val connection: NetConnection, password: CharArray?, privat
                 client.rename(remoteOf(path), remoteOf(target))
             } catch (e: SFTPException) {
                 if (e.statusCode != Response.StatusCode.FAILURE) throw e
-                if (client.statExistence(remoteOf(target)) != null) throw Explained("כבר קיים פריט בשם הזה", e)
+                if (lstatOrNull(client, remoteOf(target)) != null) throw Explained("כבר קיים פריט בשם הזה", e)
                 // בין שני כוננים בשרת (בית ← דיסק USB) שינוי שם לא אפשרי — מעתיקים ומוחקים.
-                if (client.statExistence(remoteOf(path)) != null) throw RemoteCrossDevice("השרת לא יכול להעביר לשם בשינוי שם", e)
+                if (lstatOrNull(client, remoteOf(path)) != null) throw RemoteCrossDevice("השרת לא יכול להעביר לשם בשינוי שם", e)
                 throw e
             }
         }
@@ -203,8 +212,10 @@ class SftpFs(private val connection: NetConnection, password: CharArray?, privat
         reset()
         SshCrypto.install()
         val verifier = Verifier(connection.hostKey)
-        val client = SSHClient(DefaultConfig())
+        // keepalive@openssh.com: חיבור שמת בשקט (מעבר Wi-Fi) נסגר אחרי כמה תשובות שלא הגיעו, ולא נשאר תקוע.
+        val client = SSHClient(DefaultConfig().apply { keepAliveProvider = KeepAliveProvider.KEEP_ALIVE })
         try {
+            client.connection.keepAlive.keepAliveInterval = KEEPALIVE_S
             client.connectTimeout = CONNECT_TIMEOUT_MS
             client.timeout = READ_TIMEOUT_MS
             client.addHostKeyVerifier(verifier)
@@ -261,12 +272,12 @@ class SftpFs(private val connection: NetConnection, password: CharArray?, privat
         return try {
             block()
         } catch (e: Exception) {
-            if (!established || !isStale(e)) throw SftpErrors.map(e, connection)
+            if (!established || !isStale(e)) throw SftpErrors.map(e, connection, usesKey)
             synchronized(lock) { if (generation == started) reset() }
             try {
                 block()
             } catch (again: Exception) {
-                throw SftpErrors.map(again, connection)
+                throw SftpErrors.map(again, connection, usesKey)
             }
         }
     }
@@ -274,8 +285,11 @@ class SftpFs(private val connection: NetConnection, password: CharArray?, privat
     private fun isStale(e: Throwable): Boolean {
         // השרת ניתק: sshj סוגר את החיבור ברקע. אחרת — שגיאת תעבורה בתוך הבקשה.
         if (ssh?.isConnected != true) return true
+        val chain = generateSequence(e) { it.cause }
+        // בקשה שלא נענתה בזמן — כנראה חיבור שמת בלי שנסגר; חיבור חדש פעם אחת.
+        if (chain.any { it is java.util.concurrent.TimeoutException || it is java.net.SocketTimeoutException }) return true
         if (e is SFTPException) return e.statusCode == Response.StatusCode.NO_CONNECTION || e.statusCode == Response.StatusCode.CONNECITON_LOST
-        return generateSequence(e) { it.cause }.any {
+        return chain.any {
             it is net.schmizz.sshj.transport.TransportException || it is net.schmizz.sshj.connection.ConnectionException || it is java.net.SocketException
         }
     }
@@ -283,13 +297,13 @@ class SftpFs(private val connection: NetConnection, password: CharArray?, privat
     private fun <T> guard(block: () -> T): T = try {
         block()
     } catch (e: Exception) {
-        throw SftpErrors.map(e, connection)
+        throw SftpErrors.map(e, connection, usesKey)
     }
 
     /** כשל ביצירה: אם יש כבר פריט בשם — "כבר קיים" (OpenSSH מחזיר "Failure" כללי). */
     private fun existsOr(path: String, e: SFTPException): Exception {
         if (e.statusCode == Response.StatusCode.FILE_ALREADY_EXISTS) return Explained("כבר קיים פריט בשם הזה", e)
-        if (e.statusCode == Response.StatusCode.FAILURE && runCatching { client().statExistence(remoteOf(path)) }.getOrNull() != null) {
+        if (e.statusCode == Response.StatusCode.FAILURE && runCatching { lstatOrNull(client(), remoteOf(path)) }.getOrNull() != null) {
             return Explained("כבר קיים פריט בשם הזה", e)
         }
         return e
@@ -297,7 +311,7 @@ class SftpFs(private val connection: NetConnection, password: CharArray?, privat
 
     private fun remoteOf(path: String): String = "/" + NetPaths.segments(path).joinToString("/")
 
-    private fun entryOf(path: String, name: String, attributes: FileAttributes): Entry {
+    private fun entryOf(path: String, name: String, attributes: FileAttributes, isLink: Boolean): Entry {
         val isDir = attributes.type == FileMode.Type.DIRECTORY
         return Entry(
             path = path,
@@ -308,6 +322,7 @@ class SftpFs(private val connection: NetConnection, password: CharArray?, privat
             lastModified = attributes.mtime * 1000,
             isHidden = name.startsWith("."),
             kind = FileKinds.of(name, isDir),
+            isLink = isLink,
         )
     }
 
@@ -340,6 +355,7 @@ class SftpFs(private val connection: NetConnection, password: CharArray?, privat
     private companion object {
         const val CONNECT_TIMEOUT_MS = 15_000
         const val READ_TIMEOUT_MS = 60_000
+        const val KEEPALIVE_S = 15
         /** בקשות קריאה וכתיבה שבדרך בבת אחת — בלי זה כל 32KB מחכה לתשובה מהשרת. */
         const val UNCONFIRMED = 16
         /** הגודל שכל שרת SFTP מקבל בבקשת כתיבה אחת. */

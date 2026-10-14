@@ -354,13 +354,9 @@ fun NexplorerRoot(
 private const val SECOND_PANE = "pane-2"
 
 /**
- * "בדוק והתחבר": מתחבר בפרטים שהוזנו, ורק אם הצליח — שומר (הסיסמה מוצפנת ב-Keystore) ומחכה שהחיבור
- * כבר בהעדפות, כדי שהרשימה שנפתחת אחריו תמצא אותו. בעריכה, סיסמה ריקה = השמורה. null — הצליח.
- */
-/**
- * "בדוק והתחבר": בדיקה מול השרת, ורק אם עבדה — הצפנה ב-Keystore ושמירה. שדה ריק בעריכה משאיר את
- * מה שבטיוטה ([NetConnection.secret], [NetConnection.keySecret] — המסך משאיר אותם רק כשהם עדיין
- * תקפים); [password] ו-[key] — מה שהוזן עכשיו.
+ * "בדוק והתחבר": בדיקה מול השרת, ורק אם עבדה — הצפנה ב-Keystore ושמירה, ומחכה שהחיבור כבר בהעדפות,
+ * כדי שהרשימה שנפתחת אחריו תמצא אותו. שדה ריק בעריכה משאיר את מה שבטיוטה ([NetConnection.secret],
+ * [NetConnection.keySecret] — המסך משאיר אותם רק כשהם עדיין תקפים); [password] ו-[key] — מה שהוזן עכשיו.
  */
 private suspend fun connectAndSave(container: AppContainer, draft: NetConnection, password: CharArray?, key: CharArray?): ConnectCheck {
     var keptPassword: CharArray? = null

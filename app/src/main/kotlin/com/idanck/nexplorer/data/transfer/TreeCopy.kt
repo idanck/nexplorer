@@ -13,8 +13,8 @@ import java.io.InputStream
 import java.io.OutputStream
 import java.nio.file.Files
 
-/** פריט בצד אחד של העתקה. */
-internal data class Node(val path: String, val name: String, val isDirectory: Boolean, val size: Long, val lastModified: Long)
+/** פריט בצד אחד של העתקה. [isLink] — קישור בשרת: לא עוקבים אחריו (ראה [TreeCopy]). */
+internal data class Node(val path: String, val name: String, val isDirectory: Boolean, val size: Long, val lastModified: Long, val isLink: Boolean = false)
 
 /**
  * צד אחד של העתקה שעוברת ברשת: תיקייה במכשיר או בשרת. הקריאות חוסמות (רצות ב-IO). העתקה מקומית
@@ -99,9 +99,9 @@ internal object LocalSide : Side {
 
 /** חיבור אחד ברשת. העברה בשינוי שם — רק בתוך אותו שיתוף (ב-SFTP — באותו כונן בשרת). */
 internal class RemoteSide(val fs: RemoteFs) : Side {
-    override fun stat(path: String): Node? = fs.stat(path)?.let { Node(it.path, it.name, it.isDirectory, it.size, it.lastModified) }
+    override fun stat(path: String): Node? = fs.stat(path)?.let { Node(it.path, it.name, it.isDirectory, it.size, it.lastModified, it.isLink) }
 
-    override fun list(dir: String): List<Node> = fs.list(dir).map { Node(it.path, it.name, it.isDirectory, it.size, it.lastModified) }
+    override fun list(dir: String): List<Node> = fs.list(dir).map { Node(it.path, it.name, it.isDirectory, it.size, it.lastModified, it.isLink) }
 
     override fun child(dir: String, name: String): String = NetPaths.child(dir, name)
 
@@ -157,6 +157,8 @@ internal class TreeCopy(
         while (stack.isNotEmpty()) {
             checkpoint()
             for (child in side.list(stack.removeLast())) {
+                // קישורים לא מועתקים — גם לא נספרים.
+                if (child.isLink) continue
                 if (child.isDirectory) stack.addLast(child.path) else total += child.size
             }
         }
@@ -166,10 +168,12 @@ internal class TreeCopy(
     /** [src] אל `[destDir]/[name]`. */
     suspend fun copy(from: Side, src: Node, to: Side, destDir: String, name: String, move: Boolean) {
         checkpoint()
+        if (src.isLink && src.isDirectory) throw IOException("\"${src.name}\" הוא קישור לתיקייה — פתח את היעד שלו והעתק משם")
         val dest = to.child(destDir, name)
         if (src.isDirectory) {
             to.mkdir(dest)
-            for (child in from.list(src.path)) copy(from, child, to, dest, child.name, move)
+            // קישור בתוך עץ — לא מועתק, כמו בהעתקה מקומית (קישור לתיקייה מעלה היה מעתיק את כל השרת).
+            for (child in from.list(src.path)) if (!child.isLink) copy(from, child, to, dest, child.name, move)
             to.setModified(dest, src.lastModified)
             if (move) from.delete(src.path, isDirectory = true)
             return
@@ -211,29 +215,31 @@ internal class TreeCopy(
     fun discard(side: Side, path: String) {
         runCatching {
             val node = side.stat(path) ?: return
-            if (node.isDirectory) side.list(path).forEach { discard(side, it.path) }
-            side.delete(path, node.isDirectory)
+            val dir = node.isDirectory && !node.isLink
+            if (dir) side.list(path).forEach { discard(side, it.path) }
+            side.delete(path, dir)
         }
     }
 
-    /** מחיקה בסדר post-order: קודם התוכן, ואז התיקייה. [onItem] — אחרי כל פריט. */
+    /** מחיקה בסדר post-order: קודם התוכן, ואז התיקייה. קישור — רק הקישור, לא מה שהוא מצביע עליו. [onItem] — אחרי כל פריט. */
     suspend fun delete(side: Side, node: Node, onItem: (Node) -> Unit) {
         checkpoint()
-        if (node.isDirectory) for (child in side.list(node.path)) delete(side, child, onItem)
-        side.delete(node.path, node.isDirectory)
+        val dir = node.isDirectory && !node.isLink
+        if (dir) for (child in side.list(node.path)) delete(side, child, onItem)
+        side.delete(node.path, dir)
         onItem(node)
     }
 
     /** כמה פריטים יימחקו (כולל התיקיות עצמן) — לפס ההתקדמות. */
     suspend fun countOf(side: Side, node: Node): Int {
-        if (!node.isDirectory) return 1
+        if (!node.isDirectory || node.isLink) return 1
         var count = 1
         val stack = ArrayDeque<String>().apply { addLast(node.path) }
         while (stack.isNotEmpty()) {
             checkpoint()
             for (child in side.list(stack.removeLast())) {
                 count++
-                if (child.isDirectory) stack.addLast(child.path)
+                if (child.isDirectory && !child.isLink) stack.addLast(child.path)
             }
         }
         return count

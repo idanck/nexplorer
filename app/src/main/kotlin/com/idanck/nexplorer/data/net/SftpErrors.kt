@@ -11,7 +11,8 @@ import java.io.IOException
 /** שגיאה של sshj (או של הרשת מתחתיו) → IOException עם הסבר בעברית. */
 internal object SftpErrors {
 
-    fun map(e: Throwable, connection: NetConnection): IOException {
+    /** [usesKey] — ההתחברות במפתח (גם כשהוא עוד לא נשמר בחיבור — "בדוק והתחבר" עם קובץ שנבחר עכשיו). */
+    fun map(e: Throwable, connection: NetConnection, usesKey: Boolean): IOException {
         if (e is HostKeyUntrusted || e is RemoteCrossDevice || e is Explained) return e as IOException
         val chain = generateSequence(e) { it.cause }.toList()
         chain.firstNotNullOfOrNull { it as? KeyDecryptionFailedException }?.let {
@@ -39,7 +40,7 @@ internal object SftpErrors {
             return IOException(
                 when {
                     unreadableKey -> "המפתח הפרטי לא נקרא — קובץ לא תקין, או שצריך את הסיסמה שלו"
-                    connection.keySecret != null -> "השרת לא קיבל את המפתח עבור ${connection.user}"
+                    usesKey -> "השרת לא קיבל את המפתח עבור ${connection.user}"
                     else -> "שם המשתמש או הסיסמה שגויים"
                 },
                 e,

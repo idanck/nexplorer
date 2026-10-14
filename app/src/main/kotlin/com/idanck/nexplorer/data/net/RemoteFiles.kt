@@ -77,7 +77,7 @@ class RemoteFiles(
     }
 
     suspend fun rename(path: String, newName: String): Result<String> = io {
-        val parent = NetPaths.parent(path) ?: throw IOException("אי אפשר לשנות שם של שיתוף")
+        val parent = NetPaths.parent(path) ?: throw IOException(if (NetPaths.isShareList(path)) "אי אפשר לשנות שם של שיתוף" else "אי אפשר לשנות את השם של השורש בשרת")
         if (NetPaths.isShare(path)) throw IOException("אי אפשר לשנות שם של שיתוף")
         validate(parent, newName)
         val target = NetPaths.child(parent, newName)
@@ -103,14 +103,15 @@ class RemoteFiles(
                 continue
             }
             val root = fs.stat(path) ?: continue
-            if (root.isDirectory) stack.addLast(path) else {
+            if (root.isDirectory && !root.isLink) stack.addLast(path) else {
                 files++
                 bytes += root.size
             }
             while (stack.isNotEmpty()) {
                 currentCoroutineContext().ensureActive()
                 for (child in fs.list(stack.removeLast())) {
-                    if (child.isDirectory) {
+                    // קישור — לא נכנסים דרכו (קישור ל-/ היה סורק את כל השרת).
+                    if (child.isDirectory && !child.isLink) {
                         folders++
                         stack.addLast(child.path)
                     } else {
@@ -191,12 +192,12 @@ class RemoteFiles(
 
         /**
          * "בדוק והתחבר": חיבור זמני בפרטים שהוזנו — רשימת השורש (השיתופים, השיתוף שנבחר, או התיקייה ב-SFTP).
-         * SFTP בלי תיקייה — נפתח בתיקיית הבית, והחיבור שחוזר כבר מכיל אותה.
+         * SFTP עם [NetConnection.HOME] — נפתח בתיקיית הבית, והחיבור שחוזר כבר מכיל אותה.
          */
         suspend fun test(connection: NetConnection, password: CharArray?, privateKey: CharArray? = null): ConnectCheck = withContext(Dispatchers.IO) {
             try {
                 create(connection, password, privateKey).use { fs ->
-                    val resolved = if (fs is SftpFs && connection.share.isBlank()) connection.copy(share = fs.home()) else connection
+                    val resolved = if (fs is SftpFs && connection.share == NetConnection.HOME) connection.copy(share = fs.home()) else connection
                     fs.list(resolved.root)
                     ConnectCheck.Ok(resolved)
                 }
