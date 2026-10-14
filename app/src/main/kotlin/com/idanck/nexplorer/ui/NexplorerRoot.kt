@@ -17,6 +17,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.idanck.nexplorer.AppContainer
 import com.idanck.nexplorer.data.crypto.EncryptedFiles
 import com.idanck.nexplorer.data.files.FileIntents
+import com.idanck.nexplorer.data.net.ConnectCheck
 import com.idanck.nexplorer.data.net.ConnectionSecrets
 import com.idanck.nexplorer.data.net.NetConnection
 import com.idanck.nexplorer.data.net.NetDiscovery
@@ -216,10 +217,11 @@ fun NexplorerRoot(
             ConnectScreen(
                 editing = editing,
                 discovery = discovery,
-                onConnect = { draft, password ->
-                    val failure = connectAndSave(container, draft, password, editing)
-                    if (failure == null) (connectTarget ?: browser).navigate(Location.Folder(draft.root))
-                    failure
+                onConnect = { draft, password, key ->
+                    val result = connectAndSave(container, draft, password, key)
+                    // השורש של מה שנשמר: ב-SFTP בלי תיקייה — הבית שהבדיקה מצאה.
+                    if (result is ConnectCheck.Ok) (connectTarget ?: browser).navigate(Location.Folder(result.connection.root))
+                    result
                 },
                 onClose = {
                     connectEditing = null
@@ -355,38 +357,52 @@ private const val SECOND_PANE = "pane-2"
  * "בדוק והתחבר": מתחבר בפרטים שהוזנו, ורק אם הצליח — שומר (הסיסמה מוצפנת ב-Keystore) ומחכה שהחיבור
  * כבר בהעדפות, כדי שהרשימה שנפתחת אחריו תמצא אותו. בעריכה, סיסמה ריקה = השמורה. null — הצליח.
  */
-private suspend fun connectAndSave(container: AppContainer, draft: NetConnection, password: CharArray?, editing: NetConnection?): String? {
-    val kept = if (password == null && draft.user.isNotBlank()) {
-        editing?.secret?.let { secret ->
-            try {
-                ConnectionSecrets.decrypt(secret)
-            } catch (e: java.io.IOException) {
-                return e.message
-            }
-        }
-    } else {
-        null
-    }
+/**
+ * "בדוק והתחבר": בדיקה מול השרת, ורק אם עבדה — הצפנה ב-Keystore ושמירה. שדה ריק בעריכה משאיר את
+ * מה שבטיוטה ([NetConnection.secret], [NetConnection.keySecret] — המסך משאיר אותם רק כשהם עדיין
+ * תקפים); [password] ו-[key] — מה שהוזן עכשיו.
+ */
+private suspend fun connectAndSave(container: AppContainer, draft: NetConnection, password: CharArray?, key: CharArray?): ConnectCheck {
+    var keptPassword: CharArray? = null
+    var keptKey: CharArray? = null
     try {
-        RemoteFiles.test(draft, password ?: kept)?.let { return it }
+        try {
+            if (password == null && draft.user.isNotBlank()) keptPassword = draft.secret?.let(ConnectionSecrets::decrypt)
+            if (key == null) keptKey = draft.keySecret?.let(ConnectionSecrets::decrypt)
+        } catch (e: java.io.IOException) {
+            return ConnectCheck.Failed(e.message ?: "הפרטים השמורים לא נקראים")
+        }
+        val checked = RemoteFiles.test(draft, password ?: keptPassword, key ?: keptKey)
+        if (checked !is ConnectCheck.Ok) return checked
+        val resolved = checked.connection
         val secret = when {
-            draft.user.isBlank() -> null
+            resolved.user.isBlank() -> null
             password != null -> try {
                 ConnectionSecrets.encrypt(password)
             } catch (e: Exception) {
-                return "לא ניתן לשמור את הסיסמה ב-Keystore: ${e.message}"
+                return ConnectCheck.Failed("לא ניתן לשמור את הסיסמה ב-Keystore: ${e.message}")
             }
-            else -> editing?.secret
+            else -> draft.secret
         }
-        val saved = draft.copy(secret = secret)
+        val keySecret = if (key != null) {
+            try {
+                ConnectionSecrets.encrypt(key)
+            } catch (e: Exception) {
+                return ConnectCheck.Failed("לא ניתן לשמור את המפתח ב-Keystore: ${e.message}")
+            }
+        } else {
+            draft.keySecret
+        }
+        val saved = resolved.copy(secret = secret, keySecret = keySecret)
         container.settings.update { s ->
             val exists = s.connections.any { it.id == saved.id }
             s.copy(connections = if (exists) s.connections.map { if (it.id == saved.id) saved else it } else s.connections + saved)
         }
         container.settings.state.first { s -> saved in s.connections }
         container.remote.forget(saved.id)
-        return null
+        return ConnectCheck.Ok(saved)
     } finally {
-        kept?.fill('\u0000')
+        keptPassword?.fill('\u0000')
+        keptKey?.fill('\u0000')
     }
 }

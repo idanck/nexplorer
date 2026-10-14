@@ -1,6 +1,11 @@
 package com.idanck.nexplorer.ui.net
 
+import android.content.Context
+import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,6 +31,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Dns
+import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Lock
@@ -33,7 +39,9 @@ import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material.icons.outlined.Terminal
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,6 +50,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -56,6 +65,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -67,38 +77,43 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.idanck.nexplorer.core.NetPaths
 import com.idanck.nexplorer.core.NetProtocol
 import com.idanck.nexplorer.core.isolated
+import com.idanck.nexplorer.data.net.ConnectCheck
 import com.idanck.nexplorer.data.net.FoundServer
 import com.idanck.nexplorer.data.net.NetConnection
 import com.idanck.nexplorer.data.net.NetDiscovery
+import com.idanck.nexplorer.data.net.SshHostKeys
 import com.idanck.nexplorer.ui.theme.MonoTextStyle
 import com.idanck.nexplorer.ui.theme.NexplorerDimens
 import com.idanck.nexplorer.ui.theme.NexplorerShape
 import com.idanck.nexplorer.ui.theme.NexplorerTheme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.IOException
 
-/** סוג במסך "הוסף מקום" — לפי הלוח. רק SMB פעיל בשלב 5א; לשאר — הסבר למה עוד לא. */
-private enum class PlaceType(val label: String, val icon: ImageVector, val unavailable: String?) {
-    Smb("SMB", Icons.Outlined.Dns, null),
-    Sftp("SFTP", Icons.Outlined.Terminal, "SFTP — בשלב 5ב, אחרי SMB"),
-    WebDav("WebDAV", Icons.Outlined.Language, "WebDAV — בשלב 5ג"),
-    Cloud("ענן", Icons.Outlined.Cloud, "ענן — מחכה להחלטה D4"),
-    Ftp("FTP/S", Icons.Outlined.Download, "FTP/S לא בתוכנית: ב-D3 נבחרו SMB, SFTP ו-WebDAV"),
-    S3("S3", Icons.Outlined.Storage, "S3 לא בתוכנית: ב-D3 נבחרו SMB, SFTP ו-WebDAV"),
-    Vault("כספת", Icons.Outlined.Lock, "תיקייה מוצפנת נוצרת מהכפתור הצף: חדש ← תיקייה מוצפנת"),
-    Archive("ארכיון", Icons.Outlined.Archive, "ארכיון נפתח בהקשה עליו ברשימת הקבצים"),
+/** סוג במסך "הוסף מקום" — לפי הלוח. SMB ו-SFTP פעילים; לשאר — הסבר למה עוד לא. */
+private enum class PlaceType(val label: String, val icon: ImageVector, val protocol: NetProtocol?, val unavailable: String?) {
+    Smb("SMB", Icons.Outlined.Dns, NetProtocol.Smb, null),
+    Sftp("SFTP", Icons.Outlined.Terminal, NetProtocol.Sftp, null),
+    WebDav("WebDAV", Icons.Outlined.Language, null, "WebDAV — בשלב 5ג"),
+    Cloud("ענן", Icons.Outlined.Cloud, null, "ענן — מחכה להחלטה D4"),
+    Ftp("FTP/S", Icons.Outlined.Download, null, "FTP/S לא בתוכנית: ב-D3 נבחרו SMB, SFTP ו-WebDAV"),
+    S3("S3", Icons.Outlined.Storage, null, "S3 לא בתוכנית: ב-D3 נבחרו SMB, SFTP ו-WebDAV"),
+    Vault("כספת", Icons.Outlined.Lock, null, "תיקייה מוצפנת נוצרת מהכפתור הצף: חדש ← תיקייה מוצפנת"),
+    Archive("ארכיון", Icons.Outlined.Archive, null, "ארכיון נפתח בהקשה עליו ברשימת הקבצים"),
 }
 
 /**
  * "הוסף מקום" (לוח "חיבור חדש"): סוג, שרתים שנמצאו ברשת, ופרטי החיבור. "בדוק והתחבר" מתחבר באמת
  * ([onConnect]) — רק חיבור שעבד נשמר. [editing] — "ערוך" מהמגירה: אותו מסך עם הפרטים השמורים, ושדה
- * סיסמה ריק משאיר את השמורה.
+ * סיסמה ריק משאיר את השמורה. ב-SFTP: מפתח פרטי מקובץ (במקום סיסמה), ושרת חדש — אישור טביעת האצבע שלו.
  */
 @Composable
 fun ConnectScreen(
     editing: NetConnection?,
     discovery: NetDiscovery,
-    /** null — הצליח ונשמר; אחרת ההודעה. הסיסמה נמחקת אחרי הקריאה. */
-    onConnect: suspend (NetConnection, CharArray?) -> String?,
+    /** הסיסמה והמפתח (קובץ שנבחר עכשיו) נמחקים אחרי הקריאה. */
+    onConnect: suspend (NetConnection, CharArray?, CharArray?) -> ConnectCheck,
     onClose: () -> Unit,
 ) {
     BackHandler(onBack = onClose)
@@ -106,14 +121,20 @@ fun ConnectScreen(
         discovery.start()
         onDispose { discovery.stop() }
     }
-    val found by discovery.found.collectAsStateWithLifecycle()
+    val allFound by discovery.found.collectAsStateWithLifecycle()
     val searching by discovery.searching.collectAsStateWithLifecycle()
 
+    var protocol by rememberSaveable { mutableStateOf(editing?.protocol ?: NetProtocol.Smb) }
+    val sftp = protocol == NetProtocol.Sftp
     var host by rememberSaveable { mutableStateOf(editing?.host.orEmpty()) }
-    var share by rememberSaveable { mutableStateOf(editing?.share.orEmpty()) }
+    // SFTP: התיקייה נשמרת בלי / בקצוות; בשדה — כנתיב מלא.
+    var share by rememberSaveable { mutableStateOf(editing?.let { e -> if (e.protocol == NetProtocol.Sftp && e.share.isNotEmpty()) "/${e.share}" else e.share }.orEmpty()) }
     var user by rememberSaveable { mutableStateOf(editing?.user.orEmpty()) }
-    // הסיסמה לא נשמרת ב-Bundle: סיבוב מסך מנקה אותה, וזה בסדר.
+    // הסיסמה והמפתח לא נשמרים ב-Bundle: סיבוב מסך מנקה אותם, וזה בסדר.
     var password by remember { mutableStateOf("") }
+    var keyText by remember { mutableStateOf<String?>(null) }
+    var keyName by remember { mutableStateOf<String?>(null) }
+    var keepKey by rememberSaveable { mutableStateOf(editing?.keySecret != null) }
     var name by rememberSaveable { mutableStateOf(editing?.name.orEmpty()) }
     var port by rememberSaveable { mutableStateOf(editing?.port?.toString().orEmpty()) }
     var domain by rememberSaveable { mutableStateOf(editing?.domain.orEmpty()) }
@@ -121,7 +142,30 @@ fun ConnectScreen(
     var note by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
+    var trust by remember { mutableStateOf<Pair<NetConnection, ConnectCheck.TrustHost>?>(null) }
+    // מפתח שאושר כאן ("שרת:פורט" ← המפתח): סיסמה שגויה אחרי האישור לא שואלת שוב על אותו שרת.
+    var trusted by remember { mutableStateOf<Pair<String, String>?>(null) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val hasKey = sftp && (keyText != null || keepKey)
+    // סיסמה שמורה נשארת רק כשדרך ההתחברות לא השתנתה (סיסמה ↔ מפתח).
+    val keepsPassword = editing != null && editing.secret != null && (editing.keySecret != null) == hasKey
+    val found = allFound.filter { it.protocol == protocol }
+
+    val pickKey = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            scope.launch {
+                withContext(Dispatchers.IO) { runCatching { readKeyFile(context, uri) } }
+                    .onSuccess { (fileName, text) ->
+                        keyText = text
+                        keyName = fileName
+                        keepKey = false
+                        error = null
+                    }
+                    .onFailure { error = it.message ?: "לא ניתן לקרוא את הקובץ" }
+            }
+        }
+    }
 
     val portValue = port.trim().takeIf { it.isNotEmpty() }?.toIntOrNull()
     val problem = when {
@@ -130,34 +174,63 @@ fun ConnectScreen(
         // "nas:4450" — פורט בתוך הכתובת (נקודתיים אחת; IPv6 עובר). הפורט בשדה שלו.
         host.trim().count { it == ':' } == 1 -> "הפורט בשדה \"פורט\" שב\"מתקדם\", לא בכתובת"
         port.isNotBlank() && (portValue == null || portValue !in 1..65535) -> "פורט — מספר בין 1 ל-65535"
-        share.isNotBlank() -> NetPaths.validateName(NetProtocol.Smb, share.trim())
+        // ל-SSH אין "אורח".
+        sftp && user.isBlank() -> "צריך שם משתמש"
+        !sftp && share.isNotBlank() -> NetPaths.validateName(NetProtocol.Smb, share.trim())
         else -> null
     }
 
-    fun connect() {
-        val draft = NetConnection(
+    fun draft(): NetConnection {
+        val address = "${host.trim()}:${portValue ?: protocol.defaultPort}"
+        val place = editing?.takeIf { it.protocol == protocol && "${it.host}:${it.effectivePort}" == address }
+        return NetConnection(
             id = editing?.id ?: NetConnection.newId(),
-            protocol = NetProtocol.Smb,
+            protocol = protocol,
             name = name.trim(),
             host = host.trim(),
-            port = portValue?.takeIf { it != NetProtocol.Smb.defaultPort },
+            port = portValue?.takeIf { it != protocol.defaultPort },
             share = share.trim().trim('/'),
             user = user.trim(),
-            domain = domain.trim(),
-            secret = editing?.secret,
+            domain = if (sftp) "" else domain.trim(),
+            secret = editing?.secret?.takeIf { keepsPassword },
+            // שרת אחר (כתובת או פורט) — המפתח שלו צריך אישור מחדש.
+            hostKey = (trusted?.takeIf { it.first == address }?.second ?: place?.hostKey)?.takeIf { sftp },
+            keySecret = editing?.keySecret?.takeIf { hasKey && keepKey },
         )
+    }
+
+    fun connect(draft: NetConnection) {
         val secret = password.takeIf { it.isNotEmpty() }?.toCharArray()
+        val key = keyText?.takeIf { sftp }?.toCharArray()
         busy = true
         error = null
         scope.launch {
-            error = try {
-                onConnect(draft, secret)
+            val result = try {
+                onConnect(draft, secret, key)
             } finally {
                 secret?.fill('\u0000')
+                key?.fill('\u0000')
                 busy = false
             }
-            if (error == null) onClose()
+            when (result) {
+                is ConnectCheck.Ok -> onClose()
+                is ConnectCheck.Failed -> error = result.message
+                is ConnectCheck.TrustHost -> trust = draft to result
+            }
         }
+    }
+
+    trust?.let { (draft, ask) ->
+        HostKeyDialog(
+            host = draft.host,
+            ask = ask,
+            onTrust = {
+                trust = null
+                trusted = "${draft.host}:${draft.effectivePort}" to ask.hostKey
+                connect(draft.copy(hostKey = ask.hostKey))
+            },
+            onDismiss = { trust = null },
+        )
     }
 
     Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
@@ -184,8 +257,18 @@ fun ConnectScreen(
                 PlaceType.entries.chunked(4).forEach { row ->
                     Row(horizontalArrangement = Arrangement.spacedBy(NexplorerDimens.Space2)) {
                         row.forEach { type ->
-                            TypeTile(type, selected = type == PlaceType.Smb, modifier = Modifier.weight(1f)) {
-                                note = type.unavailable
+                            TypeTile(type, selected = type.protocol == protocol, modifier = Modifier.weight(1f)) {
+                                val chosen = type.protocol
+                                if (chosen == null) {
+                                    note = type.unavailable
+                                } else if (editing != null && chosen != protocol) {
+                                    // מועדפים ותצוגות בתוך החיבור תלויים בסוג שלו.
+                                    note = "בעריכה הסוג לא משתנה — כדי לעבור ל-${type.label}, הוסף מקום חדש"
+                                } else {
+                                    protocol = chosen
+                                    note = null
+                                    error = null
+                                }
                             }
                         }
                     }
@@ -195,7 +278,7 @@ fun ConnectScreen(
                 SectionLabel("נמצאו ברשת")
                 FoundCard(found, searching, selectedHost = host.trim()) { server ->
                     host = server.host
-                    if (server.port != NetProtocol.Smb.defaultPort) {
+                    if (server.port != protocol.defaultPort) {
                         port = server.port.toString()
                         advanced = true
                     }
@@ -206,21 +289,43 @@ fun ConnectScreen(
                 Card {
                     Field("שרת", host, { host = it; error = null }, keyboard = KeyboardType.Uri)
                     Row(horizontalArrangement = Arrangement.spacedBy(NexplorerDimens.Space2 + NexplorerDimens.Space1 / 2)) {
-                        Field("שיתוף", share, { share = it; error = null }, placeholder = "כל השיתופים", modifier = Modifier.weight(1f))
-                        Field("משתמש", user, { user = it; error = null }, placeholder = "אורח", modifier = Modifier.weight(1f))
+                        if (sftp) {
+                            Field("תיקייה", share, { share = it; error = null }, placeholder = "תיקיית הבית", modifier = Modifier.weight(1f))
+                            Field("משתמש", user, { user = it; error = null }, modifier = Modifier.weight(1f))
+                        } else {
+                            Field("שיתוף", share, { share = it; error = null }, placeholder = "כל השיתופים", modifier = Modifier.weight(1f))
+                            Field("משתמש", user, { user = it; error = null }, placeholder = "אורח", modifier = Modifier.weight(1f))
+                        }
                     }
                     Field(
-                        "סיסמה",
+                        if (hasKey) "סיסמת המפתח" else "סיסמה",
                         password,
                         { password = it; error = null },
                         keyboard = KeyboardType.Password,
                         secret = true,
-                        placeholder = if (editing?.secret != null) "ללא שינוי" else null,
+                        placeholder = when {
+                            keepsPassword -> "ללא שינוי"
+                            hasKey -> "אם יש"
+                            else -> null
+                        },
                     )
+                    if (sftp) {
+                        KeyRow(
+                            name = keyName ?: if (keepKey) "המפתח השמור" else null,
+                            onPick = { pickKey.launch(arrayOf("*/*")) },
+                            onRemove = {
+                                keyText = null
+                                keyName = null
+                                keepKey = false
+                                error = null
+                            },
+                        )
+                    }
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NexplorerDimens.Space2 + NexplorerDimens.Space1 / 2)) {
                         Icon(Icons.Outlined.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(NexplorerDimens.ConnectHintIcon))
                         Text(
-                            "הסיסמה נשמרת מוצפנת ב-${"Android Keystore".isolated()}, ולא יוצאת מהמכשיר.",
+                            if (sftp) "הסיסמה והמפתח נשמרים מוצפנים ב-${"Android Keystore".isolated()}, ולא יוצאים מהמכשיר."
+                            else "הסיסמה נשמרת מוצפנת ב-${"Android Keystore".isolated()}, ולא יוצאת מהמכשיר.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -232,8 +337,8 @@ fun ConnectScreen(
                     Card {
                         Field("שם במגירה", name, { name = it }, placeholder = host.trim().ifEmpty { null }, mono = false)
                         Row(horizontalArrangement = Arrangement.spacedBy(NexplorerDimens.Space2 + NexplorerDimens.Space1 / 2)) {
-                            Field("פורט", port, { port = it.filter(Char::isDigit); error = null }, keyboard = KeyboardType.Number, placeholder = NetProtocol.Smb.defaultPort.toString(), modifier = Modifier.weight(1f))
-                            Field("דומיין", domain, { domain = it }, placeholder = "—", modifier = Modifier.weight(1f))
+                            Field("פורט", port, { port = it.filter(Char::isDigit); error = null }, keyboard = KeyboardType.Number, placeholder = protocol.defaultPort.toString(), modifier = Modifier.weight(1f))
+                            if (!sftp) Field("דומיין", domain, { domain = it }, placeholder = "—", modifier = Modifier.weight(1f))
                         }
                     }
                 }
@@ -254,7 +359,7 @@ fun ConnectScreen(
                         .padding(start = NexplorerDimens.Space4, end = NexplorerDimens.Space4, top = NexplorerDimens.Space2 + NexplorerDimens.Space1 / 2, bottom = NexplorerDimens.Space4),
                 ) {
                     Button(
-                        onClick = ::connect,
+                        onClick = { connect(draft()) },
                         enabled = problem == null && !busy,
                         shape = NexplorerShape.Pill,
                         modifier = Modifier.weight(1f).height(NexplorerDimens.BottomBarButton),
@@ -269,6 +374,99 @@ fun ConnectScreen(
         }
     }
 }
+
+/**
+ * שרת SSH חדש, או שהמפתח שלו השתנה: טביעת האצבע (SHA256, כמו ש-ssh מציג) לפני שממשיכים. אחרי האישור
+ * המפתח נשמר בחיבור, וחיבור לשרת עם מפתח אחר נחסם.
+ */
+@Composable
+private fun HostKeyDialog(host: String, ask: ConnectCheck.TrustHost, onTrust: () -> Unit, onDismiss: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (ask.changed) "המפתח של השרת השתנה" else "לסמוך על השרת?") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(NexplorerDimens.Space2)) {
+                Text("טביעת האצבע של ${host.isolated()} (${SshHostKeys.typeLabel(ask.hostKey).isolated()}):")
+                Text(SshHostKeys.fingerprint(ask.hostKey) ?: ask.hostKey, style = MonoTextStyle, modifier = Modifier.fillMaxWidth())
+                if (ask.changed) {
+                    Text("אם לא התקנת את השרת מחדש ולא החלפת לו מפתח — ייתכן שמישהו מתחזה אליו. אל תמשיך.", color = scheme.error)
+                } else {
+                    Text(
+                        "בדוק שזה השרת שלך: בשרת, ${"ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub".isolated()} מציג את אותה טביעה. " +
+                            "היא נשמרת, וחיבור לשרת עם מפתח אחר ייחסם.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = scheme.onSurfaceVariant,
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onTrust,
+                colors = if (ask.changed) ButtonDefaults.textButtonColors(contentColor = scheme.error) else ButtonDefaults.textButtonColors(),
+            ) { Text(if (ask.changed) "סמוך על המפתח החדש" else "סמוך והתחבר") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("ביטול") } },
+    )
+}
+
+/** מפתח פרטי (SFTP): הקובץ שנבחר, או השמור בעריכה; "בחר קובץ" פותח את בורר הקבצים של המערכת. */
+@Composable
+private fun KeyRow(name: String?, onPick: () -> Unit, onRemove: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    Column(verticalArrangement = Arrangement.spacedBy(NexplorerDimens.Space1)) {
+        Text("מפתח פרטי", style = MaterialTheme.typography.labelMedium.copy(letterSpacing = MaterialTheme.typography.labelSmall.letterSpacing), color = scheme.onSurfaceVariant)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(NexplorerDimens.ConnectField)
+                .border(NexplorerDimens.ConnectTypeBorder, scheme.outline, NexplorerShape.ConnectField)
+                .padding(start = NexplorerDimens.ConnectFieldPadding, end = NexplorerDimens.Space1),
+        ) {
+            Icon(Icons.Outlined.Key, contentDescription = null, tint = if (name != null) scheme.primary else scheme.onSurfaceVariant, modifier = Modifier.size(NexplorerDimens.ConnectHintIcon))
+            Text(
+                name ?: "בלי — התחברות בסיסמה",
+                style = if (name != null) MonoTextStyle.copy(color = scheme.onSurface) else MaterialTheme.typography.bodyMedium.copy(color = scheme.onSurfaceVariant),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).padding(horizontal = NexplorerDimens.Space2),
+            )
+            if (name != null) TextButton(onClick = onRemove) { Text("הסר") }
+            TextButton(onClick = onPick) { Text(if (name == null) "בחר קובץ" else "החלף") }
+        }
+    }
+}
+
+/** קובץ מפתח: השם (לתצוגה) והתוכן. מפתח ציבורי או קובץ אחר — הודעה ברורה במקום כשל בהתחברות. */
+private fun readKeyFile(context: Context, uri: Uri): Pair<String, String> {
+    val resolver = context.contentResolver
+    val fileName = runCatching {
+        resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+    }.getOrNull() ?: uri.lastPathSegment ?: "מפתח"
+    val bytes = resolver.openInputStream(uri)?.use { input ->
+        val out = java.io.ByteArrayOutputStream()
+        val buffer = ByteArray(4096)
+        while (out.size() <= MAX_KEY_BYTES) {
+            val read = input.read(buffer)
+            if (read < 0) break
+            out.write(buffer, 0, read)
+        }
+        out.toByteArray()
+    } ?: throw IOException("לא ניתן לקרוא את הקובץ")
+    if (bytes.size > MAX_KEY_BYTES) throw IOException("הקובץ גדול מדי בשביל מפתח")
+    val text = String(bytes, Charsets.UTF_8)
+    bytes.fill(0)
+    val start = text.trimStart()
+    if (start.startsWith("ssh-") || start.startsWith("ecdsa-") || start.startsWith("sk-")) {
+        throw IOException("זה המפתח הציבורי (.pub) — בחר את הקובץ שבלי .pub")
+    }
+    if (!start.startsWith("-----BEGIN") && !start.startsWith("PuTTY-User-Key-File")) throw IOException("הקובץ שנבחר אינו מפתח פרטי של SSH")
+    return fileName to text
+}
+
+private const val MAX_KEY_BYTES = 64 * 1024
 
 @Composable
 private fun SectionLabel(text: String) {

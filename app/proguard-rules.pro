@@ -29,3 +29,6 @@
 -dontwarn com.google.j2objc.annotations.**
 -dontwarn javax.annotation.**
 -dontwarn org.checkerframework.**
+# SFTP (sshj, שלב 5ב): רפלקציה רק בבדיקה אם bcpkix קיים — לפענוח מפתח PEM ישן ומוצפן.
+# Ed25519 ו-X25519 (SshCrypto) נוצרים ישירות, בלי שמות מחלקות — לא צריך כאן כללים.
+-keepnames class org.bouncycastle.openssl.PEMDecryptor

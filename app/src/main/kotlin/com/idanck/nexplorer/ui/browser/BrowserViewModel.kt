@@ -99,7 +99,7 @@ data class BrowserState(
         get() = folderPath?.let(NetPaths::connectionId)?.let { id -> connections.firstOrNull { it.id == id } }
 
     /** רשימת השיתופים של שרת: אין כאן תיקייה ליצור או להדביק בה. */
-    val atShareList: Boolean get() = isRemote && NetPaths.segments(folderPath.orEmpty()).isEmpty()
+    val atShareList: Boolean get() = folderPath?.let(NetPaths::isShareList) == true
 
     val remoteSpace: RemoteSpace? get() = folderPath?.let(NetPaths::connectionId)?.let(remoteSpaces::get)
 

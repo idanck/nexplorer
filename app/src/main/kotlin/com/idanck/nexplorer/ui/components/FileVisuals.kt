@@ -188,7 +188,7 @@ fun metaLine(entry: Entry, now: Long, zone: ZoneId = ZoneId.systemDefault(), fol
             append(HebrewDates.short(entry.lastModified, now, zone))
         }
         // שיתוף ברשת: לשיתוף אין תאריך (השרת מחזיר 0 — "1 בינו׳ 1970").
-        NetPaths.isRemote(entry.path) && NetPaths.segments(entry.path).size == 1 -> {
+        NetPaths.isShare(entry.path) -> {
             separate()
             append("שיתוף")
         }

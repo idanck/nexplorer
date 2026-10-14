@@ -16,9 +16,10 @@ import java.net.Inet4Address
 data class FoundServer(val name: String, val host: String, val port: Int, val protocol: NetProtocol)
 
 /**
- * גילוי שרתים ב-LAN דרך NsdManager: `_smb._tcp` (Synology, macOS ו-Samba עם Avahi מפרסמים אותו).
- * כל שירות שנמצא מתורגם לכתובת אחד אחרי השני — לפני Android 14 אפשר רק תרגום אחד בכל רגע.
- * שרת שלא מפרסם את עצמו (Windows בלי Bonjour) לא יופיע — הכתובת מוזנת ידנית.
+ * גילוי שרתים ב-LAN דרך NsdManager: `_smb._tcp` (Synology, macOS ו-Samba עם Avahi מפרסמים אותו), ו-SSH —
+ * `_sftp-ssh._tcp` או `_ssh._tcp` (Raspberry Pi OS ו-Synology עם Avahi). כל שירות שנמצא מתורגם לכתובת
+ * אחד אחרי השני — לפני Android 14 אפשר רק תרגום אחד בכל רגע. שרת שלא מפרסם את עצמו (Windows בלי
+ * Bonjour) לא יופיע — הכתובת מוזנת ידנית.
  */
 class NetDiscovery(context: Context) {
 
@@ -30,46 +31,28 @@ class NetDiscovery(context: Context) {
     private val _searching = MutableStateFlow(false)
     val searching: StateFlow<Boolean> = _searching
 
-    private val pending = ArrayDeque<NsdServiceInfo>()
+    private val pending = ArrayDeque<Pair<NsdServiceInfo, NetProtocol>>()
     private var resolving = false
-    private var listener: NsdManager.DiscoveryListener? = null
+    private val listeners = mutableListOf<NsdManager.DiscoveryListener>()
 
     fun start() {
-        if (nsd == null || listener != null) return
-        val l = object : NsdManager.DiscoveryListener {
-            override fun onDiscoveryStarted(serviceType: String) = Unit
-            override fun onDiscoveryStopped(serviceType: String) = Unit
-            override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
-                main.post {
-                    // פתיחה הבאה של המסך מנסה שוב.
-                    if (listener === this) listener = null
-                    _searching.value = false
-                }
-            }
-            override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) = Unit
-            override fun onServiceFound(info: NsdServiceInfo) {
-                main.post {
-                    pending.addLast(info)
-                    resolveNext()
-                }
-            }
-            override fun onServiceLost(info: NsdServiceInfo) {
-                main.post { _found.update { list -> list.filterNot { it.name == info.serviceName } } }
-            }
-        }
-        listener = l
+        if (nsd == null || listeners.isNotEmpty()) return
         _searching.value = true
-        runCatching { nsd.discoverServices(SMB_SERVICE, NsdManager.PROTOCOL_DNS_SD, l) }.onFailure {
-            listener = null
+        for ((type, protocol) in SERVICES) {
+            val l = listenerFor(protocol)
+            runCatching { nsd.discoverServices(type, NsdManager.PROTOCOL_DNS_SD, l) }.onSuccess { listeners += l }
+        }
+        if (listeners.isEmpty()) {
             _searching.value = false
+            return
         }
         // אין "סיום" לגילוי: אחרי כמה שניות בלי תשובה — "לא נמצאו".
         main.postDelayed({ _searching.value = false }, SEARCH_WINDOW_MS)
     }
 
     fun stop() {
-        listener?.let { l -> runCatching { nsd?.stopServiceDiscovery(l) } }
-        listener = null
+        listeners.forEach { l -> runCatching { nsd?.stopServiceDiscovery(l) } }
+        listeners.clear()
         pending.clear()
         // תוצאה של תרגום שעוד בדרך נזרקת (removeCallbacks) — בלי זה הגילוי הבא היה מחכה לה לנצח.
         resolving = false
@@ -77,10 +60,32 @@ class NetDiscovery(context: Context) {
         _searching.value = false
     }
 
+    private fun listenerFor(protocol: NetProtocol) = object : NsdManager.DiscoveryListener {
+        override fun onDiscoveryStarted(serviceType: String) = Unit
+        override fun onDiscoveryStopped(serviceType: String) = Unit
+        override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
+            main.post {
+                // פתיחה הבאה של המסך מנסה שוב.
+                listeners.remove(this)
+                if (listeners.isEmpty()) _searching.value = false
+            }
+        }
+        override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) = Unit
+        override fun onServiceFound(info: NsdServiceInfo) {
+            main.post {
+                pending.addLast(info to protocol)
+                resolveNext()
+            }
+        }
+        override fun onServiceLost(info: NsdServiceInfo) {
+            main.post { _found.update { list -> list.filterNot { it.name == info.serviceName && it.protocol == protocol } } }
+        }
+    }
+
     @Suppress("DEPRECATION") // registerServiceInfoCallback רק מ-Android 14; resolveService עדיין עובד.
     private fun resolveNext() {
-        if (resolving || listener == null) return
-        val next = pending.removeFirstOrNull() ?: return
+        if (resolving || listeners.isEmpty()) return
+        val (next, protocol) = pending.removeFirstOrNull() ?: return
         resolving = true
         nsd?.resolveService(
             next,
@@ -101,9 +106,12 @@ class NetDiscovery(context: Context) {
                     main.post {
                         resolving = false
                         val host = address?.hostAddress
-                        if (host != null && listener != null) {
-                            val server = FoundServer(info.serviceName, host, info.port, NetProtocol.Smb)
-                            _found.update { list -> (list.filterNot { it.name == server.name } + server).sortedBy { it.name.lowercase() } }
+                        if (host != null && listeners.isNotEmpty()) {
+                            val server = FoundServer(info.serviceName, host, info.port, protocol)
+                            // שרת שמפרסם גם _ssh וגם _sftp-ssh — שורה אחת.
+                            _found.update { list ->
+                                (list.filterNot { it.name == server.name && it.protocol == protocol } + server).sortedBy { it.name.lowercase() }
+                            }
                         }
                         resolveNext()
                     }
@@ -113,7 +121,7 @@ class NetDiscovery(context: Context) {
     }
 
     private companion object {
-        const val SMB_SERVICE = "_smb._tcp"
+        val SERVICES = listOf("_smb._tcp" to NetProtocol.Smb, "_sftp-ssh._tcp" to NetProtocol.Sftp, "_ssh._tcp" to NetProtocol.Sftp)
         const val SEARCH_WINDOW_MS = 6_000L
     }
 }

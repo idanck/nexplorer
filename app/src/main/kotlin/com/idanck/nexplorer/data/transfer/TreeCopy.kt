@@ -3,6 +3,7 @@ package com.idanck.nexplorer.data.transfer
 import com.idanck.nexplorer.core.FileNames
 import com.idanck.nexplorer.core.NetPaths
 import com.idanck.nexplorer.data.files.LocalFiles
+import com.idanck.nexplorer.data.net.RemoteCrossDevice
 import com.idanck.nexplorer.data.net.RemoteFs
 import java.io.File
 import java.io.FileOutputStream
@@ -96,7 +97,7 @@ internal object LocalSide : Side {
     override fun move(from: String, to: String): Boolean = File(from).renameTo(File(to))
 }
 
-/** חיבור אחד ברשת. העברה בשינוי שם — רק בתוך אותו שיתוף. */
+/** חיבור אחד ברשת. העברה בשינוי שם — רק בתוך אותו שיתוף (ב-SFTP — באותו כונן בשרת). */
 internal class RemoteSide(val fs: RemoteFs) : Side {
     override fun stat(path: String): Node? = fs.stat(path)?.let { Node(it.path, it.name, it.isDirectory, it.size, it.lastModified) }
 
@@ -125,8 +126,12 @@ internal class RemoteSide(val fs: RemoteFs) : Side {
 
     override fun move(from: String, to: String): Boolean {
         if (!NetPaths.sameShare(from, to)) return false
-        fs.rename(from, to)
-        return true
+        return try {
+            fs.rename(from, to)
+            true
+        } catch (e: RemoteCrossDevice) {
+            false
+        }
     }
 }
 

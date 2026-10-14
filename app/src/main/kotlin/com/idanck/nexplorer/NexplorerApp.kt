@@ -31,7 +31,7 @@ class AppContainer(app: Application) {
     /** מקומות ברשת (D3): החיבורים מההעדפות, והסיסמאות מה-Keystore — רק כשמתחברים. */
     val remote = RemoteFiles(
         connectionOf = { id -> settings.state.value.connections.firstOrNull { it.id == id } },
-        passwordOf = { connection -> connection.secret?.let(ConnectionSecrets::decrypt) },
+        decrypt = ConnectionSecrets::decrypt,
     )
     val transfers = TransferManager(app, scope, vaults, remote)
     val updates = UpdateManager(app, settings, transfers)

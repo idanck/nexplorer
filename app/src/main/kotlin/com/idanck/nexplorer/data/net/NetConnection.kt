@@ -18,12 +18,20 @@ data class NetConnection(
     val host: String,
     /** null — ברירת המחדל של הפרוטוקול. */
     val port: Int?,
-    /** SMB: השיתוף שנפתח; ריק — רשימת השיתופים בשרת. */
+    /**
+     * SMB: השיתוף שנפתח; ריק — רשימת השיתופים בשרת. SFTP: התיקייה שנפתחת, בלי / בקצוות ("home/idan");
+     * "בדוק והתחבר" ממלא את תיקיית הבית כשהשדה ריק.
+     */
     val share: String,
-    /** ריק — אורח. */
+    /** ריק — אורח (ב-SMB בלבד). */
     val user: String,
     val domain: String = "",
+    /** הצופן של הסיסמה — או, כשיש [keySecret], של הסיסמה של המפתח. */
     val secret: String? = null,
+    /** SFTP: המפתח של השרת שאושר ("ssh-ed25519 AAAA…") — חיבור לשרת עם מפתח אחר נדחה. */
+    val hostKey: String? = null,
+    /** SFTP: הצופן של קובץ המפתח הפרטי (OpenSSH / PEM / PuTTY), באותו מפתח Keystore כמו הסיסמה. */
+    val keySecret: String? = null,
 ) {
     val label: String get() = name.ifBlank { host }
 
@@ -41,11 +49,13 @@ data class NetConnection(
             if (port != null && port != protocol.defaultPort) append(':').append(port)
         }
 
-    /** "smb://192.168.50.171/volume2/Photos" — מה ש"העתק נתיב" נותן בתוך החיבור. */
+    /** "smb://192.168.50.171/volume2/Photos" או "sftp://192.168.50.83/home/idan" — מה ש"העתק נתיב" נותן בתוך החיבור. */
     fun displayUrl(path: String): String {
         val segments = NetPaths.segments(path)
         val authority = host + if (port != null && port != protocol.defaultPort) ":$port" else ""
-        return "${protocol.scheme}://$authority" + segments.joinToString("") { "/$it" }
+        // SFTP: השורש הוא "/" של השרת.
+        val tail = segments.joinToString("") { "/$it" }.ifEmpty { if (protocol == NetProtocol.Sftp) "/" else "" }
+        return "${protocol.scheme}://$authority$tail"
     }
 
     /** "NAS › volume2 › Photos" — במקומות שבהם הנתיב מוצג למשתמש (מועדפים, מאפיינים). */
@@ -69,7 +79,9 @@ data class NetConnection(
                         .put("share", c.share)
                         .put("user", c.user)
                         .put("domain", c.domain)
-                        .put("secret", c.secret ?: JSONObject.NULL),
+                        .put("secret", c.secret ?: JSONObject.NULL)
+                        .put("hostKey", c.hostKey ?: JSONObject.NULL)
+                        .put("keySecret", c.keySecret ?: JSONObject.NULL),
                 )
             }
         }.toString()
@@ -91,10 +103,15 @@ data class NetConnection(
                         share = o.optString("share"),
                         user = o.optString("user"),
                         domain = o.optString("domain"),
-                        secret = if (o.isNull("secret")) null else o.optString("secret").ifEmpty { null },
+                        secret = o.nullableString("secret"),
+                        hostKey = o.nullableString("hostKey"),
+                        keySecret = o.nullableString("keySecret"),
                     )
                 }.getOrNull()
             }.distinctBy { it.id }
         }
+
+        /** חסר, null או ריק — null (רשומה מגרסה שלא הכירה את השדה). */
+        private fun JSONObject.nullableString(key: String): String? = if (isNull(key)) null else optString(key).ifEmpty { null }
     }
 }

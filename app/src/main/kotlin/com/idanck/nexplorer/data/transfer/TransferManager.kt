@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Build
 import com.idanck.nexplorer.core.FileNames
 import com.idanck.nexplorer.core.NetPaths
+import com.idanck.nexplorer.core.NetProtocol
 import com.idanck.nexplorer.data.archive.Archives
 import com.idanck.nexplorer.data.crypto.EncryptedFiles
 import com.idanck.nexplorer.data.crypto.KeyRing
@@ -363,7 +364,7 @@ class TransferManager(
      */
     private suspend fun copyOverNetwork(job: Transfer) {
         val target = requireNotNull(job.targetDir)
-        if (NetPaths.isRemote(target) && NetPaths.segments(target).isEmpty()) throw IOException("פתח שיתוף כדי להעתיק אליו")
+        if (NetPaths.isShareList(target)) throw IOException("פתח שיתוף כדי להעתיק אליו")
         if (!NetPaths.isRemote(target) && Vaults.rootOf(File(target)) != null) {
             throw IOException("מהרשת לתוך תיקייה מוצפנת — העתק קודם לתיקייה רגילה במכשיר, ומשם לתוכה")
         }
@@ -385,8 +386,8 @@ class TransferManager(
             if (!NetPaths.isRemote(source) && LocalFiles.isLink(File(source)) && File(source).isDirectory) {
                 throw IOException("\"${File(source).name}\" הוא קישור לתיקייה — פתח את היעד שלו והעתק משם")
             }
-            if (NetPaths.isRemote(source) && NetPaths.segments(source).size < 2) {
-                throw IOException("אי אפשר ${if (move) "להעביר" else "להעתיק"} שיתוף שלם — פתח אותו ובחר את מה שבתוכו")
+            if (NetPaths.isRemote(source) && NetPaths.isFixed(source)) {
+                throw IOException("אי אפשר ${if (move) "להעביר" else "להעתיק"} ${if (NetPaths.isShareList(source) || NetPaths.isShare(source)) "שיתוף שלם" else "את כל השרת"} — פתח אותו ובחר את מה שבתוכו")
             }
             val from = sideFor(source)
             val node = from.stat(source) ?: throw IOException("\"${NetPaths.nameOf(source)}\" כבר לא קיים")
@@ -431,7 +432,7 @@ class TransferManager(
     private suspend fun deleteOverNetwork(job: Transfer) {
         val copier = copierFor(job.id, Progress(job.id))
         val roots = job.sources.map { source ->
-            if (NetPaths.segments(source).size < 2) throw IOException("אי אפשר למחוק שיתוף")
+            if (NetPaths.isFixed(source)) throw IOException(if (NetPaths.protocolOf(source) == NetProtocol.Smb) "אי אפשר למחוק שיתוף" else "אי אפשר למחוק את השורש של השרת")
             val side = sideFor(source)
             side to (side.stat(source) ?: throw IOException("\"${NetPaths.nameOf(source)}\" כבר לא קיים"))
         }

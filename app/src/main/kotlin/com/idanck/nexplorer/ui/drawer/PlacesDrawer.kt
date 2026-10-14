@@ -27,7 +27,6 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.DeleteOutline
-import androidx.compose.material.icons.outlined.Dns
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Image
@@ -72,6 +71,7 @@ import com.idanck.nexplorer.ui.theme.FileNameTextStyle
 import com.idanck.nexplorer.ui.theme.MonoTextStyle
 import com.idanck.nexplorer.ui.theme.NexplorerDimens
 import com.idanck.nexplorer.ui.theme.NexplorerShape
+import com.idanck.nexplorer.ui.net.icon
 
 class DrawerModel(
     val volumes: List<StorageVolumeInfo>,
@@ -341,7 +341,7 @@ private fun ConnectionRow(connection: NetConnection, space: RemoteSpace?, active
                     .background(if (active) scheme.primary else scheme.surfaceVariant),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Outlined.Dns, contentDescription = null, tint = if (active) scheme.onPrimary else scheme.onSurface)
+                Icon(connection.protocol.icon, contentDescription = null, tint = if (active) scheme.onPrimary else scheme.onSurface)
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NexplorerDimens.Space1)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {

@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.outlined.Dns
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.SdCard
 import androidx.compose.material.icons.outlined.Settings
@@ -73,6 +72,7 @@ import com.idanck.nexplorer.ui.transfer.TransfersSheet
 import com.idanck.nexplorer.ui.update.UpdateActions
 import com.idanck.nexplorer.ui.update.UpdateBanner
 import com.idanck.nexplorer.update.UpdateState
+import com.idanck.nexplorer.ui.net.icon
 import kotlinx.coroutines.launch
 
 /**
@@ -269,7 +269,7 @@ private fun PaneRail(
             RailVolume(volume, selected = volume.path == activeVolumePath, onClick = { onVolume(volume) })
         }
         connections.forEach { connection ->
-            RailPlace(Icons.Outlined.Dns, connection.label, selected = connection.id == activeConnectionId, onClick = { onConnection(connection) })
+            RailPlace(connection.protocol.icon, connection.label, selected = connection.id == activeConnectionId, onClick = { onConnection(connection) })
         }
         Spacer(Modifier.weight(1f))
         RailTransfers(count = transfers, onClick = onTransfers)

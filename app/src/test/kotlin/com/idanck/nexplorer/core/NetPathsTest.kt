@@ -68,4 +68,35 @@ class NetPathsTest {
         assertNotNull(NetPaths.validateName(NetProtocol.Smb, "a/b"))
         assertNotNull(NetPaths.validateName(NetProtocol.Smb, ""))
     }
+
+    @Test
+    fun `sftp paths are full server paths from the root`() {
+        val sftp = NetPaths.root(NetProtocol.Sftp, "f00d")
+        assertEquals("sftp://f00d", sftp)
+        assertEquals(NetProtocol.Sftp, NetPaths.protocolOf("$sftp/home/idan"))
+        assertEquals(listOf("home", "idan", "x.txt"), NetPaths.segments("$sftp/home/idan/x.txt"))
+        assertEquals(sftp, NetPaths.parent("$sftp/home"))
+        // "/" של השרת הוא תיקייה רגילה, לא רשימת שיתופים.
+        assertFalse(NetPaths.isShareList(sftp))
+        assertFalse(NetPaths.isShare("$sftp/home"))
+        assertTrue(NetPaths.isFixed(sftp))
+        assertFalse(NetPaths.isFixed("$sftp/home"))
+        // שינוי שם בכל השרת; לא בין שרתים ולא בין פרוטוקולים.
+        assertTrue(NetPaths.sameShare("$sftp/home/a", "$sftp/mnt/usb/a"))
+        assertFalse(NetPaths.sameShare("$sftp/home/a", "sftp://other/home/a"))
+        assertFalse(NetPaths.sameShare("$sftp/home/a", "smb://f00d/home/a"))
+        assertNull(NetPaths.validateName(NetProtocol.Sftp, "a:b*?.txt."))
+        assertNotNull(NetPaths.validateName(NetProtocol.Sftp, "a/b"))
+    }
+
+    @Test
+    fun `smb share list and shares are fixed`() {
+        assertTrue(NetPaths.isShareList(root))
+        assertTrue(NetPaths.isShare("$root/volume2"))
+        assertFalse(NetPaths.isShare("$root/volume2/Photos"))
+        assertTrue(NetPaths.isFixed(root))
+        assertTrue(NetPaths.isFixed("$root/volume2"))
+        assertFalse(NetPaths.isFixed("$root/volume2/Photos"))
+        assertFalse(NetPaths.isFixed("/storage/emulated/0"))
+    }
 }

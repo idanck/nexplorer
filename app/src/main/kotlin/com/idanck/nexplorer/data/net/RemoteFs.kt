@@ -2,6 +2,7 @@ package com.idanck.nexplorer.data.net
 
 import com.idanck.nexplorer.core.Entry
 import java.io.Closeable
+import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 
@@ -33,7 +34,7 @@ interface RemoteFs : Closeable {
     /** תיקייה — רק ריקה. */
     fun delete(path: String, isDirectory: Boolean)
 
-    /** שינוי שם או העברה בתוך אותו שיתוף. היעד לא קיים. */
+    /** שינוי שם או העברה בתוך אותו שיתוף (ב-SFTP — אותו שרת). היעד לא קיים. [RemoteCrossDevice] — אי אפשר כאן בשינוי שם. */
     fun rename(path: String, target: String)
 
     /** תאריך שינוי — אחרי העתקה, כמו בהעתקה מקומית. מה שהשרת לא מקבל לא מכשיל את ההעתקה. */
@@ -41,3 +42,6 @@ interface RemoteFs : Closeable {
 
     fun space(path: String): RemoteSpace?
 }
+
+/** העברה בשינוי שם בין שני כוננים באותו שרת — לא אפשרית; מעתיקים ומוחקים במקום. */
+class RemoteCrossDevice(message: String, cause: Throwable? = null) : IOException(message, cause)

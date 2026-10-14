@@ -2,13 +2,15 @@ package com.idanck.nexplorer.core
 
 import java.io.File
 
-/** פרוטוקול של מקום ברשת (D3). SFTP ו-WebDAV יצטרפו בשלבים 5ב ו-5ג. */
+/** פרוטוקול של מקום ברשת (D3). WebDAV יצטרף בשלב 5ג. */
 enum class NetProtocol(val scheme: String, val label: String, val defaultPort: Int) {
     Smb("smb", "SMB", 445),
+    Sftp("sftp", "SFTP", 22),
 }
 
 /**
- * נתיב של מקום ברשת: `smb://<חיבור>/<שיתוף>/<תיקייה>/<קובץ>`. המזהה של החיבור — ולא השרת — בנתיב, כדי
+ * נתיב של מקום ברשת: `smb://<חיבור>/<שיתוף>/<תיקייה>/<קובץ>`, או `sftp://<חיבור>/<נתיב מלא בשרת>`
+ * (`sftp://<חיבור>` הוא `/` של השרת). המזהה של החיבור — ולא השרת — בנתיב, כדי
  * שמועדף או תצוגה "רק בתיקייה זו" ישרדו שינוי של כתובת השרת או של המשתמש. נתיב מקומי מתחיל ב-/,
  * ולכן אין התנגשות בין השניים. בלי תלות באנדרואיד — נבדק ב-JVM.
  */
@@ -18,7 +20,7 @@ object NetPaths {
 
     fun protocolOf(path: String): NetProtocol? = NetProtocol.entries.firstOrNull { path.startsWith("${it.scheme}://") }
 
-    /** השורש של החיבור: `smb://<id>`. ב-SMB, הרשימה שם היא השיתופים. */
+    /** השורש של החיבור: `smb://<id>`. ב-SMB, הרשימה שם היא השיתופים; ב-SFTP — `/` של השרת. */
     fun root(protocol: NetProtocol, connectionId: String): String = "${protocol.scheme}://$connectionId"
 
     fun connectionId(path: String): String? {
@@ -26,7 +28,7 @@ object NetPaths {
         return path.removePrefix("${protocol.scheme}://").substringBefore('/').ifEmpty { null }
     }
 
-    /** מה שאחרי המזהה: [שיתוף, תיקייה, ..., שם]. ריק בשורש של החיבור. */
+    /** מה שאחרי המזהה: [שיתוף, תיקייה, ..., שם] (ב-SFTP — רכיבי הנתיב בשרת). ריק בשורש של החיבור. */
     fun segments(path: String): List<String> {
         val protocol = protocolOf(path) ?: return emptyList()
         val rest = path.removePrefix("${protocol.scheme}://").substringAfter('/', "")
@@ -56,9 +58,22 @@ object NetPaths {
     /** [path] בתוך [dir] או זהה לו — בנתיבים באותה צורה (שניהם ברשת או שניהם מקומיים). */
     fun isInside(path: String, dir: String): Boolean = FileNames.isInside(path, dir)
 
-    /** אותו חיבור ואותו שיתוף — אפשר להעביר בשינוי שם, בלי להעתיק בתים. */
+    /** SMB: השורש של החיבור — רשימת השיתופים, לא תיקייה (אין בה קבצים, ואי אפשר ליצור או להדביק בה). */
+    fun isShareList(path: String): Boolean = protocolOf(path) == NetProtocol.Smb && segments(path).isEmpty()
+
+    /** SMB: שיתוף שלם — לא נמחק, לא משנה שם ולא מועתק כיחידה. */
+    fun isShare(path: String): Boolean = protocolOf(path) == NetProtocol.Smb && segments(path).size == 1
+
+    /** מה שאי אפשר לבחור כפריט: רשימת השיתופים, שיתוף, ו-`/` של שרת SFTP. */
+    fun isFixed(path: String): Boolean = isShareList(path) || isShare(path) || (isRemote(path) && segments(path).isEmpty())
+
+    /**
+     * אפשר להעביר בשינוי שם, בלי להעתיק בתים: אותו חיבור, וב-SMB גם אותו שיתוף. ב-SFTP השרת עצמו מסרב
+     * כשהיעד בכונן אחר — ואז זו שגיאה, כמו `mv` בין כוננים בלי העתקה.
+     */
     fun sameShare(a: String, b: String): Boolean {
-        if (connectionId(a) == null || connectionId(a) != connectionId(b)) return false
+        if (connectionId(a) == null || connectionId(a) != connectionId(b) || protocolOf(a) != protocolOf(b)) return false
+        if (protocolOf(a) != NetProtocol.Smb) return true
         val sa = segments(a).firstOrNull() ?: return false
         return sa == segments(b).firstOrNull()
     }
@@ -75,6 +90,8 @@ object NetPaths {
                 name.endsWith('.') || name.endsWith(' ') -> "בשרת הזה השם לא יכול להיגמר בנקודה או ברווח"
                 else -> null
             }
+            // שרת SSH (Linux, macOS): כל שם שמקומי מקבל.
+            NetProtocol.Sftp -> null
         }
     }
 
