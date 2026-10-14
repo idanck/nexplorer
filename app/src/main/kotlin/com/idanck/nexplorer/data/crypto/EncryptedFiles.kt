@@ -233,6 +233,17 @@ object EncryptedFiles {
         }
     }
 
+    /** מלח הסיסמה ומספר החזרות מהכותרת של [file] — בלי סיסמה. */
+    internal fun passwordSaltOf(file: File): Pair<ByteArray, Int> {
+        val header = ByteArray(HEADER_SIZE)
+        val read = file.inputStream().use { readFully(it, header, 0) }
+        if (read < HEADER_SIZE || !header.copyOf(MAGIC.size).contentEquals(MAGIC)) throw Damaged("זה לא קובץ שהוצפן ב-nexplorer")
+        val fields = ByteBuffer.wrap(header, MAGIC.size, HEADER_SIZE - MAGIC.size)
+        val iterations = fields.int
+        fields.get()
+        return ByteArray(SALT).also { fields.get(it) } to iterations
+    }
+
     /** null — האימות נכשל. */
     private fun open(
         cipher: Cipher,
@@ -313,15 +324,28 @@ object EncryptedFiles {
  * שמוצפנים באותה פעולה חולקים מלח אחד, ובפענוח כל מלח נגזר פעם אחת. [close] מוחק הכל מהזיכרון.
  * לא בטוח לשימוש מכמה תהליכונים במקביל — כל פעולה מחזיקה אחד משלה.
  */
-class KeyRing(password: CharArray, private val iterations: Int = EncryptedFiles.ITERATIONS) : AutoCloseable {
+class KeyRing private constructor(private val secret: ByteArray, private var iterations: Int) : AutoCloseable {
 
-    init {
-        require(password.isNotEmpty()) { "צריך סיסמה" }
-    }
+    constructor(password: CharArray, iterations: Int = EncryptedFiles.ITERATIONS) :
+        this(EncryptedFiles.passwordBytes(requireFilled(password)), iterations)
 
-    private val secret = EncryptedFiles.passwordBytes(password)
     private val derived = HashMap<String, ByteArray>()
     private var sealingSalt: ByteArray? = null
+
+    /**
+     * מצפין במלח קבוע — של תיקייה מוצפנת — במקום במלח חדש: כל הקבצים שבה נפתחים במפתח אחד שכבר נגזר.
+     * אותה סיסמה, ולכן כל קובץ עדיין נפתח לבד (גם בכלי הפענוח).
+     */
+    internal fun sealWith(salt: ByteArray, iterations: Int) {
+        sealingSalt = salt.copyOf()
+        this.iterations = iterations
+    }
+
+    /** עותק עצמאי לפעולה אחת: נעילת התיקייה המוצפנת לא מוחקת את המפתח מתחת להעתקה שרצה. */
+    fun copy(): KeyRing = KeyRing(secret.copyOf(), iterations).also { copy ->
+        copy.sealingSalt = sealingSalt?.copyOf()
+        derived.forEach { (id, key) -> copy.derived[id] = key.copyOf() }
+    }
 
     internal class Sealing(val salt: ByteArray, val iterations: Int, val key: ByteArray)
 
@@ -345,5 +369,9 @@ class KeyRing(password: CharArray, private val iterations: Int = EncryptedFiles.
         secret.fill(0)
         derived.values.forEach { it.fill(0) }
         derived.clear()
+    }
+
+    private companion object {
+        fun requireFilled(password: CharArray): CharArray = password.also { require(it.isNotEmpty()) { "צריך סיסמה" } }
     }
 }

@@ -16,15 +16,16 @@ object EncryptedPreview {
     private const val DIR = "decrypted"
     private var cleared = false
 
+    suspend fun open(cacheDir: File, source: File, password: CharArray, onBytes: (Long) -> Unit): File =
+        KeyRing(password).use { keys -> open(cacheDir, source, keys, onBytes) }
+
     /** תיקייה נפרדת לכל פתיחה: שני קבצים באותו שם לא דורסים זה את זה, והשם המקורי נשמר. */
-    suspend fun open(cacheDir: File, source: File, password: CharArray, onBytes: (Long) -> Unit): File {
+    suspend fun open(cacheDir: File, source: File, keys: KeyRing, onBytes: (Long) -> Unit): File {
         clearStale(cacheDir)
         val dir = File(File(cacheDir, DIR), UUID.randomUUID().toString())
         if (!dir.mkdirs()) throw IOException("לא ניתן ליצור עותק זמני")
         try {
-            return KeyRing(password).use { keys ->
-                EncryptedFiles.decryptFile(source, dir, keys, { currentCoroutineContext().ensureActive() }, onBytes)
-            }
+            return EncryptedFiles.decryptFile(source, dir, keys, { currentCoroutineContext().ensureActive() }, onBytes)
         } catch (e: Throwable) {
             dir.deleteRecursively()
             throw e

@@ -20,6 +20,8 @@ import com.idanck.nexplorer.core.sortedFor
 import com.idanck.nexplorer.data.archive.Archives
 import com.idanck.nexplorer.data.crypto.EncryptedFiles
 import com.idanck.nexplorer.data.crypto.EncryptedPreview
+import com.idanck.nexplorer.data.crypto.KeyRing
+import com.idanck.nexplorer.data.crypto.Vaults
 import com.idanck.nexplorer.data.files.LocalFiles
 import com.idanck.nexplorer.data.files.MediaCollection
 import com.idanck.nexplorer.data.files.MediaCollections
@@ -77,6 +79,8 @@ data class BrowserState(
     val hiddenFolders: Set<String> = emptySet(),
     /** "גודל תיקיות": מה שחושב עד עכשיו (נתיב → בתים). */
     val folderSizes: Map<String, Long> = emptyMap(),
+    /** התיקייה המוצפנת (הפתוחה) שהתיקייה הנוכחית בתוכה. */
+    val vaultRoot: String? = null,
 ) {
     val folderPath: String? get() = (location as? Location.Folder)?.path
     val volume: StorageVolumeInfo? get() = folderPath?.let { StorageVolumes.volumeOf(it, volumes) }
@@ -124,8 +128,11 @@ sealed interface BrowserEvent {
     /** ‏APK: גיליון הפרטים וההתקנה. */
     data class OpenApk(val entry: Entry) : BrowserEvent
 
-    /** קובץ ‎.enc‎: חלון הסיסמה ("פתח" / "פענח"). */
-    data class OpenEncrypted(val entry: Entry) : BrowserEvent
+    /** קובץ ‎.enc‎: חלון הסיסמה ("פתח" / "פענח"). [inVault] — בתוך תיקייה מוצפנת פתוחה: נפתח בלי סיסמה. */
+    data class OpenEncrypted(val entry: Entry, val inVault: Boolean) : BrowserEvent
+
+    /** כניסה לתיקייה מוצפנת נעולה: הסיסמה, ואז ל-[then] (התיקייה עצמה או משהו בתוכה). */
+    data class UnlockVault(val vault: Entry, val then: String) : BrowserEvent
 }
 
 /** תוצאה של שינוי שם מרובה. */
@@ -140,6 +147,7 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
     private val container = (app as NexplorerApp).container
     private val settings = container.settings
     private val transfers = container.transfers
+    private val vaults = container.vaults
 
     // הנפחים נטענים מייד (StatFs זול): בלעדיהם הפריימים הראשונים מציגים "/ › storage › emulated › 0",
     // ו"חזרה" מיידית יוצאת מהשורש. המיקום ולוח הגזירים שורדים הריגת תהליך ברקע.
@@ -166,8 +174,16 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
     private val scrollPositions = mutableMapOf<String, Pair<Int, Int>>()
 
     init {
+        _state.update { it.copy(vaultRoot = it.folderPath?.let { path -> Vaults.rootOf(File(path))?.absolutePath }) }
         applySettings(reload = false)
         load()
+        viewModelScope.launch {
+            // התיקייה המוצפנת ננעלה ("נעל", או שהאפליקציה יצאה לרקע) — יוצאים ממנה.
+            vaults.unlocked.collect { open ->
+                val root = _state.value.vaultRoot ?: return@collect
+                if (root !in open) navigate(Location.Folder(File(root).parent ?: StorageVolumes.primaryPath()))
+            }
+        }
         viewModelScope.launch {
             // שינוי בהעדפות (מכאן או מההגדרות) — מיון מחדש; "הצג מוסתרים" — רישום מחדש.
             settings.state.drop(1).map { Triple(it.viewFor(_state.value.folderPath), it.favorites, it.hiddenFolders) }
@@ -193,12 +209,18 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
             if (key.startsWith(MEDIA_PREFIX)) {
                 MediaCollection.entries.firstOrNull { it.name == key.removePrefix(MEDIA_PREFIX) }?.let { return Location.Media(it) }
             } else if (File(key).isDirectory) {
-                return Location.Folder(key)
+                return Location.Folder(outsideLockedVault(key))
             }
         }
         val s = settings.state.value
         val last = s.lastFolder?.takeIf { s.reopenLastFolder && File(it).isDirectory }
-        return Location.Folder(last ?: StorageVolumes.primaryPath())
+        return Location.Folder(outsideLockedVault(last ?: StorageVolumes.primaryPath()))
+    }
+
+    /** תיקייה בתוך תיקייה מוצפנת נעולה (אחרי הפעלה מחדש) — במקומה, התיקייה שמעל התיקייה המוצפנת. */
+    private fun outsideLockedVault(path: String): String {
+        val root = Vaults.rootOf(File(path)) ?: return path
+        return if (vaults.isUnlocked(root)) path else root.parent ?: StorageVolumes.primaryPath()
     }
 
     private fun savedClipboard(): Clipboard? {
@@ -254,7 +276,10 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
         }
         when {
             entry.isDirectory -> navigate(Location.Folder(entry.path))
-            EncryptedFiles.hasEncryptedName(entry.name) -> emitEvent(BrowserEvent.OpenEncrypted(entry))
+            EncryptedFiles.hasEncryptedName(entry.name) -> {
+                val vault = Vaults.rootOf(File(entry.path))
+                emitEvent(BrowserEvent.OpenEncrypted(entry, inVault = vault != null && vaults.isUnlocked(vault)))
+            }
             ArchiveFormats.of(entry.name) != null -> emitEvent(BrowserEvent.OpenArchive(entry))
             entry.extension == "apk" -> emitEvent(BrowserEvent.OpenApk(entry))
             else -> emitEvent(BrowserEvent.OpenFile(entry))
@@ -262,11 +287,17 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
     }
 
     fun navigate(location: Location) {
+        val vault = (location as? Location.Folder)?.let { Vaults.rootOf(File(it.path)) }
+        if (vault != null && !vaults.isUnlocked(vault)) {
+            emitEvent(BrowserEvent.UnlockVault(LocalFiles.entryOf(vault, countChildren = false), (location as Location.Folder).path))
+            return
+        }
         // בלי הרשימה הקודמת: אחרת שורות של התיקייה הקודמת מוצגות (ולחיצות) מתחת לכותרת החדשה עד שהרישום מסתיים.
         _state.update {
             it.copy(
                 location = location, selection = emptySet(), filter = null, error = null,
                 listed = emptyList(), entries = emptyList(), sections = emptyList(), loading = true, folderSizes = emptyMap(),
+                vaultRoot = vault?.absolutePath,
             )
         }
         saved[KEY_LOCATION] = keyOf(location)
@@ -588,14 +619,20 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
      * "פתח": מפענח עותק זמני (ראה [EncryptedPreview]) ופותח אותו כמו כל קובץ — במציג, בנגן או באפליקציה
      * אחרת; הקובץ המוצפן לא משתנה. מחזיר הודעת שגיאה, או null כשנפתח. [onProgress] — מ-0 עד 1.
      */
-    suspend fun openEncrypted(entry: Entry, password: CharArray, onProgress: (Float) -> Unit): String? {
+    suspend fun openEncrypted(entry: Entry, password: CharArray?, onProgress: (Float) -> Unit): String? {
+        // בלי סיסמה — בתוך תיקייה מוצפנת פתוחה, במפתח שלה.
+        val keys = password?.let { KeyRing(it) }
+            ?: Vaults.rootOf(File(entry.path))?.let(vaults::copyFor)
+            ?: return "התיקייה המוצפנת נעולה"
         val opened = try {
             withContext(Dispatchers.IO) {
                 val total = (entry.size - EncryptedFiles.HEADER_SIZE).coerceAtLeast(1)
                 var done = 0L
-                val file = EncryptedPreview.open(getApplication<Application>().cacheDir, File(entry.path), password) { bytes ->
-                    done += bytes
-                    onProgress((done.toFloat() / total).coerceIn(0f, 1f))
+                val file = keys.use {
+                    EncryptedPreview.open(getApplication<Application>().cacheDir, File(entry.path), it) { bytes ->
+                        done += bytes
+                        onProgress((done.toFloat() / total).coerceIn(0f, 1f))
+                    }
                 }
                 LocalFiles.entryOf(file, countChildren = false)
             }
@@ -605,6 +642,40 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
         clearSelection()
         emitEvent(BrowserEvent.OpenFile(opened))
         return null
+    }
+
+    // ---------- תיקייה מוצפנת ----------
+
+    /** "תיקייה מוצפנת" בכפתור "חדש": נוצרת פתוחה. */
+    fun createVault(name: String, password: CharArray) {
+        val folder = _state.value.folderPath ?: return
+        viewModelScope.launch {
+            val created = withContext(Dispatchers.IO) { runCatching { Vaults.create(File(folder), name, password) } }
+            password.fill('\u0000')
+            created.onSuccess { (dir, keys) ->
+                vaults.put(dir, keys)
+                refresh()
+                emit("התיקייה המוצפנת נוצרה — מה שמועתק או מועבר לתוכה מוצפן")
+            }.onFailure { emit(it.message ?: "לא ניתן ליצור את התיקייה") }
+        }
+    }
+
+    /** מחזיר הודעת שגיאה, או null כשנפתחה (ואז נכנסים ל-[then]). */
+    suspend fun unlockVault(vault: Entry, then: String, password: CharArray): String? {
+        val keys = try {
+            withContext(Dispatchers.IO) { Vaults.unlock(File(vault.path), password) }
+        } catch (e: IOException) {
+            return e.message ?: "לא ניתן לפתוח את התיקייה"
+        }
+        vaults.put(File(vault.path), keys)
+        navigate(Location.Folder(then))
+        return null
+    }
+
+    /** "נעל": המפתח נמחק מהזיכרון, ויוצאים מהתיקייה (האיסוף של התיקיות הפתוחות ב-init). */
+    fun lockVault() {
+        val root = _state.value.vaultRoot ?: return
+        vaults.lock(File(root))
     }
 
     suspend fun inspectArchive(path: String): Result<Archives.Info> =

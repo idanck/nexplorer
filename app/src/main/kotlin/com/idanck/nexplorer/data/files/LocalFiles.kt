@@ -3,6 +3,7 @@ package com.idanck.nexplorer.data.files
 import com.idanck.nexplorer.core.Entry
 import com.idanck.nexplorer.core.FileKinds
 import com.idanck.nexplorer.core.FileNames
+import com.idanck.nexplorer.data.crypto.Vaults
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
@@ -24,15 +25,18 @@ object LocalFiles {
 
     fun entryOf(file: File, countChildren: Boolean = true): Entry {
         val isDir = file.isDirectory
+        val isVault = isDir && Vaults.isVault(file)
         return Entry(
             path = file.absolutePath,
             name = file.name.ifEmpty { file.absolutePath },
             isDirectory = isDir,
             size = if (isDir) 0 else file.length(),
-            childCount = if (isDir && countChildren) file.list()?.size ?: -1 else -1,
+            // קובץ הסימון של תיקייה מוצפנת לא נספר — הוא לא מוצג.
+            childCount = if (isDir && countChildren) file.list()?.let { it.size - if (isVault) 1 else 0 } ?: -1 else -1,
             lastModified = file.lastModified(),
             isHidden = file.name.startsWith("."),
             kind = FileKinds.of(file.name, isDir),
+            isVault = isVault,
         )
     }
 
@@ -44,7 +48,8 @@ object LocalFiles {
             )
         Result.success(
             children.asSequence()
-                .filter { showHidden || !it.name.startsWith(".") }
+                // הסימון של תיקייה מוצפנת לא מוצג גם עם "הצג קבצים מוסתרים": אין מה לעשות איתו.
+                .filter { (showHidden || !it.name.startsWith(".")) && it.name != Vaults.MARKER }
                 .map {
                     // תיקייה של עשרות אלפי קבצים: ניווט הלאה מבטל את הרישום הישן.
                     ensureActive()
