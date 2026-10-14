@@ -4,6 +4,8 @@ import android.content.Context
 import android.os.Build
 import com.idanck.nexplorer.core.FileNames
 import com.idanck.nexplorer.data.archive.Archives
+import com.idanck.nexplorer.data.crypto.EncryptedFiles
+import com.idanck.nexplorer.data.crypto.KeyRing
 import com.idanck.nexplorer.data.files.LocalFiles
 import com.idanck.nexplorer.data.files.MediaScan
 import kotlinx.coroutines.CoroutineScope
@@ -30,6 +32,8 @@ enum class TransferKind(val verb: String, val feminine: Boolean) {
     Delete("מחיקה", true),
     Compress("דחיסה", true),
     Extract("חילוץ", false),
+    Encrypt("הצפנה", true),
+    Decrypt("פענוח", false),
     ;
 
     fun past(masculine: String, feminine: String): String = if (this.feminine) feminine else masculine
@@ -106,7 +110,7 @@ class TransferManager(private val context: Context, private val scope: Coroutine
         }
     }
 
-    /** [password] — לארכיון בלבד. נשמר בזיכרון עד סוף הפעולה, לא במצב שהממשק רואה, ונמחק אחריה. */
+    /** [password] — לארכיון ולהצפנה. נשמר בזיכרון עד סוף הפעולה, לא במצב שהממשק רואה, ונמחק אחריה. */
     fun enqueue(
         kind: TransferKind,
         sources: List<String>,
@@ -169,6 +173,8 @@ class TransferManager(private val context: Context, private val scope: Coroutine
                 TransferKind.Copy, TransferKind.Move -> copyOrMove(job)
                 TransferKind.Compress -> compress(job)
                 TransferKind.Extract -> extract(job)
+                TransferKind.Encrypt -> encrypt(job)
+                TransferKind.Decrypt -> decrypt(job)
             }
             set(id) { it.copy(status = TransferStatus.Done, doneBytes = it.totalBytes, doneItems = it.totalItems) }
             null
@@ -309,6 +315,132 @@ class TransferManager(private val context: Context, private val scope: Coroutine
             "${result.special} קישורים או קבצים מיוחדים לא נוצרו".takeIf { result.special > 0 },
         )
         if (notes.isNotEmpty()) set(job.id) { it.copy(note = notes.joinToString(" · ")) }
+    }
+
+    /**
+     * "הצפן": כל קובץ בבחירה ובתיקיות שבה הופך ל-"<שם>.enc" באותה תיקייה, והמקור נמחק רק אחרי שהגרסה
+     * המוצפנת נכתבה ונקראה בחזרה. קובץ שכבר מוצפן לא מוצפן שוב. כשל באמצע משאיר את מה שכבר הוצפן — מוצפן.
+     */
+    private suspend fun encrypt(job: Transfer) {
+        val password = secrets[job.id] ?: throw IOException("חסרה סיסמה")
+        KeyRing(password).use { keys ->
+            val found = filesIn(job.id, job.sources.map(::File))
+            val (already, plain) = found.files.partition { EncryptedFiles.isEncrypted(it) }
+            plain.firstOrNull { it.parentFile?.canWrite() != true }?.let {
+                throw IOException("אין הרשאת כתיבה ב-\"${it.parentFile?.name}\"")
+            }
+            // PBKDF2 — שנייה בערך, עוד במצב "מכין".
+            keys.prepareSealing()
+            // כל בית נספר פעמיים: בכתיבה ובאימות.
+            set(job.id) {
+                it.copy(status = TransferStatus.Running, totalBytes = plain.sumOf { f -> f.length() } * 2, totalItems = plain.size)
+            }
+            val progress = Progress(job.id)
+            var done = 0
+            for (file in plain) {
+                checkpoint(job.id)
+                set(job.id) { it.copy(currentName = file.name) }
+                val dir = file.parentFile ?: continue
+                val sealed = EncryptedFiles.encryptFile(file, dir, keys, { checkpoint(job.id) }, progress::add)
+                if (!file.delete()) {
+                    throw IOException("\"${file.name}\" הוצפן, אבל לא ניתן למחוק את המקור — יש עכשיו גם עותק מוצפן וגם המקור")
+                }
+                touched(file, sealed)
+                done++
+                set(job.id) { it.copy(doneItems = done) }
+            }
+            val notes = listOfNotNull(
+                "${already.size} קבצים כבר היו מוצפנים".takeIf { already.isNotEmpty() },
+                "${found.links} קישורים לא הוצפנו".takeIf { found.links > 0 },
+                "אין כאן קבצים להצפנה".takeIf { found.files.isEmpty() && found.links == 0 },
+            )
+            if (notes.isNotEmpty()) set(job.id) { it.copy(note = notes.joinToString(" · ")) }
+        }
+    }
+
+    /**
+     * "פענח": כל קובץ מוצפן בבחירה ובתיקיות שבה חוזר לשם המקורי (או לשם פנוי), והקובץ המוצפן נמחק אחרי
+     * שהפענוח נכתב. קבצים שהוצפנו בסיסמה אחרת, או שנפגמו, נשארים כמו שהם ונספרים בהערה.
+     */
+    private suspend fun decrypt(job: Transfer) {
+        val password = secrets[job.id] ?: throw IOException("חסרה סיסמה")
+        KeyRing(password).use { keys ->
+            val encrypted = filesIn(job.id, job.sources.map(::File)).files.filter { EncryptedFiles.isEncrypted(it) }
+            if (encrypted.isEmpty()) throw IOException(if (job.sources.size == 1 && File(job.sources.single()).isFile) "הקובץ לא מוצפן" else "אין כאן קבצים מוצפנים")
+            encrypted.firstOrNull { it.parentFile?.canWrite() != true }?.let {
+                throw IOException("אין הרשאת כתיבה ב-\"${it.parentFile?.name}\"")
+            }
+            set(job.id) {
+                it.copy(
+                    status = TransferStatus.Running,
+                    totalBytes = encrypted.sumOf { f -> (f.length() - EncryptedFiles.HEADER_SIZE).coerceAtLeast(0) },
+                    totalItems = encrypted.size,
+                )
+            }
+            val progress = Progress(job.id)
+            var done = 0
+            var wrong = 0
+            val damaged = mutableListOf<IOException>()
+            for (file in encrypted) {
+                checkpoint(job.id)
+                set(job.id) { it.copy(currentName = file.name) }
+                val dir = file.parentFile ?: continue
+                try {
+                    val restored = EncryptedFiles.decryptFile(file, dir, keys, { checkpoint(job.id) }, progress::add)
+                    if (!file.delete()) {
+                        throw IOException("\"${restored.name}\" פוענח, אבל לא ניתן למחוק את הקובץ המוצפן")
+                    }
+                    touched(file, restored)
+                    done++
+                    set(job.id) { it.copy(doneItems = done) }
+                } catch (e: EncryptedFiles.WrongPassword) {
+                    wrong++
+                } catch (e: EncryptedFiles.Damaged) {
+                    damaged += e
+                }
+            }
+            if (done == 0) {
+                // אף קובץ לא נפתח: הסיבה היא השגיאה של הפעולה ולא הערה.
+                throw damaged.firstOrNull()?.takeIf { wrong == 0 } ?: EncryptedFiles.WrongPassword()
+            }
+            val notes = listOfNotNull(
+                "$wrong קבצים לא פוענחו — הם הוצפנו בסיסמה אחרת".takeIf { wrong > 0 },
+                "${damaged.size} קבצים פגומים לא פוענחו".takeIf { damaged.isNotEmpty() },
+            )
+            if (notes.isNotEmpty()) set(job.id) { it.copy(note = notes.joinToString(" · ")) }
+        }
+    }
+
+    private class Found(val files: List<File>, val links: Int)
+
+    /** הקבצים שנבחרו ומה שבתוך התיקיות שנבחרו, בלי לעקוב אחרי קישורים ובלי קבצים זמניים שלנו. */
+    private suspend fun filesIn(id: Long, sources: List<File>): Found {
+        val files = mutableListOf<File>()
+        var links = 0
+        var seen = 0
+        val stack = ArrayDeque<File>()
+        for (source in sources) {
+            when {
+                LocalFiles.isLink(source) -> links++
+                !source.exists() -> throw IOException("\"${source.name}\" כבר לא קיים")
+                source.isDirectory -> stack.addLast(source)
+                else -> files += source
+            }
+        }
+        while (stack.isNotEmpty()) {
+            val dir = stack.removeLast()
+            for (child in dir.listFiles() ?: throw IOException("לא ניתן לקרוא את התיקייה \"${dir.name}\"")) {
+                if (++seen % 256 == 0) checkpoint(id)
+                when {
+                    LocalFiles.isLink(child) -> links++
+                    child.isDirectory -> stack.addLast(child)
+                    child.name.endsWith(".nexplorer-part") -> Unit
+                    else -> files += child
+                }
+            }
+        }
+        // אותו קובץ פעמיים (תיקייה ומשהו בתוכה, מאוסף) — בפעם השנייה הוא כבר לא היה קיים.
+        return Found(files.distinctBy { it.absolutePath }, links)
     }
 
     private fun recordMove(id: Long, from: File, to: File) {

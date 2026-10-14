@@ -39,9 +39,11 @@ import androidx.compose.material.icons.outlined.FilterList
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.automirrored.outlined.NoteAdd
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.SelectAll
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.StarOutline
@@ -221,9 +223,15 @@ class ItemMenuModel(
     val isArchive: Boolean = false,
     /** הארכיון נוצר בתיקייה הנוכחית — באוסף אין כזו. */
     val canCompress: Boolean = false,
+    /** יש בבחירה קובץ שלא מוצפן, או תיקייה. */
+    val canEncrypt: Boolean = false,
+    /** יש בבחירה קובץ ‎.enc‎, או תיקייה. */
+    val canDecrypt: Boolean = false,
     val onEditText: () -> Unit = {},
     val onCompress: () -> Unit = {},
     val onExtract: () -> Unit = {},
+    val onEncrypt: () -> Unit = {},
+    val onDecrypt: () -> Unit = {},
 )
 
 @Composable
@@ -234,6 +242,8 @@ fun ItemMenu(expanded: Boolean, onDismiss: () -> Unit, model: ItemMenuModel) {
         if (model.canEditText) MenuRow("ערוך כטקסט", Icons.Outlined.EditNote, act(model.onEditText))
         if (model.isArchive) MenuRow("חלץ", Icons.Outlined.Unarchive, act(model.onExtract))
         if (model.canCompress) MenuRow("הוסף לארכיון", Icons.Outlined.Archive, act(model.onCompress))
+        if (model.canEncrypt) MenuRow("הצפן", Icons.Outlined.Security, act(model.onEncrypt))
+        if (model.canDecrypt) MenuRow("פענח", Icons.Outlined.LockOpen, act(model.onDecrypt))
         MenuRow("העבר", Icons.AutoMirrored.Outlined.DriveFileMove, act(model.onMove))
         if (model.single) MenuRow("העתק נתיב", Icons.Outlined.Link, act(model.onCopyPath))
         if (model.single && model.isFolder) {

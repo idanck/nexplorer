@@ -19,6 +19,7 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -28,6 +29,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -52,6 +54,7 @@ import com.idanck.nexplorer.data.archive.Archives
 import com.idanck.nexplorer.ui.theme.FileNameTextStyle
 import com.idanck.nexplorer.ui.theme.MonoTextStyle
 import com.idanck.nexplorer.ui.theme.NexplorerDimens
+import kotlinx.coroutines.launch
 
 private val LtrField = TextDirection.Ltr
 
@@ -128,7 +131,7 @@ fun CompressDialog(
                 }
                 Text(
                     when {
-                        password.isNotEmpty() -> "AES-256. בלי הסיסמה אי אפשר לפתוח את הארכיון — אין שחזור"
+                        password.isNotEmpty() -> "הצפנת ${"AES-256".isolated()}. בלי הסיסמה אי אפשר לפתוח את הארכיון — אין שחזור"
                         format == ArchiveFormat.SevenZ -> "7z — קטן יותר, אבל לא כל מערכת פותחת אותו בלי תוכנה"
                         else -> "בלי סיסמה — ZIP רגיל שכל מערכת פותחת"
                     },
@@ -142,6 +145,109 @@ fun CompressDialog(
                 onClick = { onConfirm(name.trim(), format, password.takeIf { it.isNotEmpty() }?.toCharArray()) },
                 enabled = name.isNotBlank() && error == null && passwordOk,
             ) { Text("צור") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("ביטול") } },
+    )
+}
+
+/** "הצפן": הסיסמה פעמיים — אין שחזור. */
+@Composable
+fun EncryptDialog(count: Int, onConfirm: (CharArray) -> Unit, onDismiss: () -> Unit) {
+    // הסיסמה לא נשמרת ב-Bundle (rememberSaveable) — רק בזיכרון של החלון.
+    var password by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf("") }
+    val matches = password == confirm
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("הצפן") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(NexplorerDimens.Space3)) {
+                Text(Counts.items(count), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                PasswordField(password, { password = it }, "סיסמה")
+                PasswordField(confirm, { confirm = it }, "הסיסמה שוב")
+                if (confirm.isNotEmpty() && !matches) {
+                    Text("הסיסמאות לא זהות", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                }
+                Text(
+                    // פותח בעברית: משפט שמתחיל ב-"AES" נפרש משמאל לימין, ו-".enc" מתהפך ל-"enc.".
+                    "הצפנת ${"AES-256".isolated()}: כל קובץ מקבל את הסיומת ${".enc".isolated()}, והמקור נמחק אחרי שההצפנה נבדקה. " +
+                        "בלי הסיסמה אי אפשר לפתוח את הקבצים — אין שחזור",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(password.toCharArray()) }, enabled = password.isNotEmpty() && matches) { Text("הצפן") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("ביטול") } },
+    )
+}
+
+/**
+ * קובץ מוצפן (הקשה עליו) או "פענח" מהבחירה. "פתח" מפענח עותק זמני ופותח אותו בלי לשנות את הקובץ;
+ * "פענח" מחזיר את המקור במקומו, בתור ההעברות. [onOpen] — null כשאין מה לפתוח (כמה פריטים, תיקייה);
+ * מחזיר הודעת שגיאה, או null כשהקובץ נפתח. סגירת החלון באמצע הפתיחה מבטלת אותה.
+ */
+@Composable
+fun DecryptDialog(
+    title: String,
+    subtitle: String,
+    titleIsFileName: Boolean,
+    onOpen: (suspend (password: CharArray, onProgress: (Float) -> Unit) -> String?)?,
+    onDecrypt: (CharArray) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var password by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    var progress by remember { mutableStateOf<Float?>(null) }
+    val scope = rememberCoroutineScope()
+    val opening = progress != null
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                title,
+                style = if (titleIsFileName) FileNameTextStyle.merge(MaterialTheme.typography.titleLarge) else MaterialTheme.typography.titleLarge,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(NexplorerDimens.Space3)) {
+                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                PasswordField(password, { password = it; error = null }, "סיסמה")
+                error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+                progress?.let { done ->
+                    // בהתחלה גוזרים את המפתח מהסיסמה (שנייה בערך) — עוד אין מה למדוד.
+                    if (done <= 0f) LinearProgressIndicator(Modifier.fillMaxWidth())
+                    else LinearProgressIndicator(progress = { done }, modifier = Modifier.fillMaxWidth())
+                }
+            }
+        },
+        confirmButton = {
+            Row {
+                TextButton(onClick = { onDecrypt(password.toCharArray()) }, enabled = password.isNotEmpty() && !opening) { Text("פענח") }
+                if (onOpen != null) {
+                    TextButton(
+                        onClick = {
+                            val secret = password.toCharArray()
+                            // לפני launch: הקשה שנייה מהירה כבר רואה את הכפתור מושבת.
+                            progress = 0f
+                            scope.launch {
+                                error = try {
+                                    onOpen(secret) { progress = it }
+                                } finally {
+                                    secret.fill('\u0000')
+                                    progress = null
+                                }
+                                if (error == null) onDismiss()
+                            }
+                        },
+                        enabled = password.isNotEmpty() && !opening,
+                    ) { Text("פתח") }
+                }
+            }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("ביטול") } },
     )

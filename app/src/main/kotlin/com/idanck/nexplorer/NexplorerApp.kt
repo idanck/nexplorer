@@ -5,6 +5,7 @@ import android.util.Log
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.decode.VideoFrameDecoder
+import com.idanck.nexplorer.data.crypto.EncryptedPreview
 import com.idanck.nexplorer.data.settings.SettingsRepository
 import com.idanck.nexplorer.data.transfer.TransferManager
 import com.idanck.nexplorer.ui.keys.KeyBus
@@ -13,6 +14,7 @@ import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /** השירותים שחיים כל עוד התהליך חי: העדפות, תור ההעברות ומנהל העדכונים. */
 class AppContainer(app: Application) {
@@ -34,6 +36,8 @@ class NexplorerApp : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
+        // עותקים מפוענחים זמניים ("פתח" בקובץ מוצפן) מהריצה הקודמת.
+        container.scope.launch(Dispatchers.IO) { EncryptedPreview.clearStale(cacheDir) }
     }
 
     /** תמונות ממוזערות ברשת ובגלריה, כולל פריים ראשון של וידאו. */

@@ -78,6 +78,7 @@ import com.idanck.nexplorer.core.MediaFormats
 import com.idanck.nexplorer.core.SizeFormat
 import com.idanck.nexplorer.core.isolated
 import com.idanck.nexplorer.data.apk.ApkInspector
+import com.idanck.nexplorer.data.crypto.EncryptedFiles
 import com.idanck.nexplorer.data.files.FileIntents
 import com.idanck.nexplorer.data.files.LocalFiles
 import com.idanck.nexplorer.data.files.StorageVolumes
@@ -114,6 +115,9 @@ private sealed interface BrowserDialog {
     data class Compress(val entries: List<Entry>) : BrowserDialog
     data class Extract(val entry: Entry) : BrowserDialog
     data class BatchRename(val entries: List<Entry>) : BrowserDialog
+    data class Encrypt(val entries: List<Entry>) : BrowserDialog
+    data class Decrypt(val entries: List<Entry>) : BrowserDialog
+    data class OpenEncrypted(val entry: Entry) : BrowserDialog
 }
 
 /**
@@ -128,8 +132,9 @@ private val BrowserDialogSaver = Saver<BrowserDialog?, String>(
             BrowserDialog.ViewOptions -> "view"
             BrowserDialog.Clipboard -> "clipboard"
             is BrowserDialog.Rename -> "rename:" + dialog.entry.path
-            // רשימות (ובחלון החילוץ — סיסמה) לא נשמרות ב-Bundle.
-            is BrowserDialog.Delete, is BrowserDialog.Compress, is BrowserDialog.Extract, is BrowserDialog.BatchRename, null -> null
+            // רשימות (ובחלונות החילוץ וההצפנה — סיסמה) לא נשמרות ב-Bundle.
+            is BrowserDialog.Delete, is BrowserDialog.Compress, is BrowserDialog.Extract, is BrowserDialog.BatchRename,
+            is BrowserDialog.Encrypt, is BrowserDialog.Decrypt, is BrowserDialog.OpenEncrypted, null -> null
         }
     },
     restore = { saved ->
@@ -214,6 +219,7 @@ fun BrowserScreen(
                 }
                 is BrowserEvent.OpenArchive -> dialog = BrowserDialog.Extract(event.entry)
                 is BrowserEvent.OpenApk -> apk = event.entry
+                is BrowserEvent.OpenEncrypted -> dialog = BrowserDialog.OpenEncrypted(event.entry)
             }
         }
     }
@@ -504,6 +510,14 @@ fun BrowserScreen(
                                     canCompress = state.location is Location.Folder,
                                     onCompress = { dialog = BrowserDialog.Compress(selected) },
                                     onExtract = { single?.let { dialog = BrowserDialog.Extract(it) } },
+                                    canEncrypt = selected.any { it.isDirectory || !EncryptedFiles.hasEncryptedName(it.name) },
+                                    canDecrypt = selected.any { it.isDirectory || EncryptedFiles.hasEncryptedName(it.name) },
+                                    onEncrypt = { dialog = BrowserDialog.Encrypt(selected) },
+                                    onDecrypt = {
+                                        // קובץ מוצפן אחד: אותו חלון כמו בהקשה עליו, עם "פתח".
+                                        dialog = single?.takeIf { !it.isDirectory }?.let { BrowserDialog.OpenEncrypted(it) }
+                                            ?: BrowserDialog.Decrypt(selected)
+                                    },
                                 ),
                             )
                         },
@@ -611,6 +625,39 @@ fun BrowserScreen(
             },
             onDismiss = { dialog = null },
         )
+        is BrowserDialog.Encrypt -> EncryptDialog(
+            count = d.entries.size,
+            onConfirm = { password ->
+                beforeTransfer()
+                vm.encrypt(d.entries.map { it.path }, password)
+                dialog = null
+            },
+            onDismiss = { dialog = null },
+        )
+        is BrowserDialog.Decrypt -> DecryptDialog(
+            title = "פענח",
+            subtitle = Counts.items(d.entries.size),
+            titleIsFileName = false,
+            onOpen = null,
+            onDecrypt = { password ->
+                beforeTransfer()
+                vm.decrypt(d.entries.map { it.path }, password)
+                dialog = null
+            },
+            onDismiss = { dialog = null },
+        )
+        is BrowserDialog.OpenEncrypted -> DecryptDialog(
+            title = d.entry.name,
+            subtitle = "קובץ מוצפן · ${SizeFormat.short(d.entry.size).isolated()}",
+            titleIsFileName = true,
+            onOpen = { password, onProgress -> vm.openEncrypted(d.entry, password, onProgress) },
+            onDecrypt = { password ->
+                beforeTransfer()
+                vm.decrypt(listOf(d.entry.path), password)
+                dialog = null
+            },
+            onDismiss = { dialog = null },
+        )
         is BrowserDialog.BatchRename -> BatchRenameDialog(
             entries = d.entries,
             others = { vm.namesBesides(d.entries) },
@@ -663,8 +710,10 @@ fun BrowserScreen(
 }
 
 /** "ערוך כטקסט": קובץ טקסט/קוד, או כל קובץ קטן — העורך עצמו מסרב לבינארי. */
+/** קובץ מוצפן לא נפתח בעורך: שמירה הייתה הורסת אותו. */
 private fun Entry.canEditAsText(): Boolean =
-    !isDirectory && size <= TextFiles.MAX_BYTES && (kind == FileKind.Text || kind == FileKind.Other)
+    !isDirectory && size <= TextFiles.MAX_BYTES && (kind == FileKind.Text || kind == FileKind.Other) &&
+        !EncryptedFiles.hasEncryptedName(name)
 
 /** צל הגרירה: primary שקוף. */
 private const val DRAG_DECORATION_ALPHA = 0.24f
