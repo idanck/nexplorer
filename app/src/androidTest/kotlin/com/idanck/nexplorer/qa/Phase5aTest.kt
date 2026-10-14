@@ -1,6 +1,7 @@
 package com.idanck.nexplorer.qa
 
 import android.content.Context
+import android.util.Log
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -106,8 +107,22 @@ class Phase5aTest {
         scenario = Qa.launch(path)
     }
 
+    /**
+     * כשל — ללוג ולצילום, לפני ש-tearDown סוגר את המסך. שגיאה בתוך Compose נתפסת ע"י מסגרת הבדיקות
+     * ונזרקת כאן; אם הקומפוזיציה נפגמה, הסגירה מפילה את התהליך — והסיבה המקורית לא הייתה נשמרת.
+     */
+    private fun logged(name: String, body: () -> Unit) {
+        try {
+            body()
+        } catch (t: Throwable) {
+            Log.e("Phase5aTest", "$name failed", t)
+            runCatching { Qa.shell("screencap -p /sdcard/Download/nexplorer-qa/failed-$name.png") }
+            throw t
+        }
+    }
+
     @Test
-    fun t01_addPlaceFromTheDrawerConnectsAndListsShares() {
+    fun t01_addPlaceFromTheDrawerConnectsAndListsShares() = logged("t01") {
         launch(root.absolutePath)
         compose.waitFor(hasText("readme.md"), 15_000)
         compose.onNodeWithContentDescription("פתח מגירת מקומות").performClick()
@@ -149,7 +164,7 @@ class Phase5aTest {
     }
 
     @Test
-    fun t02_openFromTheServerAndCopyBothWays() {
+    fun t02_openFromTheServerAndCopyBothWays() = logged("t02") {
         saveConnection()
         launch(base)
         compose.waitFor(hasText("readme.txt"), 30_000)
@@ -188,7 +203,7 @@ class Phase5aTest {
     }
 
     @Test
-    fun t03_pasteCreateRenameAndDeleteOnTheServer() {
+    fun t03_pasteCreateRenameAndDeleteOnTheServer() = logged("t03") {
         saveConnection()
         launch(root.absolutePath)
         compose.waitFor(hasText("readme.md"), 15_000)
@@ -239,7 +254,7 @@ class Phase5aTest {
     }
 
     @Test
-    fun t04_removeFromTheDrawerForgetsItsFavorites() {
+    fun t04_removeFromTheDrawerForgetsItsFavorites() = logged("t04") {
         saveConnection()
         runBlocking { container.settings.update { it.copy(favorites = listOf(base, root.absolutePath)) } }
         launch(base)

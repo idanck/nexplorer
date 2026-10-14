@@ -43,9 +43,21 @@ wait_for "הוסף מקום" 10 || fail "the drawer has no add place row"
 ui tap "הוסף מקום"
 wait_for "פרטי חיבור" 10 || fail "the add place screen did not open"
 
-ui tap-desc "שרת" && adb shell input text 10.0.2.2
-ui tap-desc "משתמש" && adb shell input text qa
-ui tap-desc "סיסמה" && adb shell input text qa-pass
+# המקלדת מכסה את השדות שמתחת לשדה הפעיל — מגוללים עד שהשדה על המסך (uiautomator לא רואה מה שמחוץ לו).
+field() {
+  for _ in 1 2 3 4; do
+    if ui tap-desc "$1"; then
+      adb shell input text "$2"
+      return 0
+    fi
+    adb shell input swipe 540 1300 540 600 300
+    sleep 1
+  done
+  return 1
+}
+field "שרת" 10.0.2.2 || fail "no server field"
+field "משתמש" qa || fail "no user field"
+field "סיסמה" qa-pass || fail "no password field"
 shot "release-01-add-place"
 ui tap "בדוק והתחבר" || fail "no connect button"
 # רשימת השיתופים: smbj + dcerpc עברו את R8.

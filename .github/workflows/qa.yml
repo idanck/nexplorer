@@ -60,6 +60,14 @@ jobs:
         # release — לבדיקת העשן של R8 (release-smoke.sh). בלי מפתח ה-release הוא נחתם במפתח debug.
         run: ./gradlew assembleDebug assembleDebugAndroidTest assembleRelease
 
+      - name: Stop the build daemons
+        # Gradle (עד 3 GB) ו-Kotlin נשארים בזיכרון אחרי ה-build, לצד האמולטור. במכונה של ריפו פרטי
+        # (2 ליבות, ~7 GB) — אחרי שנוסף build ה-release (R8) האמולטור של API 35 נתקע והמכונה נעצרה.
+        run: |
+          ./gradlew --stop
+          pkill -f KotlinCompileDaemon || true
+          free -m
+
       - name: Free disk space for the emulator
         # מ-API 24 האמולטור מעגל את מחיצת הנתונים ל-6 GiB לפחות ודורש פי 1.2 פנויים (7373 MB) — disk-size קטן לא עוזר.
         # אחרי ה-build, כדי לא למחוק משהו שהוא צריך.
