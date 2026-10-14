@@ -53,7 +53,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -163,10 +162,11 @@ private fun NowPlaying(state: AudioState, viewModel: AudioPlayerViewModel, artSi
         modifier.verticalScroll(rememberScrollState()).padding(horizontal = NexplorerDimens.Space5, vertical = NexplorerDimens.Space2),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        // עטיפה חדשה: הקודמת יורדת מיד, והחדשה מפוענחת ברקע.
         val artBytes = state.artwork
-        val art by produceState<ImageBitmap?>(null, artBytes) {
-            value = null
-            value = artBytes?.let { bytes -> withContext(Dispatchers.Default) { decodeArtwork(bytes) } }
+        var art by remember(artBytes) { mutableStateOf<ImageBitmap?>(null) }
+        LaunchedEffect(artBytes) {
+            art = artBytes?.let { bytes -> withContext(Dispatchers.Default) { decodeArtwork(bytes) } }
         }
         Box(
             Modifier
