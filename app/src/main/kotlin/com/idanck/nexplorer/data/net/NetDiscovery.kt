@@ -40,7 +40,11 @@ class NetDiscovery(context: Context) {
             override fun onDiscoveryStarted(serviceType: String) = Unit
             override fun onDiscoveryStopped(serviceType: String) = Unit
             override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
-                main.post { _searching.value = false }
+                main.post {
+                    // פתיחה הבאה של המסך מנסה שוב.
+                    if (listener === this) listener = null
+                    _searching.value = false
+                }
             }
             override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) = Unit
             override fun onServiceFound(info: NsdServiceInfo) {
@@ -67,6 +71,8 @@ class NetDiscovery(context: Context) {
         listener?.let { l -> runCatching { nsd?.stopServiceDiscovery(l) } }
         listener = null
         pending.clear()
+        // תוצאה של תרגום שעוד בדרך נזרקת (removeCallbacks) — בלי זה הגילוי הבא היה מחכה לה לנצח.
+        resolving = false
         main.removeCallbacksAndMessages(null)
         _searching.value = false
     }

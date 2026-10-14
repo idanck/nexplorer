@@ -359,7 +359,8 @@ fun BrowserScreen(
 
     // שחרור על החלון עצמו (לא על תיקייה בו): לתיקייה שהוא מציג.
     val paneDrop = rememberDropZone(state.folderPath, drag) { payload ->
-        payload.pane != pane?.index && state.folderPath?.let { acceptsInto(it)(payload) } == true
+        // ברשימת השיתופים של שרת אין לאן להעתיק — רק לתוך שיתוף.
+        payload.pane != pane?.index && !state.atShareList && state.folderPath?.let { acceptsInto(it)(payload) } == true
     }
 
     val screen: @Composable () -> Unit = {

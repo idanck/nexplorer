@@ -22,6 +22,8 @@
 # dcerpc זורק java.rmi.UnmarshalException על תשובה פגומה — אין java.rmi באנדרואיד. SmbFs.listShares
 # תופס את ה-NoClassDefFoundError שיוצא משם, והופך אותו להודעה ("השרת לא מחזיר את רשימת השיתופים").
 -dontwarn java.rmi.**
+# BouncyCastle: LDAP של CRL/CertStore (javax.naming) — smbj משתמש רק ב-API הקל, בלי JCE.
+-dontwarn javax.naming.**
 # Guava (דרך dcerpc): אנוטציות לזמן קומפילציה בלבד.
 -dontwarn com.google.errorprone.annotations.**
 -dontwarn com.google.j2objc.annotations.**

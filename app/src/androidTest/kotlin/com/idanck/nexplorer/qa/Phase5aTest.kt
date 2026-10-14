@@ -31,7 +31,6 @@ import com.idanck.nexplorer.qa.Qa.waitGone
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
-import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -70,7 +69,7 @@ class Phase5aTest {
         Qa.grantStorage()
         QaData.seed()
         runBlocking { container.settings.update { it.copy(connections = emptyList(), favorites = emptyList()) } }
-        container.remote.forget(server.id)
+        runBlocking { container.remote.forget(server.id) }
         SmbFs(server, password.toCharArray()).use { fs ->
             wipe(fs, base)
             fs.mkdir(base)

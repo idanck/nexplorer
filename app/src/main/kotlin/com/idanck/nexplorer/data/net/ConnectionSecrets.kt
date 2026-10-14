@@ -36,9 +36,12 @@ object ConnectionSecrets {
 
     /** [IOException] כשאין מה לפענח — מפתח שנמחק (שחזור נתונים) או צופן פגום. */
     fun decrypt(secret: String): CharArray {
-        val (iv, sealed) = secret.split(':').takeIf { it.size == 2 }
-            ?.let { Base64.decode(it[0], Base64.NO_WRAP) to Base64.decode(it[1], Base64.NO_WRAP) }
-            ?: throw unreadable()
+        val (iv, sealed) = try {
+            secret.split(':').takeIf { it.size == 2 }
+                ?.let { Base64.decode(it[0], Base64.NO_WRAP) to Base64.decode(it[1], Base64.NO_WRAP) }
+        } catch (e: IllegalArgumentException) {
+            null
+        } ?: throw unreadable()
         val plain = try {
             val key = existingKey() ?: throw unreadable()
             Cipher.getInstance(TRANSFORMATION).apply { init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(TAG_BITS, iv)) }.doFinal(sealed)

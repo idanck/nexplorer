@@ -127,6 +127,8 @@ fun ConnectScreen(
     val problem = when {
         host.isBlank() -> "צריך כתובת של שרת"
         host.trim().any { it.isWhitespace() || it == '/' || it == '\\' } -> "כתובת השרת בלי רווחים ובלי / — רק השם או ה-IP"
+        // "nas:4450" — פורט בתוך הכתובת (נקודתיים אחת; IPv6 עובר). הפורט בשדה שלו.
+        host.trim().count { it == ':' } == 1 -> "הפורט בשדה \"פורט\" שב\"מתקדם\", לא בכתובת"
         port.isNotBlank() && (portValue == null || portValue !in 1..65535) -> "פורט — מספר בין 1 ל-65535"
         share.isNotBlank() -> NetPaths.validateName(NetProtocol.Smb, share.trim())
         else -> null

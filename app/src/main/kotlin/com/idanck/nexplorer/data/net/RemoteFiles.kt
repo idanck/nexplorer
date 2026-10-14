@@ -40,9 +40,13 @@ class RemoteFiles(
         }
     }
 
-    /** חיבור שנערך או נמחק: נסגר, והפעם הבאה מתחברת מחדש בפרטים החדשים. */
-    fun forget(id: String) {
+    /**
+     * חיבור שנערך או נמחק: נסגר, והפעם הבאה מתחברת מחדש בפרטים החדשים. ב-IO: הסגירה מדברת עם השרת,
+     * ומחכה להתחברות שבאמצע (עד זמן ההמתנה).
+     */
+    suspend fun forget(id: String) = withContext(Dispatchers.IO) {
         synchronized(open) { open.remove(id) }?.second?.let { runCatching { it.close() } }
+        Unit
     }
 
     suspend fun list(path: String): Result<List<Entry>> = io { fsFor(path).list(path) }
@@ -88,6 +92,11 @@ class RemoteFiles(
         val stack = ArrayDeque<String>()
         for (path in paths) {
             val fs = fsFor(path)
+            // רשימת השיתופים: לא סורקים את כל השרת — רק סופרים שיתופים.
+            if (NetPaths.segments(path).isEmpty()) {
+                folders += fs.list(path).size
+                continue
+            }
             val root = fs.stat(path) ?: continue
             if (root.isDirectory) stack.addLast(path) else {
                 files++
