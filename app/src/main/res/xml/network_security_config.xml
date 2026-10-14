@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  שלב 5ג: WebDAV ב-http לשרת בבית — לבחירת המשתמש, עם אזהרה במסך "הוסף מקום". בלי זה אנדרואיד חוסם
+  כל http (מ-API 28). תעודות: של המערכת; תעודה עצמית — רק זו שאושרה בחיבור (WebDavFs).
+-->
+<network-security-config xmlns:tools="http://schemas.android.com/tools">
+    <base-config cleartextTrafficPermitted="true" tools:ignore="InsecureBaseConfiguration">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+    <!-- ערוץ העדכונים (D5) — רק https. -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="false">nexplorer-updates.idanck.com</domain>
+    </domain-config>
+</network-security-config>

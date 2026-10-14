@@ -84,4 +84,22 @@ class NetConnectionTest {
         val old = """[{"id":"a1b2c3d4e5f6","protocol":"Smb","name":"NAS","host":"192.168.50.171","port":null,"share":"volume2","user":"idanc","domain":"","secret":"aXY=:c2Vh"}]"""
         assertEquals(listOf(nas), NetConnection.decode(old))
     }
+
+    @Test
+    fun `webdav keeps http and roots at the address`() {
+        val cloud = NetConnection("0d0d0d0d0d0d", NetProtocol.WebDav, "Cloud", "cloud.example.com", null, "remote.php/dav/files/idan", "idan", secret = "aXY=:cGs=")
+        val home = cloud.copy(id = "0e0e0e0e0e0e", plainHttp = true, port = 8080)
+        assertEquals(listOf(cloud, home), NetConnection.decode(NetConnection.encode(listOf(cloud, home))))
+        assertEquals("dav://0d0d0d0d0d0d", cloud.root)
+        assertEquals(443, cloud.effectivePort)
+        assertEquals(80, cloud.copy(plainHttp = true).effectivePort)
+        assertEquals("https://cloud.example.com/remote.php/dav/files/idan/Photos", cloud.displayUrl("${cloud.root}/Photos"))
+        assertEquals("http://nas:5005/dav", cloud.copy(host = "nas", port = 5005, share = "dav", plainHttp = true).displayUrl(cloud.root))
+        assertEquals("idan@nas:5005", cloud.copy(host = "nas", port = 5005, plainHttp = true).subtitle)
+        assertEquals("Cloud › Photos", cloud.displayPath("${cloud.root}/Photos"))
+        // כתובת אמיתית — "ערוך" מדביק אותה בחזרה ל-DavAddress.
+        val odd = cloud.copy(host = "fe80::1", port = 8443, share = "dav/a b", plainHttp = false)
+        assertEquals("https://[fe80::1]:8443/dav/a%20b/x%23%25%3F", odd.displayUrl("${odd.root}/x#%?"))
+        assertEquals(com.idanck.nexplorer.core.DavAddress("fe80::1", 8443, "dav/a b", false), com.idanck.nexplorer.core.DavAddress.parse(odd.displayUrl(odd.root)))
+    }
 }
