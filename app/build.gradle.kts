@@ -110,6 +110,7 @@ dependencies {
     implementation(libs.dcerpc)
     implementation(libs.sshj)
     implementation(libs.bcpkix)
+    implementation(libs.okhttp)
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)

@@ -80,14 +80,15 @@ jobs:
           avail=$(df -Pm "$HOME" | awk 'NR==2{print $4}')
           [ "$avail" -ge 9000 ] || { echo "::error::Only ${avail} MB free; the emulator needs ~7373 MB for userdata"; exit 1; }
 
-      - name: Start SMB and SFTP servers for the emulator
-        # שלב 5א: Samba, ושלב 5ב: OpenSSH (פורט 2222) על המארח — האמולטור מגיע אליהם ב-10.0.2.2
-        # (Phase5aTest, Phase5bTest, release-smoke.sh).
+      - name: Start SMB, SFTP and WebDAV servers for the emulator
+        # שלב 5א: Samba, שלב 5ב: OpenSSH (פורט 2222), ושלב 5ג: Apache WebDAV (8080, ‏8443) על המארח —
+        # האמולטור מגיע אליהם ב-10.0.2.2 (Phase5aTest, Phase5bTest, Phase5cTest, release-smoke.sh).
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq --no-install-recommends samba openssh-server > /dev/null
+          sudo apt-get install -y -qq --no-install-recommends samba openssh-server apache2 apache2-utils > /dev/null
           bash .github/qa/smb-server.sh
           bash .github/qa/sftp-server.sh
+          bash .github/qa/webdav-server.sh
 
       - name: Run on the emulator
         uses: reactivecircus/android-emulator-runner@v2

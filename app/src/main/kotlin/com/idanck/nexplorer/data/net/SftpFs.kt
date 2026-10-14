@@ -368,5 +368,11 @@ internal class Explained(message: String, cause: Throwable? = null) : IOExceptio
 
 /** השרת עוד לא אושר, או שהמפתח שלו השתנה ([changed]). [offered] — "ssh-ed25519 AAAA…". */
 class HostKeyUntrusted(val offered: String, val changed: Boolean) : IOException(
-    if (changed) "המפתח של השרת השתנה — ערוך את החיבור כדי לאשר אותו מחדש" else "צריך לאשר את המפתח של השרת",
+    when {
+        // WebDAV: תעודה עצמית ("x509-sha256 …").
+        offered.startsWith("x509-") && changed -> "התעודה של השרת השתנתה — ערוך את החיבור כדי לאשר אותה מחדש"
+        offered.startsWith("x509-") -> "צריך לאשר את התעודה של השרת — ערוך את החיבור"
+        changed -> "המפתח של השרת השתנה — ערוך את החיבור כדי לאשר אותו מחדש"
+        else -> "צריך לאשר את המפתח של השרת"
+    },
 )

@@ -188,6 +188,7 @@ class RemoteFiles(
         fun create(connection: NetConnection, password: CharArray?, privateKey: CharArray? = null): RemoteFs = when (connection.protocol) {
             NetProtocol.Smb -> SmbFs(connection, password)
             NetProtocol.Sftp -> SftpFs(connection, password, privateKey)
+            NetProtocol.WebDav -> WebDavFs(connection, password)
         }
 
         /**

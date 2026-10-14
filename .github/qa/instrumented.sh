@@ -80,6 +80,12 @@ if [ -d /tmp/nexplorer-sftp/keys ]; then
   adb push /tmp/nexplorer-sftp/keys/. /sdcard/nexplorer-qa-keys/ > /dev/null
 fi
 run_class Phase5bTest
+# טביעת האצבע של התעודה העצמית של webdav-server.sh — Phase5cTest משווה אליה.
+if [ -f /tmp/nexplorer-dav/certs/fingerprint.txt ]; then
+  adb shell mkdir -p /sdcard/nexplorer-qa-keys
+  adb push /tmp/nexplorer-dav/certs/fingerprint.txt /sdcard/nexplorer-qa-keys/dav-fingerprint.txt > /dev/null
+fi
+run_class Phase5cTest
 # Phase2bTest מדמה טאבלט ו-Phase3bTest מסובב; אם התהליך קרס לפני tearDown — שהמונקי ירוץ על המסך הרגיל.
 adb shell wm size reset || true
 adb shell wm density reset || true

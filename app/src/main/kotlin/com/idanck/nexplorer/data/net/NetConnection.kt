@@ -32,27 +32,39 @@ data class NetConnection(
     val hostKey: String? = null,
     /** SFTP: הצופן של קובץ המפתח הפרטי (OpenSSH / PEM / PuTTY), באותו מפתח Keystore כמו הסיסמה. */
     val keySecret: String? = null,
+    /** WebDAV: http בלי הצפנה (שרת בבית). ברירת המחדל — https. */
+    val plainHttp: Boolean = false,
 ) {
     val label: String get() = name.ifBlank { host }
 
-    val effectivePort: Int get() = port ?: protocol.defaultPort
+    /** WebDAV ב-http — 80; אחרת של הפרוטוקול. */
+    val defaultPort: Int get() = if (protocol == NetProtocol.WebDav && plainHttp) 80 else protocol.defaultPort
 
-    /** הנתיב שנפתח מהמגירה, וממנו "למעלה" חוזר למכשיר. */
+    val effectivePort: Int get() = port ?: defaultPort
+
+    /**
+     * הנתיב שנפתח מהמגירה, וממנו "למעלה" חוזר למכשיר. ב-WebDAV [share] הוא הנתיב של הכתובת בשרת
+     * (`remote.php/dav/files/idan`), והשורש של החיבור הוא הכתובת עצמה — לא תיקייה בתוכה.
+     */
     val root: String
-        get() = NetPaths.root(protocol, id).let { if (share.isBlank()) it else NetPaths.child(it, share) }
+        get() = NetPaths.root(protocol, id).let { if (share.isBlank() || protocol == NetProtocol.WebDav) it else NetPaths.child(it, share) }
 
     /** "idanc@192.168.50.171" — בשורה שמתחת לשם במגירה (כמו "idan@192.168.50.83:41725" בלוח). */
     val subtitle: String
         get() = buildString {
             if (user.isNotBlank()) append(user).append('@')
             append(host)
-            if (port != null && port != protocol.defaultPort) append(':').append(port)
+            if (port != null && port != defaultPort) append(':').append(port)
         }
 
     /** "smb://192.168.50.171/volume2/Photos" או "sftp://192.168.50.83/home/idan" — מה ש"העתק נתיב" נותן בתוך החיבור. */
     fun displayUrl(path: String): String {
         val segments = NetPaths.segments(path)
-        val authority = host + if (port != null && port != protocol.defaultPort) ":$port" else ""
+        val authority = host + if (port != null && port != defaultPort) ":$port" else ""
+        if (protocol == NetProtocol.WebDav) {
+            val all = share.split('/').filter { it.isNotEmpty() } + segments
+            return "${if (plainHttp) "http" else "https"}://$authority/" + all.joinToString("/")
+        }
         // SFTP: השורש הוא "/" של השרת.
         val tail = segments.joinToString("") { "/$it" }.ifEmpty { if (protocol == NetProtocol.Sftp) "/" else "" }
         return "${protocol.scheme}://$authority$tail"
@@ -84,7 +96,8 @@ data class NetConnection(
                         .put("domain", c.domain)
                         .put("secret", c.secret ?: JSONObject.NULL)
                         .put("hostKey", c.hostKey ?: JSONObject.NULL)
-                        .put("keySecret", c.keySecret ?: JSONObject.NULL),
+                        .put("keySecret", c.keySecret ?: JSONObject.NULL)
+                        .put("plainHttp", c.plainHttp),
                 )
             }
         }.toString()
@@ -109,6 +122,7 @@ data class NetConnection(
                         secret = o.nullableString("secret"),
                         hostKey = o.nullableString("hostKey"),
                         keySecret = o.nullableString("keySecret"),
+                        plainHttp = o.optBoolean("plainHttp", false),
                     )
                 }.getOrNull()
             }.distinctBy { it.id }

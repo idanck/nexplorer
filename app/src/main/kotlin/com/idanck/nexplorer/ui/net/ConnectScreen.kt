@@ -74,6 +74,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.idanck.nexplorer.core.DavAddress
 import com.idanck.nexplorer.core.NetPaths
 import com.idanck.nexplorer.core.NetProtocol
 import com.idanck.nexplorer.core.isolated
@@ -91,11 +92,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
 
-/** סוג במסך "הוסף מקום" — לפי הלוח. SMB ו-SFTP פעילים; לשאר — הסבר למה עוד לא. */
+/** סוג במסך "הוסף מקום" — לפי הלוח. SMB, ‏SFTP ו-WebDAV פעילים; לשאר — הסבר למה לא. */
 private enum class PlaceType(val label: String, val icon: ImageVector, val protocol: NetProtocol?, val unavailable: String?) {
     Smb("SMB", Icons.Outlined.Dns, NetProtocol.Smb, null),
     Sftp("SFTP", Icons.Outlined.Terminal, NetProtocol.Sftp, null),
-    WebDav("WebDAV", Icons.Outlined.Language, null, "WebDAV — בשלב 5ג"),
+    WebDav("WebDAV", Icons.Outlined.Language, NetProtocol.WebDav, null),
     Cloud("ענן", Icons.Outlined.Cloud, null, "ענן — מחכה להחלטה D4"),
     Ftp("FTP/S", Icons.Outlined.Download, null, "FTP/S לא בתוכנית: ב-D3 נבחרו SMB, SFTP ו-WebDAV"),
     S3("S3", Icons.Outlined.Storage, null, "S3 לא בתוכנית: ב-D3 נבחרו SMB, SFTP ו-WebDAV"),
@@ -126,7 +127,10 @@ fun ConnectScreen(
 
     var protocol by rememberSaveable { mutableStateOf(editing?.protocol ?: NetProtocol.Smb) }
     val sftp = protocol == NetProtocol.Sftp
+    val dav = protocol == NetProtocol.WebDav
     var host by rememberSaveable { mutableStateOf(editing?.host.orEmpty()) }
+    // WebDAV: כתובת אחת (scheme, שרת, פורט ונתיב) במקום שרת ושיתוף.
+    var url by rememberSaveable { mutableStateOf(editing?.takeIf { it.protocol == NetProtocol.WebDav }?.let { it.displayUrl(it.root) }.orEmpty()) }
     // SFTP: התיקייה נשמרת בלי / בקצוות; בשדה — כנתיב מלא ("/" — השורש של השרת; ריק — הבית).
     var share by rememberSaveable { mutableStateOf(editing?.let { e -> if (e.protocol == NetProtocol.Sftp) "/${e.share}" else e.share }.orEmpty()) }
     var user by rememberSaveable { mutableStateOf(editing?.user.orEmpty()) }
@@ -168,7 +172,11 @@ fun ConnectScreen(
     }
 
     val portValue = port.trim().takeIf { it.isNotEmpty() }?.toIntOrNull()
+    val davAddress = if (dav) DavAddress.parse(url) else null
     val problem = when {
+        dav && url.isBlank() -> "צריך כתובת של שרת"
+        dav && davAddress == null -> "כתובת לא תקינה — למשל https://cloud.example.com/remote.php/dav/files/idan"
+        dav -> null
         host.isBlank() -> "צריך כתובת של שרת"
         host.trim().any { it.isWhitespace() || it == '/' || it == '\\' } -> "כתובת השרת בלי רווחים ובלי / — רק השם או ה-IP"
         // "nas:4450" — פורט בתוך הכתובת (נקודתיים אחת; IPv6 עובר). הפורט בשדה שלו.
@@ -181,22 +189,28 @@ fun ConnectScreen(
     }
 
     fun draft(): NetConnection {
-        val address = "${host.trim()}:${portValue ?: protocol.defaultPort}"
-        val place = editing?.takeIf { it.protocol == protocol && "${it.host}:${it.effectivePort}" == address }
-        return NetConnection(
+        val base = NetConnection(
             id = editing?.id ?: NetConnection.newId(),
             protocol = protocol,
             name = name.trim(),
-            host = host.trim(),
-            port = portValue?.takeIf { it != protocol.defaultPort },
-            share = if (sftp && share.isBlank()) NetConnection.HOME else share.trim().trim('/'),
+            host = davAddress?.host ?: host.trim(),
+            port = if (dav) davAddress?.port else portValue?.takeIf { it != protocol.defaultPort },
+            share = when {
+                dav -> davAddress?.path.orEmpty()
+                sftp && share.isBlank() -> NetConnection.HOME
+                else -> share.trim().trim('/')
+            },
             user = user.trim(),
-            domain = if (sftp) "" else domain.trim(),
+            domain = if (sftp || dav) "" else domain.trim(),
             secret = editing?.secret?.takeIf { keepsPassword },
-            // שרת אחר (כתובת או פורט) — המפתח שלו צריך אישור מחדש.
-            hostKey = (trusted?.takeIf { it.first == address }?.second ?: place?.hostKey)?.takeIf { sftp },
             keySecret = editing?.keySecret?.takeIf { hasKey && keepKey },
+            plainHttp = davAddress?.plainHttp ?: false,
         )
+        val address = addressOf(base)
+        val place = editing?.takeIf { addressOf(it) == address }
+        // שרת אחר (כתובת או פורט) — המפתח או התעודה שלו צריכים אישור מחדש. ב-http אין מה לאשר.
+        val hostKey = (trusted?.takeIf { it.first == address }?.second ?: place?.hostKey)?.takeIf { sftp || (dav && !base.plainHttp) }
+        return base.copy(hostKey = hostKey)
     }
 
     fun connect(draft: NetConnection) {
@@ -226,7 +240,7 @@ fun ConnectScreen(
             ask = ask,
             onTrust = {
                 trust = null
-                trusted = "${draft.host}:${draft.effectivePort}" to ask.hostKey
+                trusted = addressOf(draft) to ask.hostKey
                 connect(draft.copy(hostKey = ask.hostKey))
             },
             onDismiss = { trust = null },
@@ -287,9 +301,15 @@ fun ConnectScreen(
 
                 SectionLabel("פרטי חיבור")
                 Card {
-                    Field("שרת", host, { host = it; error = null }, keyboard = KeyboardType.Uri)
+                    if (dav) {
+                        Field("כתובת", url, { url = it; error = null }, keyboard = KeyboardType.Uri, placeholder = "https://cloud.example.com/remote.php/dav/files/…")
+                    } else {
+                        Field("שרת", host, { host = it; error = null }, keyboard = KeyboardType.Uri)
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(NexplorerDimens.Space2 + NexplorerDimens.Space1 / 2)) {
-                        if (sftp) {
+                        if (dav) {
+                            Field("משתמש", user, { user = it; error = null }, placeholder = "בלי", modifier = Modifier.weight(1f))
+                        } else if (sftp) {
                             Field("תיקייה", share, { share = it; error = null }, placeholder = "תיקיית הבית", modifier = Modifier.weight(1f))
                             Field("משתמש", user, { user = it; error = null }, modifier = Modifier.weight(1f))
                         } else {
@@ -324,8 +344,12 @@ fun ConnectScreen(
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NexplorerDimens.Space2 + NexplorerDimens.Space1 / 2)) {
                         Icon(Icons.Outlined.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(NexplorerDimens.ConnectHintIcon))
                         Text(
-                            if (sftp) "הסיסמה והמפתח נשמרים מוצפנים ב-${"Android Keystore".isolated()}, ולא יוצאים מהמכשיר."
-                            else "הסיסמה נשמרת מוצפנת ב-${"Android Keystore".isolated()}, ולא יוצאת מהמכשיר.",
+                            when {
+                                sftp -> "הסיסמה והמפתח נשמרים מוצפנים ב-${"Android Keystore".isolated()}, ולא יוצאים מהמכשיר."
+                                // http: הסיסמה מוצפנת במכשיר, אבל עוברת גלויה ברשת.
+                                davAddress?.plainHttp == true -> "בלי הצפנה (${"http".isolated()}): הסיסמה והקבצים עוברים ברשת גלויים. במכשיר הסיסמה נשמרת מוצפנת."
+                                else -> "הסיסמה נשמרת מוצפנת ב-${"Android Keystore".isolated()}, ולא יוצאת מהמכשיר."
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -336,14 +360,15 @@ fun ConnectScreen(
                     SectionLabel("מתקדם")
                     Card {
                         Field("שם במגירה", name, { name = it }, placeholder = host.trim().ifEmpty { null }, mono = false)
-                        Row(horizontalArrangement = Arrangement.spacedBy(NexplorerDimens.Space2 + NexplorerDimens.Space1 / 2)) {
+                        // WebDAV: הפורט בתוך הכתובת.
+                        if (!dav) Row(horizontalArrangement = Arrangement.spacedBy(NexplorerDimens.Space2 + NexplorerDimens.Space1 / 2)) {
                             Field("פורט", port, { port = it.filter(Char::isDigit); error = null }, keyboard = KeyboardType.Number, placeholder = protocol.defaultPort.toString(), modifier = Modifier.weight(1f))
                             if (!sftp) Field("דומיין", domain, { domain = it }, placeholder = "—", modifier = Modifier.weight(1f))
                         }
                     }
                 }
 
-                (error ?: problem?.takeIf { host.isNotBlank() })?.let {
+                (error ?: problem?.takeIf { (if (dav) url else host).isNotBlank() })?.let {
                     Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
                 }
                 if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -375,22 +400,51 @@ fun ConnectScreen(
     }
 }
 
+/** שרת אחד, לעניין אישור מפתח או תעודה: הסוג, http או לא, השרת והפורט. */
+private fun addressOf(c: NetConnection): String = "${c.protocol.name}:${if (c.plainHttp) "http" else ""}//${c.host}:${c.effectivePort}"
+
 /**
- * שרת SSH חדש, או שהמפתח שלו השתנה: טביעת האצבע (SHA256, כמו ש-ssh מציג) לפני שממשיכים. אחרי האישור
- * המפתח נשמר בחיבור, וחיבור לשרת עם מפתח אחר נחסם.
+ * שרת SSH חדש, או שהמפתח שלו השתנה: טביעת האצבע (SHA256, כמו ש-ssh מציג) לפני שממשיכים. ב-WebDAV —
+ * התעודה העצמית של השרת (SHA-256, כמו בפרטי התעודה בדפדפן). אחרי האישור היא נשמרת בחיבור, וחיבור
+ * לשרת עם מפתח או תעודה אחרים נחסם.
  */
 @Composable
 private fun HostKeyDialog(host: String, ask: ConnectCheck.TrustHost, onTrust: () -> Unit, onDismiss: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
+    val certificate = ask.hostKey.startsWith(CERTIFICATE_PREFIX)
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (ask.changed) "המפתח של השרת השתנה" else "לסמוך על השרת?") },
+        title = {
+            Text(
+                when {
+                    !ask.changed -> "לסמוך על השרת?"
+                    certificate -> "התעודה של השרת השתנתה"
+                    else -> "המפתח של השרת השתנה"
+                },
+            )
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(NexplorerDimens.Space2)) {
-                Text("טביעת האצבע של ${host.isolated()} (${SshHostKeys.typeLabel(ask.hostKey).isolated()}):")
-                Text(SshHostKeys.fingerprint(ask.hostKey) ?: ask.hostKey, style = MonoTextStyle, modifier = Modifier.fillMaxWidth())
+                if (certificate) {
+                    Text("טביעת האצבע של התעודה של ${host.isolated()} (${"SHA-256".isolated()}):")
+                    Text(ask.hostKey.removePrefix(CERTIFICATE_PREFIX), style = MonoTextStyle, modifier = Modifier.fillMaxWidth())
+                } else {
+                    Text("טביעת האצבע של ${host.isolated()} (${SshHostKeys.typeLabel(ask.hostKey).isolated()}):")
+                    Text(SshHostKeys.fingerprint(ask.hostKey) ?: ask.hostKey, style = MonoTextStyle, modifier = Modifier.fillMaxWidth())
+                }
                 if (ask.changed) {
-                    Text("אם לא התקנת את השרת מחדש ולא החלפת לו מפתח — ייתכן שמישהו מתחזה אליו. אל תמשיך.", color = scheme.error)
+                    Text(
+                        if (certificate) "אם לא החלפת לשרת תעודה — ייתכן שמישהו מתחזה אליו. אל תמשיך."
+                        else "אם לא התקנת את השרת מחדש ולא החלפת לו מפתח — ייתכן שמישהו מתחזה אליו. אל תמשיך.",
+                        color = scheme.error,
+                    )
+                } else if (certificate) {
+                    Text(
+                        "התעודה לא חתומה על ידי רשות מוכרת (תעודה עצמית, כמו בשרת בבית). בדוק שזו הטביעה שהשרת מציג — " +
+                            "בדפדפן, בפרטי התעודה. היא נשמרת, וחיבור עם תעודה אחרת ייחסם.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = scheme.onSurfaceVariant,
+                    )
                 } else {
                     Text(
                         "בדוק שזה השרת שלך: בשרת, ${"ssh-keygen -lf /etc/ssh/ssh_host_${SshHostKeys.typeLabel(ask.hostKey).lowercase()}_key.pub".isolated()} מציג את אותה טביעה. " +
@@ -405,7 +459,7 @@ private fun HostKeyDialog(host: String, ask: ConnectCheck.TrustHost, onTrust: ()
             TextButton(
                 onClick = onTrust,
                 colors = if (ask.changed) ButtonDefaults.textButtonColors(contentColor = scheme.error) else ButtonDefaults.textButtonColors(),
-            ) { Text(if (ask.changed) "סמוך על המפתח החדש" else "סמוך והתחבר") }
+            ) { Text(if (ask.changed) (if (certificate) "סמוך על התעודה החדשה" else "סמוך על המפתח החדש") else "סמוך והתחבר") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("ביטול") } },
     )
@@ -467,6 +521,7 @@ private fun readKeyFile(context: Context, uri: Uri): Pair<String, String> {
 }
 
 private const val MAX_KEY_BYTES = 64 * 1024
+private const val CERTIFICATE_PREFIX = "x509-sha256 "
 
 @Composable
 private fun SectionLabel(text: String) {

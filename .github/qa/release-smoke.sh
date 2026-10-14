@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # בדיקת עשן על build ‏release (R8 מכווץ ומשנה שמות): "הוסף מקום" ← SMB מול השרת של smb-server.sh,
-# ואז SFTP מול sftp-server.sh.
+# ואז SFTP מול sftp-server.sh ו-WebDAV מול webdav-server.sh.
 # הבדיקות האחרות רצות על debug, בלי R8 — וספריית ה-SMB (smbj) מוצאת חלק מהקוד שלה ברפלקציה.
 # כלל חסר ב-proguard-rules.pro נראה רק כאן: קריסה, או חיבור שלא עונה.
 #   $1 — ה-APK. $2 — תיקיית התוצאות (צילומים, logcat).
@@ -87,6 +87,24 @@ shot "release-05-trust-host"
 ui tap "סמוך והתחבר" || fail "no trust button"
 wait_for "release-smoke-sftp.txt" 45 || fail "the SFTP home did not open"
 shot "release-06-sftp-home"
+
+# WebDAV (שלב 5ג): OkHttp ואישור התעודה העצמית אחרי R8, מול webdav-server.sh.
+ui tap "פתח מגירת מקומות" || fail "no drawer button (WebDAV)"
+wait_for "הוסף מקום" 10 || fail "the drawer has no add place row (WebDAV)"
+ui tap "הוסף מקום"
+wait_for "פרטי חיבור" 10 || fail "the add place screen did not open (WebDAV)"
+ui tap "WebDAV" || fail "no WebDAV tile"
+wait_for "כתובת" 10 || fail "the WebDAV fields did not appear"
+field "כתובת" https://10.0.2.2:8443/dav/ || fail "no address field"
+field "משתמש" qa || fail "no user field (WebDAV)"
+field "סיסמה" qa-pass || fail "no password field (WebDAV)"
+shot "release-07-add-webdav"
+ui tap "בדוק והתחבר" || fail "no connect button (WebDAV)"
+wait_for "לסמוך על השרת?" 45 || fail "the certificate question did not appear"
+shot "release-08-trust-certificate"
+ui tap "סמוך והתחבר" || fail "no trust button (WebDAV)"
+wait_for "release-smoke-dav.txt" 45 || fail "the WebDAV folder did not open"
+shot "release-09-webdav"
 
 adb logcat -d -b crash > "$out/release-crash.txt" || true
 # "Process: com.idanck.nexplorer," — ה-release בלבד, לא ה-debug (‎.debug) שרץ לפניו.
