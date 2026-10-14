@@ -63,18 +63,22 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.idanck.nexplorer.core.ArchivePaths
 import com.idanck.nexplorer.core.Counts
 import com.idanck.nexplorer.core.Entry
+import com.idanck.nexplorer.core.FileKind
 import com.idanck.nexplorer.core.SizeFormat
 import com.idanck.nexplorer.core.isolated
 import com.idanck.nexplorer.data.files.FileIntents
 import com.idanck.nexplorer.data.files.LocalFiles
 import com.idanck.nexplorer.data.files.StorageVolumes
+import com.idanck.nexplorer.data.files.TextFiles
 import com.idanck.nexplorer.data.settings.AppSettings
 import com.idanck.nexplorer.data.transfer.TransferManager
 import com.idanck.nexplorer.data.transfer.TransferStatus
@@ -88,6 +92,11 @@ import com.idanck.nexplorer.ui.transfer.TransfersSheet
 import com.idanck.nexplorer.ui.update.UpdateActions
 import com.idanck.nexplorer.ui.update.UpdateBanner
 import com.idanck.nexplorer.update.UpdateState
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.graphics.RectangleShape
+import com.idanck.nexplorer.ui.keys.KeyBus
+import com.idanck.nexplorer.ui.keys.KeyCommand
+import com.idanck.nexplorer.ui.theme.NexplorerTheme
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -98,6 +107,9 @@ private sealed interface BrowserDialog {
     data class Delete(val entries: List<Entry>) : BrowserDialog
     data object ViewOptions : BrowserDialog
     data object Clipboard : BrowserDialog
+    data class Compress(val entries: List<Entry>) : BrowserDialog
+    data class Extract(val entry: Entry) : BrowserDialog
+    data class BatchRename(val entries: List<Entry>) : BrowserDialog
 }
 
 /**
@@ -112,7 +124,8 @@ private val BrowserDialogSaver = Saver<BrowserDialog?, String>(
             BrowserDialog.ViewOptions -> "view"
             BrowserDialog.Clipboard -> "clipboard"
             is BrowserDialog.Rename -> "rename:" + dialog.entry.path
-            is BrowserDialog.Delete, null -> null
+            // רשימות (ובחלון החילוץ — סיסמה) לא נשמרות ב-Bundle.
+            is BrowserDialog.Delete, is BrowserDialog.Compress, is BrowserDialog.Extract, is BrowserDialog.BatchRename, null -> null
         }
     },
     restore = { saved ->
@@ -140,6 +153,12 @@ fun BrowserScreen(
     updateActions: UpdateActions,
     onOpenSearch: (String?) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenAnalyzer: (String?) -> Unit,
+    onEditText: (String) -> Unit,
+    onOpenImage: (String) -> Unit,
+    keys: KeyBus,
+    /** שני חלונות: החלון הזה הוא אחד מהם. null — מסך יחיד (טלפון). */
+    pane: PaneConfig? = null,
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val transferList by transfers.transfers.collectAsStateWithLifecycle()
@@ -178,9 +197,15 @@ fun BrowserScreen(
             when (event) {
                 // showSnackbar ממתין עד שההודעה נעלמת — בלי launch, פתיחת קובץ הייתה מחכה מאחוריה.
                 is BrowserEvent.Message -> launch { snackbar.showSnackbar(event.text) }
-                is BrowserEvent.OpenFile -> if (!FileIntents.open(context, event.entry.path, event.entry.name)) {
-                    launch { snackbar.showSnackbar("אין אפליקציה שפותחת קבצים מסוג זה") }
+                // תמונה נפתחת במציג המובנה (החלקה בין התמונות בתיקייה); "פתיחה באמצעות" שם פותח אחרת.
+                is BrowserEvent.OpenFile -> if (event.entry.kind == FileKind.Image) {
+                    onOpenImage(event.entry.path)
+                } else if (!FileIntents.open(context, event.entry.path, event.entry.name)) {
+                    // אין אפליקציה לטקסט/קוד — העורך המובנה פותח אותו.
+                    if (event.entry.canEditAsText()) onEditText(event.entry.path)
+                    else launch { snackbar.showSnackbar("אין אפליקציה שפותחת קבצים מסוג זה") }
                 }
+                is BrowserEvent.OpenArchive -> dialog = BrowserDialog.Extract(event.entry)
             }
         }
     }
@@ -196,17 +221,30 @@ fun BrowserScreen(
         onDispose { if (controller != null && before != null) controller.isAppearanceLightStatusBars = before }
     }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.onResume() }
-    val listActions = remember(vm) {
+    val dragDecoration = MaterialTheme.colorScheme.primary.copy(alpha = DRAG_DECORATION_ALPHA)
+    val currentPane by rememberUpdatedState(pane)
+    val drag = if (pane == null) null else remember(vm, pane.index, dragDecoration) {
+        FileDrag(
+            pane = pane.index,
+            selectedPaths = { vm.selectedEntries().map { it.path } },
+            onDrop = { payload, folder -> currentPane?.onDrop?.invoke(payload, folder) },
+            decoration = dragDecoration,
+        )
+    }
+    val listActions = remember(vm, drag) {
         FileListActions(
             onClick = vm::open,
             onLongClick = { vm.longPress(it.path) },
             onIconClick = { vm.toggle(it.path) },
             scrollFor = vm::scrollFor,
             onScrolled = vm::saveScroll,
+            drag = drag,
         )
     }
 
-    BackHandler(enabled = fabOpen || drawerState.isOpen || state.filter != null || state.inSelection || !state.isAtRoot) {
+    // בשני חלונות "חזרה" ומקלדת שייכות לחלון הפעיל בלבד — אחרת החלון שהורכב אחרון תופס אותן.
+    val ownsBack = pane == null || pane.active
+    BackHandler(enabled = ownsBack && (fabOpen || drawerState.isOpen || state.filter != null || state.inSelection || !state.isAtRoot)) {
         when {
             fabOpen -> fabOpen = false
             drawerState.isOpen -> scope.launch { drawerState.close() }
@@ -219,33 +257,76 @@ fun BrowserScreen(
     val selected = state.entries.filter { it.path in state.selection }
     val activeTransfers = transferList.filter { it.isActive }
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = {
-            PlacesDrawer(
-                DrawerModel(
-                    volumes = state.volumes,
-                    activeVolumePath = if (state.location is Location.Folder) state.volume?.path else null,
-                    activeCollection = (state.location as? Location.Media)?.collection,
-                    favorites = state.favorites,
-                    activeTransfers = activeTransfers.size,
-                    onVolume = { v -> scope.launch { drawerState.close() }; vm.navigate(Location.Folder(v.path)) },
-                    onFavorite = { path -> scope.launch { drawerState.close() }; vm.openPath(path) },
-                    onRemoveFavorite = { path -> vm.removeFavorite(path); message("הוסר מהמועדפים") },
-                    onCollection = { c -> scope.launch { drawerState.close() }; vm.navigate(Location.Media(c)) },
-                    onDownloads = {
-                        scope.launch { drawerState.close() }
-                        vm.openPath(File(StorageVolumes.primaryPath(), android.os.Environment.DIRECTORY_DOWNLOADS).absolutePath)
-                    },
-                    onAddPlace = { message("חיבורי רשת וענן יגיעו בשלב הבא (החלטות D3, D4)") },
-                    onTransfers = { scope.launch { drawerState.close() }; showTransfers = true },
-                    onSettings = { scope.launch { drawerState.close() }; onOpenSettings() },
-                ),
-            )
-        },
-    ) {
+    // מקלדת פיזית: רק המסך שמוצג — ובשני חלונות רק החלון הפעיל — מקבל פקודות.
+    val onKey by rememberUpdatedState<(KeyCommand) -> Boolean> { command ->
+        if (dialog != null || properties != null || showTransfers || fabOpen) return@rememberUpdatedState false
+        val current = vm.selectedEntries()
+        when (command) {
+            KeyCommand.SelectAll -> true.also { vm.selectAll() }
+            KeyCommand.ClearSelection -> state.inSelection.also { if (it) vm.clearSelection() }
+            KeyCommand.Delete -> current.isNotEmpty().also {
+                if (!it) return@also
+                if (settings.confirmDelete) {
+                    dialog = BrowserDialog.Delete(current)
+                } else {
+                    beforeTransfer()
+                    vm.delete(current.map { e -> e.path })
+                }
+            }
+            KeyCommand.Rename -> current.singleOrNull()?.let { dialog = BrowserDialog.Rename(it) } != null
+            KeyCommand.GoUp -> vm.goUp()
+            KeyCommand.Refresh -> true.also { vm.refresh() }
+            KeyCommand.Search -> true.also { onOpenSearch(state.folderPath) }
+            KeyCommand.CopyToOther, KeyCommand.MoveToOther -> {
+                val target = pane?.otherFolder
+                if (target == null || current.isEmpty()) {
+                    false
+                } else {
+                    beforeTransfer()
+                    vm.sendTo(current.map { it.path }, target, move = command == KeyCommand.MoveToOther)
+                    true
+                }
+            }
+            KeyCommand.Menu -> true.also { if (state.inSelection) itemMenuOpen = true else overflowOpen = true }
+            KeyCommand.SwitchPane -> false
+        }
+    }
+    DisposableEffect(keys, ownsBack) {
+        val unregister = if (ownsBack) keys.register { onKey(it) } else null
+        onDispose { unregister?.invoke() }
+    }
+
+    val moreMenu: @Composable () -> Unit = {
+        OverflowMenu(
+            expanded = overflowOpen,
+            onDismiss = { overflowOpen = false },
+            model = overflowModel(
+                state = state,
+                vm = vm,
+                activeTransfers = activeTransfers,
+                canPin = canPin,
+                onProperties = { state.folderPath?.let { properties = listOf(LocalFiles.entryOf(File(it), countChildren = false)) } },
+                onViewOptions = { dialog = BrowserDialog.ViewOptions },
+                onPinShortcut = {
+                    state.folderPath?.let { path ->
+                        if (!FileIntents.pinFolderShortcut(context, path, state.title)) message("המשגר לא תומך בקיצורי דרך")
+                    }
+                },
+                onTransfers = { showTransfers = true },
+                onSettings = onOpenSettings,
+                onAnalyzer = { onOpenAnalyzer(state.folderPath) },
+            ),
+        )
+    }
+
+    // שחרור על החלון עצמו (לא על תיקייה בו): לתיקייה שהוא מציג.
+    val paneDrop = rememberDropZone(state.folderPath, drag) { payload ->
+        payload.pane != pane?.index && state.folderPath?.let { acceptsInto(it)(payload) } == true
+    }
+
+    val screen: @Composable () -> Unit = {
         Scaffold(
-            containerColor = MaterialTheme.colorScheme.background,
+            containerColor = if (pane == null) MaterialTheme.colorScheme.background else MaterialTheme.colorScheme.surface,
             snackbarHost = { SnackbarHost(snackbar, Modifier.navigationBarsPadding()) },
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
         ) { scaffoldPadding ->
@@ -261,10 +342,19 @@ fun BrowserScreen(
                     if (state.inSelection) {
                         SelectionHeader(
                             count = state.selection.size,
-                            sizeText = selected.filter { !it.isDirectory }.sumOf { it.size }.takeIf { it > 0 }?.let(SizeFormat::precise).orEmpty(),
+                            sizeText = selectedSize(selected),
                             onSelectAll = vm::selectAll,
                             onInvert = vm::invertSelection,
                             onClose = vm::clearSelection,
+                        )
+                    } else if (pane != null) {
+                        PaneHeader(
+                            crumbs = state.crumbs,
+                            countText = Counts.items(state.entries.size),
+                            onCrumb = { crumb -> openCrumb(vm, state, crumb) },
+                            onSearch = { onOpenSearch(state.folderPath) },
+                            onMore = { overflowOpen = true },
+                            moreMenu = moreMenu,
                         )
                     } else {
                         BrowserTopBar(
@@ -276,43 +366,26 @@ fun BrowserScreen(
                             onSearch = { onOpenSearch(state.folderPath) },
                             onMore = { overflowOpen = true },
                             onClipboard = { dialog = BrowserDialog.Clipboard },
-                            moreMenu = {
-                                OverflowMenu(
-                                    expanded = overflowOpen,
-                                    onDismiss = { overflowOpen = false },
-                                    model = overflowModel(
-                                        state = state,
-                                        vm = vm,
-                                        activeTransfers = activeTransfers,
-                                        canPin = canPin,
-                                        onProperties = { state.folderPath?.let { properties = listOf(LocalFiles.entryOf(File(it), countChildren = false)) } },
-                                        onViewOptions = { dialog = BrowserDialog.ViewOptions },
-                                        onPinShortcut = {
-                                            state.folderPath?.let { path ->
-                                                if (!FileIntents.pinFolderShortcut(context, path, state.title)) message("המשגר לא תומך בקיצורי דרך")
-                                            }
-                                        },
-                                        onTransfers = { showTransfers = true },
-                                        onSettings = onOpenSettings,
-                                    ),
-                                )
-                            },
+                            moreMenu = moreMenu,
                         )
                     }
-                    UpdateBanner(updateState, updateActions)
-                    Breadcrumbs(state.crumbs) { crumb ->
-                        if (crumb.path.isEmpty() || crumb == state.crumbs.lastOrNull()) vm.refresh()
-                        else vm.navigate(Location.Folder(crumb.path))
+                    if (pane == null) {
+                        UpdateBanner(updateState, updateActions)
+                        Breadcrumbs(state.crumbs, onCrumb = { crumb -> openCrumb(vm, state, crumb) }, modifier = Modifier.fillMaxWidth())
                     }
                     if (state.filter != null) {
                         FilterBar(state.filter.orEmpty(), onChange = vm::setFilter, onClose = { vm.setFilter(null) })
                     }
                     Surface(
-                        shape = NexplorerShape.ContentSheet,
+                        shape = if (pane == null) NexplorerShape.ContentSheet else RectangleShape,
                         color = MaterialTheme.colorScheme.surface,
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .then(paneDrop.modifier)
+                            .dropHighlight(paneDrop.hovering, NexplorerTheme.colors, inset = false),
                     ) {
-                        val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                        val navBottom = if (pane == null) WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() else 0.dp
                         FileList(
                             state = state,
                             actions = listActions,
@@ -338,13 +411,42 @@ fun BrowserScreen(
                             onCancel = vm::cancelClipboard,
                         )
                     }
+                    if (pane != null) {
+                        if (state.inSelection) {
+                            PaneSelectionFooter(
+                                count = state.selection.size,
+                                sizeText = selectedSize(selected),
+                                towardEnd = pane.index == 0,
+                                blockedReason = when (pane.otherFolder) {
+                                    null -> "החלון השני לא בתיקייה"
+                                    state.folderPath -> "שני החלונות באותה תיקייה"
+                                    else -> null
+                                },
+                                onCopy = {
+                                    beforeTransfer()
+                                    pane.otherFolder?.let { vm.sendTo(selected.map { it.path }, it, move = false) }
+                                },
+                                onMove = {
+                                    beforeTransfer()
+                                    pane.otherFolder?.let { vm.sendTo(selected.map { it.path }, it, move = true) }
+                                },
+                            )
+                        } else if (!pane.active && state.clipboard == null) {
+                            PaneHint()
+                        }
+                    }
                 }
 
                 if (state.inSelection) {
                     val single = selected.singleOrNull()
                     SelectionActionBar(
                         onMore = { itemMenuOpen = true },
-                        onRename = single?.let { entry -> { dialog = BrowserDialog.Rename(entry) } },
+                        onRename = when {
+                            single != null -> { { dialog = BrowserDialog.Rename(single) } }
+                            // באוסף (תמונות, וידאו) הפריטים מתיקיות שונות — אין "תיקייה" לשנות בה שמות יחד.
+                            selected.size > 1 && state.location is Location.Folder -> { { dialog = BrowserDialog.BatchRename(selected) } }
+                            else -> null
+                        },
                         onShare = {
                             val files = selected.filter { !it.isDirectory }
                             when {
@@ -388,21 +490,34 @@ fun BrowserScreen(
                                     },
                                     onToggleFavorite = { single?.let { vm.toggleFavorite(it.path) } },
                                     onProperties = { properties = selected },
+                                    canEditText = single?.canEditAsText() == true,
+                                    isZip = single?.extension == "zip",
+                                    onEditText = { single?.let { onEditText(it.path) } },
+                                    canCompress = state.location is Location.Folder,
+                                    onCompress = { dialog = BrowserDialog.Compress(selected) },
+                                    onExtract = { single?.let { dialog = BrowserDialog.Extract(it) } },
                                 ),
                             )
                         },
-                        modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding(),
-                    )
-                } else if (state.clipboard == null) {
-                    TransferChip(
-                        activeTransfers,
-                        onClick = { showTransfers = true },
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .navigationBarsPadding()
-                            .padding(bottom = NexplorerDimens.FabMargin + NexplorerDimens.Space2),
+                            // בשני חלונות: מעל תחתית החלון ("העתק לחלון השני").
+                            .padding(bottom = if (pane != null) NexplorerDimens.PaneFooterHeight else 0.dp),
                     )
-                    if (state.location is Location.Folder) {
+                } else if (state.clipboard == null) {
+                    // בשני חלונות ההעברות במסילה, והכפתור הצף רק בחלון הפעיל.
+                    if (pane == null) {
+                        TransferChip(
+                            activeTransfers,
+                            onClick = { showTransfers = true },
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .navigationBarsPadding()
+                                .padding(bottom = NexplorerDimens.FabMargin + NexplorerDimens.Space2),
+                        )
+                    }
+                    if (state.location is Location.Folder && (pane == null || pane.active)) {
                         NewFab(
                             open = fabOpen,
                             onToggle = { fabOpen = !fabOpen },
@@ -414,6 +529,28 @@ fun BrowserScreen(
                 }
             }
         }
+    }
+
+    if (pane == null) {
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            drawerContent = {
+                PlacesDrawer(
+                    placesDrawerModel(
+                        state = state,
+                        vm = vm,
+                        activeTransfers = activeTransfers.size,
+                        close = { scope.launch { drawerState.close() } },
+                        onTransfers = { showTransfers = true },
+                        onSettings = onOpenSettings,
+                        onAnalyzer = onOpenAnalyzer,
+                        message = ::message,
+                    ),
+                )
+            },
+        ) { screen() }
+    } else {
+        screen()
     }
 
     when (val d = dialog) {
@@ -440,6 +577,39 @@ fun BrowserScreen(
         BrowserDialog.Clipboard -> state.clipboard?.let { clip ->
             ClipboardDialog(clip, onClear = vm::cancelClipboard, onDismiss = { dialog = null })
         }
+        is BrowserDialog.Compress -> CompressDialog(
+            defaultName = ArchivePaths.defaultZipName(d.entries.map { it.name }, state.folderPath?.let { File(it).name }.orEmpty()),
+            count = d.entries.size,
+            onConfirm = { name, password ->
+                beforeTransfer()
+                vm.compress(d.entries.map { it.path }, name, password)
+                dialog = null
+            },
+            onDismiss = { dialog = null },
+        )
+        is BrowserDialog.Extract -> ExtractDialog(
+            entry = d.entry,
+            inspect = { vm.inspectArchive(d.entry.path) },
+            onExtract = { intoFolder, password ->
+                beforeTransfer()
+                vm.extract(d.entry, intoFolder, password)
+                dialog = null
+            },
+            onOpenWith = {
+                if (!FileIntents.openWith(context, d.entry.path, d.entry.name)) message("אין אפליקציה מתאימה")
+                dialog = null
+            },
+            onDismiss = { dialog = null },
+        )
+        is BrowserDialog.BatchRename -> BatchRenameDialog(
+            entries = d.entries,
+            others = { vm.namesBesides(d.entries) },
+            onConfirm = { pattern ->
+                vm.batchRename(d.entries, pattern)
+                dialog = null
+            },
+            onDismiss = { dialog = null },
+        )
     }
 
     if (showTransfers) {
@@ -463,6 +633,60 @@ fun BrowserScreen(
     }
 }
 
+/** "ערוך כטקסט": קובץ טקסט/קוד, או כל קובץ קטן — העורך עצמו מסרב לבינארי. */
+private fun Entry.canEditAsText(): Boolean =
+    !isDirectory && size <= TextFiles.MAX_BYTES && (kind == FileKind.Text || kind == FileKind.Other)
+
+/** צל הגרירה: primary שקוף. */
+private const val DRAG_DECORATION_ALPHA = 0.24f
+
+/** חלון אחד מתוך שניים (לוח Tablet). */
+class PaneConfig(
+    val index: Int,
+    val active: Boolean,
+    /** התיקייה שהחלון השני מציג; null — הוא באוסף (תמונות, וידאו), ואין לאן לשלוח. */
+    val otherFolder: String?,
+    val onDrop: (DragPayload, String) -> Unit,
+)
+
+private fun selectedSize(selected: List<Entry>): String =
+    selected.filter { !it.isDirectory }.sumOf { it.size }.takeIf { it > 0 }?.let(SizeFormat::precise).orEmpty()
+
+private fun openCrumb(vm: BrowserViewModel, state: BrowserState, crumb: Crumb) {
+    if (crumb.path.isEmpty() || crumb == state.crumbs.lastOrNull()) vm.refresh()
+    else vm.navigate(Location.Folder(crumb.path))
+}
+
+/** המגירה (או המסילה בשני חלונות) פועלת על [vm] — בשני חלונות, על החלון הפעיל. */
+internal fun placesDrawerModel(
+    state: BrowserState,
+    vm: BrowserViewModel,
+    activeTransfers: Int,
+    close: () -> Unit,
+    onTransfers: () -> Unit,
+    onSettings: () -> Unit,
+    onAnalyzer: (String?) -> Unit,
+    message: (String) -> Unit,
+): DrawerModel = DrawerModel(
+    volumes = state.volumes,
+    activeVolumePath = if (state.location is Location.Folder) state.volume?.path else null,
+    activeCollection = (state.location as? Location.Media)?.collection,
+    favorites = state.favorites,
+    activeTransfers = activeTransfers,
+    onVolume = { v -> close(); vm.navigate(Location.Folder(v.path)) },
+    onFavorite = { path -> close(); vm.openPath(path) },
+    onRemoveFavorite = { path -> vm.removeFavorite(path); message("הוסר מהמועדפים") },
+    onCollection = { c -> close(); vm.navigate(Location.Media(c)) },
+    onDownloads = {
+        close()
+        vm.openPath(File(StorageVolumes.primaryPath(), android.os.Environment.DIRECTORY_DOWNLOADS).absolutePath)
+    },
+    onAddPlace = { message("חיבורי רשת וענן יגיעו בשלב הבא (החלטות D3, D4)") },
+    onTransfers = { close(); onTransfers() },
+    onSettings = { close(); onSettings() },
+    onAnalyzer = { close(); onAnalyzer(state.folderPath) },
+)
+
 private fun summary(state: BrowserState): String = when (state.location) {
     is Location.Media -> Counts.items(state.listed.size)
     is Location.Folder -> {
@@ -483,6 +707,7 @@ private fun overflowModel(
     onPinShortcut: () -> Unit,
     onTransfers: () -> Unit,
     onSettings: () -> Unit,
+    onAnalyzer: () -> Unit,
 ): OverflowMenuModel {
     val running = activeTransfers.firstOrNull { it.status == TransferStatus.Running }
     return OverflowMenuModel(
@@ -506,6 +731,7 @@ private fun overflowModel(
         onTransfers = onTransfers,
         onRefresh = vm::refresh,
         onSettings = onSettings,
+        onAnalyzer = onAnalyzer,
     )
 }
 

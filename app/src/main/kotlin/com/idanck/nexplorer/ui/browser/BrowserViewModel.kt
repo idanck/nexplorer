@@ -5,11 +5,16 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.idanck.nexplorer.NexplorerApp
+import com.idanck.nexplorer.core.ArchivePaths
+import com.idanck.nexplorer.core.BatchRename
 import com.idanck.nexplorer.core.Entry
+import com.idanck.nexplorer.core.FileNames
+import com.idanck.nexplorer.core.RenamePattern
 import com.idanck.nexplorer.core.Section
 import com.idanck.nexplorer.core.ViewOptions
 import com.idanck.nexplorer.core.sectionsFor
 import com.idanck.nexplorer.core.sortedFor
+import com.idanck.nexplorer.data.archive.ZipArchives
 import com.idanck.nexplorer.data.files.LocalFiles
 import com.idanck.nexplorer.data.files.MediaCollection
 import com.idanck.nexplorer.data.files.MediaCollections
@@ -101,7 +106,12 @@ data class BrowserState(
 sealed interface BrowserEvent {
     data class Message(val text: String) : BrowserEvent
     data class OpenFile(val entry: Entry) : BrowserEvent
+    /** ZIP נפתח בתוך האפליקציה: חלון "חלץ". */
+    data class OpenArchive(val entry: Entry) : BrowserEvent
 }
+
+/** תוצאה של שינוי שם מרובה. */
+data class BatchRenameResult(val renamed: Int, val failed: List<String>, val moved: List<Pair<String, String>>)
 
 /**
  * המצב של חלון הקבצים: מיקום, רשימה, בחירה, לוח גזירים ומסנן.
@@ -127,6 +137,12 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
     private var selectionAnchor: String? = null
     private var resumedOnce = false
 
+    /**
+     * החלון השני בשני חלונות נפתח בפעם הראשונה בתיקייה של הראשון. כאן ולא ב-Compose: סיבוב לאורך
+     * ובחזרה לרוחב לא מאפס אותו.
+     */
+    var pairedOnce = false
+
     /** מיקום הגלילה של כל תיקייה שביקרנו בה — "למעלה" חוזר לאותה שורה. */
     private val scrollPositions = mutableMapOf<String, Pair<Int, Int>>()
 
@@ -144,10 +160,11 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
                 refresh()
                 refreshVolumes()
                 // מועדפים ותצוגה "רק בתיקייה זו" עוברים עם התיקייה.
-                if (transfer.moved.isNotEmpty()) settings.update { s -> transfer.moved.fold(s) { acc, (from, to) -> acc.relocated(from, to) } }
+                if (transfer.moved.isNotEmpty()) settings.update { it.relocated(transfer.moved) }
                 if (transfer.status == TransferStatus.Failed) {
-                    emit("${transfer.kind.verb} נכשלה: ${transfer.error}")
+                    emit("${transfer.kind.verb} ${transfer.kind.past("נכשל", "נכשלה")}: ${transfer.error}")
                 }
+                if (transfer.status == TransferStatus.Done) transfer.note?.let(::emit)
             }
         }
     }
@@ -216,7 +233,11 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
             toggle(entry.path)
             return
         }
-        if (entry.isDirectory) navigate(Location.Folder(entry.path)) else emitEvent(BrowserEvent.OpenFile(entry))
+        when {
+            entry.isDirectory -> navigate(Location.Folder(entry.path))
+            entry.extension == "zip" -> emitEvent(BrowserEvent.OpenArchive(entry))
+            else -> emitEvent(BrowserEvent.OpenFile(entry))
+        }
     }
 
     fun navigate(location: Location) {
@@ -421,6 +442,108 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
         if (paths.isEmpty()) return
         transfers.enqueue(TransferKind.Delete, paths, null)
         clearSelection()
+    }
+
+    /** שני חלונות: העתקה או העברה ישר לתיקייה של החלון השני, או לתיקייה שעליה שוחררה גרירה. */
+    fun sendTo(paths: List<String>, targetDir: String, move: Boolean) {
+        if (paths.isEmpty()) return
+        // לאותה תיקייה: העברה היא כלום, והעתקה רק משכפלת בשם אחר — לא מה שהתכוונו בגרירה בין חלונות.
+        if (paths.all { File(it).parent == targetDir }) {
+            emit("הפריטים כבר בתיקייה הזו")
+            return
+        }
+        transfers.enqueue(if (move) TransferKind.Move else TransferKind.Copy, paths, targetDir)
+        clearSelection()
+    }
+
+    // ---------- ארכיונים ושינוי שם מרובה ----------
+
+    fun compress(paths: List<String>, zipName: String, password: CharArray?) {
+        val folder = _state.value.folderPath ?: return
+        val name = zipName.trim().let { if (it.endsWith(".zip", ignoreCase = true)) it else "$it.zip" }
+        transfers.enqueue(TransferKind.Compress, paths, folder, archiveName = name, password = password)
+        clearSelection()
+    }
+
+    /** [intoFolder] — לתיקייה חדשה בשם הארכיון; אחרת לתיקייה שבה הוא נמצא. */
+    fun extract(archive: Entry, intoFolder: Boolean, password: CharArray?) {
+        val parent = File(archive.path).parent ?: return
+        val folderName = if (intoFolder) ArchivePaths.extractFolderName(archive.name) else null
+        transfers.enqueue(TransferKind.Extract, listOf(archive.path), parent, archiveName = folderName, password = password)
+        clearSelection()
+    }
+
+    suspend fun inspectArchive(path: String): Result<ZipArchives.Info> =
+        withContext(Dispatchers.IO) { runCatching { ZipArchives.inspect(File(path)) } }
+
+    /** שמות אחרים בתיקייה — מה שהתבנית לא יכולה לקבל. */
+    suspend fun namesBesides(entries: List<Entry>): Set<String> = withContext(Dispatchers.IO) {
+        val folder = _state.value.folderPath ?: return@withContext emptySet()
+        File(folder).list().orEmpty().toSet() - entries.map { it.name }.toSet()
+    }
+
+    /**
+     * רוב הפריטים עוברים ישירות לשם החדש. רק מי שהיעד שלו תפוס כרגע ע"י פריט אחר בבחירה (החלפה a↔b,
+     * שרשרת) או ששינויו הוא רק ברישיות עובר קודם דרך שם זמני גלוי והפיך — `<שם>.nexplorer-rename` —
+     * כך שגם אם התהליך נהרג באמצע, הקובץ נשאר גלוי ואפשר לזהות מה הוא היה.
+     */
+    fun batchRename(entries: List<Entry>, pattern: RenamePattern) {
+        val folder = _state.value.folderPath ?: return
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) { renameAll(File(folder), entries, pattern) }
+            clearSelection()
+            if (result.moved.isNotEmpty()) settings.update { it.relocated(result.moved) }
+            emit(
+                when {
+                    result.failed.isEmpty() -> "שונה השם ל-${result.renamed} פריטים"
+                    else -> "שונה השם ל-${result.renamed}; ${result.failed.size} נכשלו: ${result.failed.first()}"
+                },
+            )
+            load()
+        }
+    }
+
+    private fun renameAll(dir: File, entries: List<Entry>, pattern: RenamePattern): BatchRenameResult {
+        val names = entries.map { it.name }
+        val others = dir.list().orEmpty().toSet() - names.toSet()
+        val plan = BatchRename.plan(names, pattern, others).filter { it.changes }
+        val sources = plan.map { it.from.lowercase() }.toSet()
+        val (staged, direct) = plan.partition { step ->
+            step.to.equals(step.from, ignoreCase = true) || step.to.lowercase() in sources
+        }
+        val failed = mutableListOf<String>()
+        val moved = mutableListOf<Pair<String, String>>()
+        var renamed = 0
+
+        // שלב א: מפנים את השמות שאחרים בבחירה צריכים.
+        val temps = staged.mapNotNull { step ->
+            val temp = File(dir, FileNames.unique("${step.from}.nexplorer-rename") { File(dir, it).exists() })
+            if (File(dir, step.from).renameTo(temp)) step to temp else null.also { failed += step.from }
+        }
+        // שלב ב: ישירים, ואז מהשמות הזמניים.
+        for (step in direct) {
+            val source = File(dir, step.from)
+            val dest = File(dir, step.to)
+            if (!dest.exists() && source.renameTo(dest)) {
+                renamed++
+                moved += source.absolutePath to dest.absolutePath
+            } else {
+                failed += step.from
+            }
+        }
+        for ((step, temp) in temps) {
+            val dest = File(dir, step.to)
+            if (!dest.exists() && temp.renameTo(dest)) {
+                renamed++
+                moved += File(dir, step.from).absolutePath to dest.absolutePath
+                continue
+            }
+            val back = File(dir, step.from).takeIf { !it.exists() }
+                ?: File(dir, FileNames.unique(step.from) { File(dir, it).exists() })
+            failed += if (temp.renameTo(back)) step.from else "${step.from} (נשאר בשם ${temp.name})"
+        }
+        MediaScan.changed(getApplication(), moved.flatMap { listOf(it.first, it.second) })
+        return BatchRenameResult(renamed, failed, moved)
     }
 
     fun createFolder(name: String) = runOp { LocalFiles.createFolder(requireNotNull(_state.value.folderPath), name) }

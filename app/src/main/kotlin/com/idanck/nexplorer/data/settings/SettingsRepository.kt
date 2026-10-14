@@ -42,11 +42,18 @@ data class AppSettings(
 }
 
 /** אחרי שינוי שם או העברה של [from]: כל נתיב שמתחיל בו (מועדף, תצוגה, תיקייה אחרונה) עובר ל-[to]. */
-fun AppSettings.relocated(from: String, to: String): AppSettings {
-    fun move(path: String): String = when {
-        path == from -> to
-        path.startsWith("$from/") -> to + path.substring(from.length)
-        else -> path
+fun AppSettings.relocated(from: String, to: String): AppSettings = relocated(listOf(from to to))
+
+/**
+ * כמה העברות בבת אחת, במעבר אחד: כל נתיב שמור עובר לפי ה-[moves] המקוריות (ההתאמה הארוכה ביותר).
+ * החלה אחת-אחת הייתה שוברת שרשרות: x→x_old ואז x_old→x_old_old מזיזה את המועדף פעמיים.
+ */
+fun AppSettings.relocated(moves: List<Pair<String, String>>): AppSettings {
+    if (moves.isEmpty()) return this
+    fun move(path: String): String {
+        val (from, to) = moves.filter { (from, _) -> path == from || path.startsWith("$from/") }
+            .maxByOrNull { it.first.length } ?: return path
+        return to + path.substring(from.length)
     }
     return copy(
         favorites = favorites.map(::move).distinct(),

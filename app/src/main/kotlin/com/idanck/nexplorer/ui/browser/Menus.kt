@@ -27,10 +27,13 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.AddToHomeScreen
+import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.CheckBox
 import androidx.compose.material.icons.outlined.CheckBoxOutlineBlank
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.CreateNewFolder
+import androidx.compose.material.icons.outlined.DonutLarge
+import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.automirrored.outlined.DriveFileMove
 import androidx.compose.material.icons.outlined.FilterList
 import androidx.compose.material.icons.outlined.Info
@@ -44,6 +47,7 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material.icons.outlined.SwapVert
 import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.Unarchive
 import androidx.compose.material.icons.outlined.ViewAgenda
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -122,6 +126,7 @@ class OverflowMenuModel(
     val onTransfers: () -> Unit,
     val onRefresh: () -> Unit,
     val onSettings: () -> Unit,
+    val onAnalyzer: () -> Unit,
 )
 
 @Composable
@@ -151,6 +156,7 @@ fun OverflowMenu(expanded: Boolean, onDismiss: () -> Unit, model: OverflowMenuMo
         MenuRow("בחר הכל", Icons.Outlined.SelectAll, act(model.onSelectAll), trailing = { TrailingText(model.count.toString()) }, enabled = model.count > 0)
         if (model.isFolder) MenuRow("מאפייני התיקייה", Icons.Outlined.Info, act(model.onProperties))
         MenuRow("רענן", Icons.Outlined.Refresh, act(model.onRefresh))
+        MenuRow("מנתח אחסון", Icons.Outlined.DonutLarge, act(model.onAnalyzer))
         HorizontalDivider(color = MaterialTheme.colorScheme.outline)
         MenuRow("אפשרויות תצוגה", Icons.Outlined.ViewAgenda, act(model.onViewOptions), trailing = { TrailingText(model.viewSummary) })
         MenuRow("סנן ברשימה", Icons.Outlined.FilterList, act(model.onFilter))
@@ -198,6 +204,14 @@ class ItemMenuModel(
     val onPinShortcut: () -> Unit,
     val onToggleFavorite: () -> Unit,
     val onProperties: () -> Unit,
+    /** קובץ בודד עד 1 MB. */
+    val canEditText: Boolean = false,
+    val isZip: Boolean = false,
+    /** הארכיון נוצר בתיקייה הנוכחית — באוסף אין כזו. */
+    val canCompress: Boolean = false,
+    val onEditText: () -> Unit = {},
+    val onCompress: () -> Unit = {},
+    val onExtract: () -> Unit = {},
 )
 
 @Composable
@@ -205,6 +219,9 @@ fun ItemMenu(expanded: Boolean, onDismiss: () -> Unit, model: ItemMenuModel) {
     fun act(block: () -> Unit) = { onDismiss(); block() }
     NexplorerMenu(expanded, onDismiss) {
         if (model.single && !model.isFolder) MenuRow("פתיחה באמצעות", Icons.AutoMirrored.Outlined.OpenInNew, act(model.onOpenWith))
+        if (model.canEditText) MenuRow("ערוך כטקסט", Icons.Outlined.EditNote, act(model.onEditText))
+        if (model.isZip) MenuRow("חלץ", Icons.Outlined.Unarchive, act(model.onExtract))
+        if (model.canCompress) MenuRow("הוסף לארכיון", Icons.Outlined.Archive, act(model.onCompress))
         MenuRow("העבר", Icons.AutoMirrored.Outlined.DriveFileMove, act(model.onMove))
         if (model.single) MenuRow("העתק נתיב", Icons.Outlined.Link, act(model.onCopyPath))
         if (model.single && model.isFolder) {

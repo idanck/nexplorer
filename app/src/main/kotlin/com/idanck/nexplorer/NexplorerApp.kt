@@ -7,6 +7,7 @@ import coil.ImageLoaderFactory
 import coil.decode.VideoFrameDecoder
 import com.idanck.nexplorer.data.settings.SettingsRepository
 import com.idanck.nexplorer.data.transfer.TransferManager
+import com.idanck.nexplorer.ui.keys.KeyBus
 import com.idanck.nexplorer.update.UpdateManager
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -22,6 +23,7 @@ class AppContainer(app: Application) {
     val settings = SettingsRepository(app, scope)
     val transfers = TransferManager(app, scope)
     val updates = UpdateManager(app, settings, transfers)
+    val keys = KeyBus()
 }
 
 class NexplorerApp : Application(), ImageLoaderFactory {

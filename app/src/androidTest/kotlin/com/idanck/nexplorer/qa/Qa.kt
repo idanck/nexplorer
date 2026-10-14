@@ -51,10 +51,13 @@ object Qa {
         }
     }
 
-    fun screenshot(compose: ComposeTestRule, name: String) {
-        compose.waitForIdle()
-        // הבהוב הסמן, אדוות ואנימציות כניסה של חלונות — שהצילום לא יתפוס אותם באמצע.
-        Thread.sleep(400)
+    /** [settle] = false — באמצע מחווה (גרירה): בלי לחכות שהממשק יירגע. */
+    fun screenshot(compose: ComposeTestRule, name: String, settle: Boolean = true) {
+        if (settle) {
+            compose.waitForIdle()
+            // הבהוב הסמן, אדוות ואנימציות כניסה של חלונות — שהצילום לא יתפוס אותם באמצע.
+            Thread.sleep(400)
+        }
         shell("mkdir -p $SHOTS")
         shell("screencap -p $SHOTS/$name.png")
     }

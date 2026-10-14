@@ -84,6 +84,12 @@ data class NexplorerColors(
     val success: Color,
     /** רקע של שורה נבחרת במצב בחירה. */
     val selectedRow: Color,
+    /** תיקייה (או חלון) שאפשר לשחרר עליה גרירה. */
+    val dropTarget: Color,
+    /** מציג התמונות: רקע, טקסט ואייקונים, ופס עליון/תחתון שקוף-למחצה. */
+    val viewerBackground: Color,
+    val onViewer: Color,
+    val viewerChrome: Color,
     /** עמעום מתחת לתפריט "חדש" ולמגירה. */
     val scrim: Color,
     val bannerGradientStart: Color,
@@ -95,6 +101,13 @@ data class NexplorerColors(
     val bannerGlowSoft: Color,
     val bannerTitle: Color,
     val bannerSubtitle: Color,
+    /** פילוח התפוסה במנתח: וידאו, תמונות, אפליקציות ומערכת, מסמכים, אודיו, אחר. */
+    val chartVideo: Color,
+    val chartImages: Color,
+    val chartApps: Color,
+    val chartDocuments: Color,
+    val chartAudio: Color,
+    val chartOther: Color,
 )
 
 private val LightExtended = NexplorerColors(
@@ -103,6 +116,10 @@ private val LightExtended = NexplorerColors(
     onAmberContainer = LightOnAmberContainer,
     success = LightSuccess,
     selectedRow = LightSelectedRow,
+    dropTarget = LightDropTarget,
+    viewerBackground = ViewerBackground,
+    onViewer = OnViewer,
+    viewerChrome = ViewerChrome,
     scrim = Color(0x99000000),
     bannerGradientStart = BannerGradientStart,
     bannerGradientEnd = BannerGradientEnd,
@@ -113,6 +130,12 @@ private val LightExtended = NexplorerColors(
     bannerGlowSoft = BannerGlowSoft,
     bannerTitle = BannerTitle,
     bannerSubtitle = BannerSubtitle,
+    chartVideo = LightChartVideo,
+    chartImages = LightChartImages,
+    chartApps = LightChartApps,
+    chartDocuments = LightChartDocuments,
+    chartAudio = LightChartAudio,
+    chartOther = LightChartOther,
 )
 
 private val DarkExtended = LightExtended.copy(
@@ -121,6 +144,13 @@ private val DarkExtended = LightExtended.copy(
     onAmberContainer = DarkOnAmberContainer,
     success = DarkSuccess,
     selectedRow = DarkSelectedRow,
+    dropTarget = DarkDropTarget,
+    chartVideo = DarkChartVideo,
+    chartImages = DarkChartImages,
+    chartApps = DarkChartApps,
+    chartDocuments = DarkChartDocuments,
+    chartAudio = DarkChartAudio,
+    chartOther = DarkChartOther,
 )
 
 private val LocalNexplorerColors = staticCompositionLocalOf { LightExtended }

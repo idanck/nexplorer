@@ -16,6 +16,22 @@ status=0
 
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+# אנדרואיד 15 הורג תהליך שלא סיים לעלות תוך ~30 שניות ("failed to complete startup"). מיד אחרי
+# האתחול האמולטור עמוס (gms, dexopt), ואימות ה-dex של שני ה-APK-ים (debug, בלי AOT) בהפעלה
+# הראשונה גלש מעבר לזה — לפני שקוד האפליקציה בכלל רץ. מאמתים מראש, ומחכים שהעומס ירד.
+adb shell cmd package compile -m verify -f "$pkg" > /dev/null || true
+adb shell cmd package compile -m verify -f "$pkg.test" > /dev/null || true
+for _ in $(seq 1 60); do
+  # "some avg10=NN.NN" — אחוז הזמן שתהליכים חיכו ל-CPU. אין /proc/pressure (API 29) — לא מחכים.
+  load=$(adb shell cat /proc/pressure/cpu 2>/dev/null | tr -d '\r' | awk '/^some/ { split($2, a, "="); print int(a[2]) }')
+  { [ -z "$load" ] || [ "$load" -lt 40 ]; } && break
+  sleep 2
+done
+echo "cpu pressure before tests: ${load:-n/a}"
+# אמולטור עמוס: אפליקציות מערכת (Pixel Launcher) נתקעות, וחלון "isn't responding" שלהן מכסה את
+# האפליקציה — ב-API 35 כל הבדיקות נכשלו בגללו. בלי חלונות שגיאה המערכת הורגת את התוקעת; ANR או
+# קריסה של האפליקציה עצמה עדיין נתפסים בסוף מה-logcat (am_anr, crash).
+adb shell settings put global hide_error_dialogs 1 || true
 adb shell rm -rf /sdcard/Download/nexplorer-qa
 adb logcat -G 16M || true
 adb logcat -c
@@ -34,6 +50,13 @@ run_class() {
 run_class PermissionGateTest
 run_class BrowserFlowTest
 run_class SearchAndSettingsTest
+run_class Phase2Test
+run_class Phase2bTest
+# Phase2bTest מדמה טאבלט; אם התהליך קרס לפני tearDown — שהמונקי ירוץ על המסך הרגיל.
+adb shell wm size reset || true
+adb shell wm density reset || true
+adb shell settings put system accelerometer_rotation 0 || true
+adb shell settings put system user_rotation 0 || true
 
 echo "::group::monkey (API $api)"
 adb shell input keyevent KEYCODE_WAKEUP
@@ -68,6 +91,11 @@ adb logcat -d > "$out/logcat.txt"
 adb logcat -d -b crash > "$out/crash.txt" || true
 if grep -q "$pkg" "$out/crash.txt"; then
   echo "::error::the app crashed on API $api (crash.txt)"
+  status=1
+fi
+adb logcat -d -b events -s am_anr > "$out/anr.txt" || true
+if grep -q "$pkg" "$out/anr.txt"; then
+  echo "::error::the app stopped responding on API $api (anr.txt)"
   status=1
 fi
 

@@ -1,9 +1,14 @@
 package com.idanck.nexplorer
 
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
+import android.view.KeyEvent
 import android.view.Menu
+import android.view.View
+import android.view.ViewGroup
 import android.view.Window
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -20,6 +25,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.idanck.nexplorer.data.files.FileIntents
 import com.idanck.nexplorer.data.settings.ThemeMode
 import com.idanck.nexplorer.ui.NexplorerRoot
+import com.idanck.nexplorer.ui.keys.KeyShortcuts
 import com.idanck.nexplorer.ui.theme.NexplorerTheme
 
 class MainActivity : ComponentActivity() {
@@ -58,6 +64,40 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+        anchorKeyFocus()
+    }
+
+    /** ה-View של Compose — הילד היחיד של android.R.id.content אחרי setContent. */
+    private val contentRoot: ViewGroup?
+        get() = findViewById<ViewGroup>(android.R.id.content)?.getChildAt(0) as? ViewGroup
+
+    /**
+     * במצב מגע, מאז Android 9, אף View לא בפוקוס — ואז Tab הראשון אחרי נגיעה לא מגיע ל-[dispatchKeyEvent]:
+     * ViewRootImpl מנצל אותו ליציאה ממצב מגע ומעביר את הפוקוס לפריט הראשון. ה-ComposeView מחזיק את
+     * הפוקוס בעצמו (לפני הילדים), ולכן היציאה ממצב מגע משאירה אותו במקום ו-Tab מגיע לקיצורים.
+     * אחרי המקש הזה הפוקוס עובר ל-Compose, כדי שהחצים ינווטו בין הפריטים. שדה טקסט לוקח את הפוקוס
+     * כרגיל, וכשהוא משחרר אותו — הפוקוס חוזר לכאן.
+     */
+    private fun anchorKeyFocus() {
+        val root = contentRoot ?: return
+        root.isFocusableInTouchMode = true
+        root.descendantFocusability = ViewGroup.FOCUS_BEFORE_DESCENDANTS
+        // לא תחנה ריקה ב-TalkBack; הילדים (Compose) נשארים נגישים.
+        root.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) root.defaultFocusHighlightEnabled = false
+        val tree = root.viewTreeObserver
+        tree.addOnGlobalFocusChangeListener { _, newFocus ->
+            if (newFocus == null) root.post { if (currentFocus == null) root.requestFocus() }
+        }
+        // נקרא בתוך עיבוד המקש, לפני ש-ViewRootImpl מחפש למי לתת פוקוס; המעבר ל-Compose אחריו.
+        tree.addOnTouchModeChangeListener { inTouchMode ->
+            if (!inTouchMode && currentFocus === root) root.post { root.getChildAt(0)?.requestFocus() }
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && currentFocus == null) contentRoot?.requestFocus()
     }
 
     /**
@@ -66,6 +106,35 @@ class MainActivity : ComponentActivity() {
      */
     override fun onCreatePanelMenu(featureId: Int, menu: Menu): Boolean =
         if (featureId == Window.FEATURE_OPTIONS_PANEL) false else super.onCreatePanelMenu(featureId, menu)
+
+    /** מקשים שהפעולה שלהם בוצעה ב-ACTION_DOWN — גם ה-UP וההחזקה שלהם לא ממשיכים הלאה. */
+    private val handledKeys = mutableSetOf<Int>()
+
+    /**
+     * קיצורי מקלדת לפני שהמקש מגיע לממשק: אחרת Tab ו-Del נבלעים בניווט הפוקוס של Compose.
+     * שדה טקסט בפוקוס (onCheckIsTextEditor) מקבל את מקשי העריכה כרגיל.
+     * RestrictedApi: זה Activity.dispatchKeyEvent, API ציבורי; lint מסמן אותו רק כי androidx.core
+     * דורס אותו ב-ComponentActivity ומסמן את הדריסה שלו כפנימית.
+     */
+    @SuppressLint("RestrictedApi")
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val keys = (application as NexplorerApp).container.keys
+        when (event.action) {
+            KeyEvent.ACTION_DOWN -> {
+                if (event.repeatCount > 0 && event.keyCode in handledKeys) return true
+                // UP שאבד (מעבר חלון באמצע) לא משאיר את המקש חסום.
+                handledKeys -= event.keyCode
+                val editing = currentFocus?.onCheckIsTextEditor() == true
+                val command = KeyShortcuts.commandFor(event.keyCode, event.isCtrlPressed, event.isAltPressed, editing)
+                if (command != null && event.repeatCount == 0 && keys.dispatch(command)) {
+                    handledKeys += event.keyCode
+                    return true
+                }
+            }
+            KeyEvent.ACTION_UP -> if (handledKeys.remove(event.keyCode)) return true
+        }
+        return super.dispatchKeyEvent(event)
+    }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)

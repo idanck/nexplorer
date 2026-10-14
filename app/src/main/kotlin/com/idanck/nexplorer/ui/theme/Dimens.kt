@@ -86,4 +86,44 @@ object NexplorerDimens {
 
     /** כפתורי סרגל ההדבקה. */
     val BottomBarButton = 48.dp
+
+    /** מנתח האחסון: פס הפילוח (pill), נקודת המקרא, ופס ורוחב הגודל בשורת "תיקיות גדולות". */
+    val AnalyzerBar = 14.dp
+    val AnalyzerBarGap = 2.dp
+    val LegendDot = 10.dp
+    val FolderBarWidth = 90.dp
+    val FolderSizeWidth = 64.dp
+
+    /** רשימה מקדימה בתוך חלון (שינוי שם מרובה): גלילה פנימית מעבר לגובה הזה. */
+    val PreviewListMaxHeight = 180.dp
+
+    /**
+     * שני חלונות (לוח Tablet): מרוחב 840 וגובה 480 ומעלה — טאבלט. טלפון לרוחב (~914×411) נשאר בחלון אחד:
+     * בגובה כזה כל חלון מציג שלוש שורות.
+     */
+    val DualPaneMinWidth = 840.dp
+    val DualPaneMinHeight = 480.dp
+
+    /** מסילת הניווט: רוחב, פריט עם תווית (64×56) ובלי (56), רווח בין פריטים, תג ספירה. */
+    val RailWidth = 88.dp
+    val RailItem = 56.dp
+    val RailItemLabeledWidth = 64.dp
+    val RailItemIcon = 22.dp
+    val RailGap = 6.dp
+    val RailBadge = 18.dp
+
+    /** חלון: רווח בין החלונות, מסגרת (פעיל = primary), ריפוד אופקי של כותרת, שורות ותחתית. */
+    val PaneGap = 12.dp
+    val PaneBorder = 2.dp
+    val PanePaddingHorizontal = 14.dp
+
+    /** תחתית החלון: "N נבחרו · העתק לחלון השני · העבר", או שורת הרמז. */
+    val PaneFooterHeight = 56.dp
+    val PaneButtonHeight = 36.dp
+
+    /** יעד שחרור: מסגרת מקווקוות 2 (מקף 6, רווח 4), מוזחת 8 מהצדדים. */
+    val DropTargetBorder = 2.dp
+    val DropTargetDash = 6.dp
+    val DropTargetGap = 4.dp
+    val DropTargetInset = 8.dp
 }

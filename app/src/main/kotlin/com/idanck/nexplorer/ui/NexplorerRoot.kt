@@ -16,9 +16,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.idanck.nexplorer.AppContainer
 import com.idanck.nexplorer.data.files.FileIntents
+import com.idanck.nexplorer.ui.analyzer.AnalyzerScreen
+import com.idanck.nexplorer.ui.analyzer.AnalyzerViewModel
 import com.idanck.nexplorer.ui.browser.BrowserScreen
 import com.idanck.nexplorer.ui.browser.BrowserViewModel
 import com.idanck.nexplorer.ui.browser.Location
+import com.idanck.nexplorer.ui.editor.EditorScreen
+import com.idanck.nexplorer.ui.editor.EditorViewModel
 import com.idanck.nexplorer.ui.permission.StorageAccess
 import com.idanck.nexplorer.ui.permission.StorageAccessScreen
 import com.idanck.nexplorer.ui.search.SearchScreen
@@ -26,9 +30,17 @@ import com.idanck.nexplorer.ui.search.SearchViewModel
 import com.idanck.nexplorer.ui.settings.SettingsModel
 import com.idanck.nexplorer.ui.settings.SettingsScreen
 import com.idanck.nexplorer.ui.update.UpdateActions
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
+import com.idanck.nexplorer.core.FileKind
+import com.idanck.nexplorer.ui.browser.DualPaneScreen
+import com.idanck.nexplorer.ui.theme.NexplorerDimens
+import com.idanck.nexplorer.ui.viewer.ImageViewerScreen
+import com.idanck.nexplorer.ui.viewer.ViewerViewModel
 import kotlinx.coroutines.launch
 
-private enum class Screen { Browser, Search, Settings }
+private enum class Screen { Browser, Search, Settings, Analyzer, Editor, Viewer }
 
 /**
  * השורש: בלי גישה לקבצים — מסך הגישה; אחרת חלון הקבצים, ומעליו חיפוש או הגדרות.
@@ -57,6 +69,15 @@ fun NexplorerRoot(container: AppContainer, pendingPath: String?, onPendingPathCo
     val search: SearchViewModel = viewModel()
     var screen by rememberSaveable { mutableStateOf(Screen.Browser) }
     var searchRoot by rememberSaveable { mutableStateOf<String?>(null) }
+    var analyzerRoot by rememberSaveable { mutableStateOf<String?>(null) }
+    var editorPath by rememberSaveable { mutableStateOf<String?>(null) }
+    var viewerPath by rememberSaveable { mutableStateOf<String?>(null) }
+    val viewer: ViewerViewModel = viewModel()
+    fun openImage(path: String) {
+        viewer.open(path)
+        viewerPath = path
+        screen = Screen.Viewer
+    }
 
     LaunchedEffect(pendingPath) {
         if (pendingPath != null) {
@@ -87,18 +108,64 @@ fun NexplorerRoot(container: AppContainer, pendingPath: String?, onPendingPathCo
     }
 
     when (screen) {
-        Screen.Browser -> BrowserScreen(
-            vm = browser,
-            transfers = container.transfers,
-            settings = settings,
-            updateState = updateState,
-            updateActions = updateActions,
-            onOpenSearch = { root ->
+        Screen.Browser -> BoxWithConstraints(Modifier.fillMaxSize()) {
+            val onOpenSearch: (String?) -> Unit = { root ->
                 searchRoot = root
                 screen = Screen.Search
-            },
-            onOpenSettings = { screen = Screen.Settings },
-        )
+            }
+            val onOpenAnalyzer: (String?) -> Unit = { path ->
+                analyzerRoot = path
+                screen = Screen.Analyzer
+            }
+            val onEditText: (String) -> Unit = { path ->
+                editorPath = path
+                screen = Screen.Editor
+            }
+            // טאבלט: שני חלונות (לוח Tablet). החלון הראשון הוא אותו חלון של הטלפון.
+            if (maxWidth >= NexplorerDimens.DualPaneMinWidth && maxHeight >= NexplorerDimens.DualPaneMinHeight) {
+                DualPaneScreen(
+                    panes = listOf(browser, viewModel<BrowserViewModel>(key = SECOND_PANE)),
+                    transfers = container.transfers,
+                    settings = settings,
+                    updateState = updateState,
+                    updateActions = updateActions,
+                    keys = container.keys,
+                    onOpenSearch = onOpenSearch,
+                    onOpenSettings = { screen = Screen.Settings },
+                    onOpenAnalyzer = onOpenAnalyzer,
+                    onEditText = onEditText,
+                    onOpenImage = ::openImage,
+                )
+            } else {
+                BrowserScreen(
+                    vm = browser,
+                    transfers = container.transfers,
+                    settings = settings,
+                    updateState = updateState,
+                    updateActions = updateActions,
+                    onOpenSearch = onOpenSearch,
+                    onOpenSettings = { screen = Screen.Settings },
+                    onOpenAnalyzer = onOpenAnalyzer,
+                    onEditText = onEditText,
+                    onOpenImage = ::openImage,
+                    keys = container.keys,
+                )
+            }
+        }
+
+        Screen.Viewer -> {
+            val path = viewerPath
+            if (path == null) {
+                LaunchedEffect(Unit) { screen = Screen.Browser }
+            } else {
+                ImageViewerScreen(
+                    viewModel = viewer,
+                    path = path,
+                    onPathChange = { viewerPath = it },
+                    onBack = { screen = Screen.Browser },
+                )
+            }
+        }
 
         Screen.Search -> {
             BackHandler { screen = Screen.Browser }
@@ -110,6 +177,8 @@ fun NexplorerRoot(container: AppContainer, pendingPath: String?, onPendingPathCo
                     if (entry.isDirectory) {
                         browser.navigate(Location.Folder(entry.path))
                         screen = Screen.Browser
+                    } else if (entry.kind == FileKind.Image) {
+                        openImage(entry.path)
                     } else if (!FileIntents.open(context, entry.path, entry.name)) {
                         Toast.makeText(context, "אין אפליקציה שפותחת קבצים מסוג זה", Toast.LENGTH_SHORT).show()
                     }
@@ -119,6 +188,33 @@ fun NexplorerRoot(container: AppContainer, pendingPath: String?, onPendingPathCo
                     screen = Screen.Browser
                 },
             )
+        }
+
+        Screen.Analyzer -> AnalyzerScreen(
+            viewModel = viewModel<AnalyzerViewModel>(),
+            startPath = analyzerRoot,
+            confirmDelete = settings.confirmDelete,
+            onBack = { screen = Screen.Browser },
+            onOpenFolder = { path ->
+                browser.openPath(path)
+                screen = Screen.Browser
+            },
+        )
+
+        Screen.Editor -> {
+            val path = editorPath
+            if (path == null) {
+                LaunchedEffect(Unit) { screen = Screen.Browser }
+            } else {
+                EditorScreen(
+                    viewModel = viewModel<EditorViewModel>(),
+                    path = path,
+                    onBack = {
+                        screen = Screen.Browser
+                        browser.refresh()
+                    },
+                )
+            }
         }
 
         Screen.Settings -> {
@@ -145,3 +241,6 @@ fun NexplorerRoot(container: AppContainer, pendingPath: String?, onPendingPathCo
         }
     }
 }
+
+/** המפתח של ה-ViewModel של החלון השני (הראשון הוא ברירת המחדל, משותף עם תצוגת הטלפון). */
+private const val SECOND_PANE = "pane-2"

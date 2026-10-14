@@ -270,15 +270,17 @@ class BrowserFlowTest {
         compose.onNodeWithText("readme.md").performClick()
         Thread.sleep(1_500)
         Qa.screenshot(compose, "33-open-text")
-        if (Qa.device.currentPackageName != Qa.packageName) Qa.device.pressBack()
-        compose.waitFor(hasText("readme.md"))
+        // אין אפליקציה ל-.md (API 29) — נפתח העורך המובנה; אחרת אפליקציה אחרת. בשני המקרים: חזרה.
+        if (Qa.device.currentPackageName != Qa.packageName || compose.exists(hasText("שמור"))) Qa.device.pressBack()
+        compose.waitFor(hasText("Photos"))
 
         compose.onNodeWithText("Photos").performClick()
         compose.waitFor(hasText("shot-1.png"))
+        // תמונה נפתחת במציג המובנה (שלב 2ב), לא באפליקציה אחרת.
         compose.onNodeWithText("shot-1.png").performClick()
-        Thread.sleep(1_500)
+        compose.waitFor(hasText("/ 4", substring = true), 15_000)
         Qa.screenshot(compose, "34-open-image")
-        if (Qa.device.currentPackageName != Qa.packageName) Qa.device.pressBack()
-        compose.waitFor(hasText("shot-1.png"))
+        Qa.device.pressBack()
+        compose.waitFor(hasText("shot-2.png"))
     }
 }
