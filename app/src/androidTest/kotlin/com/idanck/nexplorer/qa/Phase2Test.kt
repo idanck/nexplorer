@@ -110,8 +110,10 @@ class Phase2Test {
         compose.waitFor(hasText("אחרי חילוץ", substring = true), 15_000)
         Qa.screenshot(compose, "55-extract-dialog")
         compose.onNodeWithText("חלץ לתיקייה", substring = true).performClick()
-        compose.waitForDisk(30_000) { File(root, "Documents (1)/Documents/notes.txt").isFile }
-        assertTrue(File(root, "Documents (1)/Documents/דוח שנתי 2026.txt").readText().startsWith("שלום"))
+        // החילוץ רץ רשומה אחרי רשומה; notes.txt לבד היה מסיים את ההמתנה לפני הקובץ בעברית.
+        val extracted = File(root, "Documents (1)/Documents")
+        compose.waitForDisk(30_000) { File(extracted, "notes.txt").isFile && File(extracted, "דוח שנתי 2026.txt").isFile }
+        assertTrue(File(extracted, "דוח שנתי 2026.txt").readText().startsWith("שלום"))
     }
 
     @Test

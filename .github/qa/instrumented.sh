@@ -16,6 +16,18 @@ status=0
 
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+# אנדרואיד 15 הורג תהליך שלא סיים לעלות תוך ~30 שניות ("failed to complete startup"). מיד אחרי
+# האתחול האמולטור עמוס (gms, dexopt), ואימות ה-dex של שני ה-APK-ים (debug, בלי AOT) בהפעלה
+# הראשונה גלש מעבר לזה — לפני שקוד האפליקציה בכלל רץ. מאמתים מראש, ומחכים שהעומס ירד.
+adb shell cmd package compile -m verify -f "$pkg" > /dev/null || true
+adb shell cmd package compile -m verify -f "$pkg.test" > /dev/null || true
+for _ in $(seq 1 60); do
+  # "some avg10=NN.NN" — אחוז הזמן שתהליכים חיכו ל-CPU. אין /proc/pressure (API 29) — לא מחכים.
+  load=$(adb shell cat /proc/pressure/cpu 2>/dev/null | tr -d '\r' | awk '/^some/ { split($2, a, "="); print int(a[2]) }')
+  { [ -z "$load" ] || [ "$load" -lt 40 ]; } && break
+  sleep 2
+done
+echo "cpu pressure before tests: ${load:-n/a}"
 adb shell rm -rf /sdcard/Download/nexplorer-qa
 adb logcat -G 16M || true
 adb logcat -c
