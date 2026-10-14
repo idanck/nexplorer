@@ -28,6 +28,10 @@ for _ in $(seq 1 60); do
   sleep 2
 done
 echo "cpu pressure before tests: ${load:-n/a}"
+# אמולטור עמוס: אפליקציות מערכת (Pixel Launcher) נתקעות, וחלון "isn't responding" שלהן מכסה את
+# האפליקציה — ב-API 35 כל הבדיקות נכשלו בגללו. בלי חלונות שגיאה המערכת הורגת את התוקעת; ANR או
+# קריסה של האפליקציה עצמה עדיין נתפסים בסוף מה-logcat (am_anr, crash).
+adb shell settings put global hide_error_dialogs 1 || true
 adb shell rm -rf /sdcard/Download/nexplorer-qa
 adb logcat -G 16M || true
 adb logcat -c
@@ -87,6 +91,11 @@ adb logcat -d > "$out/logcat.txt"
 adb logcat -d -b crash > "$out/crash.txt" || true
 if grep -q "$pkg" "$out/crash.txt"; then
   echo "::error::the app crashed on API $api (crash.txt)"
+  status=1
+fi
+adb logcat -d -b events -s am_anr > "$out/anr.txt" || true
+if grep -q "$pkg" "$out/anr.txt"; then
+  echo "::error::the app stopped responding on API $api (anr.txt)"
   status=1
 fi
 
