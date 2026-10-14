@@ -1,5 +1,6 @@
 package com.idanck.nexplorer
 
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
@@ -75,7 +76,10 @@ class MainActivity : ComponentActivity() {
     /**
      * קיצורי מקלדת לפני שהמקש מגיע לממשק: אחרת Tab ו-Del נבלעים בניווט הפוקוס של Compose.
      * שדה טקסט בפוקוס (onCheckIsTextEditor) מקבל את מקשי העריכה כרגיל.
+     * RestrictedApi: זה Activity.dispatchKeyEvent, API ציבורי; lint מסמן אותו רק כי androidx.core
+     * דורס אותו ב-ComponentActivity ומסמן את הדריסה שלו כפנימית.
      */
+    @SuppressLint("RestrictedApi")
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         val keys = (application as NexplorerApp).container.keys
         when (event.action) {

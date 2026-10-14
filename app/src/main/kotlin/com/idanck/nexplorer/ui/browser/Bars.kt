@@ -134,7 +134,7 @@ fun BrowserTopBar(
 fun Breadcrumbs(
     crumbs: List<Crumb>,
     onCrumb: (Crumb) -> Unit,
-    modifier: Modifier = Modifier.fillMaxWidth(),
+    modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(
         start = NexplorerDimens.Space4,
         end = NexplorerDimens.Space4,
