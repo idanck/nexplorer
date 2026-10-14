@@ -4,10 +4,14 @@
     ui.py has <text>        — יציאה 0 אם יש על המסך צומת עם הטקסט / התיאור הזה
     ui.py tap <text>        — לוחץ על מרכז הצומת
     ui.py tap-desc <text>   — כמו tap, לפי התיאור בלבד (שדה שהתווית שלו מופיעה גם כטקסט מעליו)
+    ui.py focus-desc <text> — לוחץ על השדה (לפי התיאור) עד שהוא מקבל פוקוס; יציאה 0 רק אם קיבל.
+                              לחיצה שלא נחתה על השדה השאירה את הפוקוס בקודם, והטקסט נכתב אליו
+                              ("qaqa-pass" בשדה המשתמש).
 """
 import re
 import subprocess
 import sys
+import time
 import xml.etree.ElementTree as ET
 
 
@@ -29,8 +33,32 @@ def find(root, text, by_desc=False):
     return None
 
 
+def bounds(node):
+    return tuple(map(int, re.findall(r"\d+", node.get("bounds"))))
+
+
+def focus(text):
+    # המיקום מה-dump יכול להיות ישן: המקלדת של השדה הקודם עוד נפתחת והטופס גולל אליו. אז הלחיצה
+    # לא נוחתת על השדה, והטקסט נכתב לשדה הקודם — לכן בודקים שהפוקוס עבר, ואם לא — dump חדש ושוב.
+    for _ in range(5):
+        root = dump()
+        node = find(root, text, by_desc=True) if root is not None else None
+        if node is None:
+            return False
+        if node.get("focused") == "true":
+            return True
+        x1, y1, x2, y2 = bounds(node)
+        subprocess.run(["adb", "shell", "input", "tap", str((x1 + x2) // 2), str((y1 + y2) // 2)], check=True)
+        time.sleep(0.5)
+    root = dump()
+    node = find(root, text, by_desc=True) if root is not None else None
+    return node is not None and node.get("focused") == "true"
+
+
 def main():
     command, text = sys.argv[1], sys.argv[2]
+    if command == "focus-desc":
+        sys.exit(0 if focus(text) else 1)
     root = dump()
     node = find(root, text, by_desc=command == "tap-desc") if root is not None else None
     if node is None:
