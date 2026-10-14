@@ -78,12 +78,16 @@ class Phase2Test {
         clickDisplayed(hasText("מנתח אחסון"))
         compose.waitFor(hasText("מה אפשר לפנות"), 60_000)
         Qa.screenshot(compose, "50-analyzer")
+        // הפתיחה אסינכרונית (בדיקה שהקבצים עוד קיימים), ושמות הקבצים מופיעים גם בסקירה —
+        // מחכים לשורת "נבחר" שקיימת רק ברשימה, אחרת "חזרה" יוצאת מהמנתח מוקדם מדי.
         compose.onNodeWithText("כפילויות").performClick()
+        compose.waitFor(hasText("נבחר", substring = true))
         compose.waitFor(hasText("song-copy.mp3", substring = true))
         Qa.screenshot(compose, "51-analyzer-duplicates")
         Qa.device.pressBack()
         compose.waitFor(hasText("קבצים גדולים"))
         compose.onNodeWithText("קבצים גדולים").performClick()
+        compose.waitFor(hasText("נבחר", substring = true))
         compose.waitFor(hasText("big.bin", substring = true))
         Qa.screenshot(compose, "52-analyzer-largest")
         Qa.device.pressBack()
@@ -115,8 +119,10 @@ class Phase2Test {
         itemMenu("readme.md")
         compose.onNodeWithText("הוסף לארכיון").performClick()
         compose.waitFor(hasText("שם הקובץ"))
-        // השדה השני הוא הסיסמה.
+        // השדה השני הוא הסיסמה; אחרי שמקלידים בה נפתח שדה האימות.
         compose.onAllNodes(hasSetTextAction())[1].performTextInput("qa-pass")
+        compose.waitFor(hasText("הסיסמה שוב"))
+        compose.onAllNodes(hasSetTextAction())[2].performTextInput("qa-pass")
         compose.onNodeWithText("צור").performClick()
         compose.waitForDisk(30_000) { File(root, "readme.zip").length() > 0 }
         compose.waitFor(hasText("readme.zip"))

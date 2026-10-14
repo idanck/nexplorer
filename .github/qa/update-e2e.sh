@@ -28,11 +28,23 @@ echo "installed $(code), published $want"
 adb shell appops set --uid "$pkg" MANAGE_EXTERNAL_STORAGE allow
 adb shell appops set "$pkg" REQUEST_INSTALL_PACKAGES allow
 adb logcat -c
+# הבדיקה היומית רצה בפתיחה, ונכשלת בשקט כשאין רשת (מנסה שוב בחזרה הבאה לאפליקציה). מיד אחרי
+# האתחול הרשת של האמולטור עוד לא מאומתת — מחכים לה, כמו טלפון שכבר מחובר.
+for _ in $(seq 1 60); do
+  adb shell dumpsys connectivity 2>/dev/null | grep -q '&VALIDATED' && break
+  sleep 2
+done
 adb shell am start -W -n "$pkg/.MainActivity" > /dev/null
 
 found=0
-for _ in $(seq 1 30); do
+for i in $(seq 1 30); do
   if ui has "עדכן"; then found=1; break; fi
+  # עדיין כלום אחרי חצי דקה: יציאה וחזרה (ON_RESUME) — מה שמשתמש היה עושה.
+  if [ "$i" -eq 15 ]; then
+    adb shell input keyevent KEYCODE_HOME
+    sleep 1
+    adb shell am start -W -n "$pkg/.MainActivity" > /dev/null
+  fi
   sleep 2
 done
 shot 01-banner

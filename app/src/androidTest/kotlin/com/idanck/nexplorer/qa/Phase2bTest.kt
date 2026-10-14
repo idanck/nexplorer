@@ -95,14 +95,14 @@ class Phase2bTest {
     fun t02_dualPaneCopyMoveDeleteWithKeys() {
         enterDualPane()
         Qa.screenshot(compose, "63-dual-pane")
-        // החלון השני → Documents; ההעתקה מהראשון נוחתת שם.
-        compose.onAllNodesWithText("Documents")[1].performClick()
-        compose.waitFor(hasText("notes.txt"))
+        // החלון השני → Empty (שורה רביעית — לרוחב Documents, האחרונה, לא נכנסת בחלון עם שורת הרמז).
+        compose.onAllNodesWithText("Empty")[1].performClick()
+        compose.waitFor(hasText("התיקייה ריקה"))
         compose.onNodeWithText("readme.md").performTouchInput { longClick() }
         compose.waitFor(hasText("העתק לחלון השני"))
         Qa.screenshot(compose, "64-dual-selection")
         compose.onNodeWithText("העתק לחלון השני").performClick()
-        compose.waitForDisk { File(root, "Documents/readme.md").isFile }
+        compose.waitForDisk { File(root, "Empty/readme.md").isFile }
         assertTrue("העתקה משאירה את המקור", File(root, "readme.md").isFile)
         compose.waitUntil(10_000) { count("readme.md") == 2 }
 
@@ -110,7 +110,7 @@ class Phase2bTest {
         compose.onNodeWithText("big.bin").performTouchInput { longClick() }
         compose.waitFor(hasContentDescription("בטל בחירה"))
         Qa.device.pressKeyCode(KeyEvent.KEYCODE_F6)
-        compose.waitForDisk { File(root, "Documents/big.bin").isFile && !File(root, "big.bin").exists() }
+        compose.waitForDisk { File(root, "Empty/big.bin").isFile && !File(root, "big.bin").exists() }
 
         // Del: מחיקה, עם האישור הרגיל.
         compose.onNodeWithText("archive.zip").performTouchInput { longClick() }
@@ -120,12 +120,12 @@ class Phase2bTest {
         compose.onNodeWithText("מחק").performClick()
         compose.waitForDisk { !File(root, "archive.zip").exists() }
 
-        // Tab: החלון השני פעיל; Backspace שם עולה מ-Documents.
+        // Tab: החלון השני פעיל; Backspace שם עולה מ-Empty, ו-big.bin (שהועבר לתוכה) כבר לא מוצג.
         Qa.device.pressKeyCode(KeyEvent.KEYCODE_TAB)
         // המקשים נרשמים מחדש אחרי ההרכבה — בלי זה Backspace עוד היה מגיע לחלון הראשון.
         compose.waitForIdle()
         Qa.device.pressKeyCode(KeyEvent.KEYCODE_DEL)
-        compose.waitGone(hasText("notes.txt"))
+        compose.waitGone(hasText("big.bin"))
         Qa.screenshot(compose, "65-dual-after-keys")
     }
 
@@ -133,7 +133,8 @@ class Phase2bTest {
     fun t03_dragToFolderInOtherPane() {
         enterDualPane()
         compose.onAllNodesWithText("readme.md")[0].performTouchInput { longClick() }
-        compose.waitFor(hasText("העתק לחלון השני"))
+        // שני החלונות באותה תיקייה: בתחתית "שני החלונות באותה תיקייה", לא כפתורים — היעד הוא תיקייה.
+        compose.waitFor(hasText("שני החלונות באותה תיקייה"))
         // לרוחב נכנסות רק כמה שורות; היעד צריך להיות כולו על המסך.
         compose.onAllNodesWithText("Empty")[1].performScrollTo()
         val from = screenCenter(compose.onAllNodesWithText("readme.md")[0].fetchSemanticsNode().boundsInWindow.center)
