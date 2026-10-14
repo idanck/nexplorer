@@ -6,7 +6,6 @@
     ui.py tap-desc <text>   — כמו tap, לפי התיאור בלבד (שדה שהתווית שלו מופיעה גם כטקסט מעליו)
     ui.py focus-desc <text> — לוחץ על השדה (לפי התיאור) רק כשהמיקום שלו יציב. לחיצה על מיקום
                               ישן לא נחתה על השדה, והטקסט נכתב לקודם ("qaqa-pass" בשדה המשתמש).
-    ui.py holds-desc <text> <value> — יציאה 0 אם הערך בשדה (שדה סיסמה — תמיד 0, הוא לא נקרא).
 """
 import re
 import subprocess
@@ -56,7 +55,7 @@ def settled(text):
 def focus(text):
     # מיקום מ-dump ישן (המקלדת של השדה הקודם עוד נפתחת והטופס גולל אליו) — הלחיצה לא נוחתת על
     # השדה, והטקסט נכתב לשדה הקודם. לכן לוחצים רק על מיקום יציב, ומחכים שיתייצב שוב לפני ההקלדה.
-    # (uiautomator לא מדווח focused על שדה טקסט של Compose — אי אפשר לבדוק פוקוס ישירות.)
+    # uiautomator לא מדווח על שדה טקסט של Compose לא focused ולא את הטקסט שבו — אי אפשר לבדוק אחרי.
     node = settled(text)
     if node is None:
         return False
@@ -66,21 +65,10 @@ def focus(text):
     return settled(text) is not None
 
 
-def holds(text, value):
-    """הערך נכתב לשדה הזה. שדה סיסמה לא נקרא — עובר."""
-    root = dump()
-    node = find(root, text, by_desc=True) if root is not None else None
-    if node is None:
-        return False
-    return node.get("password") == "true" or any(value in (n.get("text") or "") for n in node.iter("node"))
-
-
 def main():
     command, text = sys.argv[1], sys.argv[2]
     if command == "focus-desc":
         sys.exit(0 if focus(text) else 1)
-    if command == "holds-desc":
-        sys.exit(0 if holds(text, sys.argv[3]) else 1)
     root = dump()
     node = find(root, text, by_desc=command == "tap-desc") if root is not None else None
     if node is None:
