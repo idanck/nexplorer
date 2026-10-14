@@ -112,6 +112,7 @@ class Phase5cTest {
             body()
         } catch (t: Throwable) {
             Log.e("Phase5cTest", "$name failed", t)
+            Qa.logTexts(compose, "Phase5cTest")
             runCatching { Qa.shell("screencap -p /sdcard/Download/nexplorer-qa/failed-5c-$name.png") }
             throw t
         }

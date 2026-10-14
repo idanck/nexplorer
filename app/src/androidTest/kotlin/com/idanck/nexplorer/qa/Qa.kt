@@ -8,6 +8,8 @@ import android.graphics.Paint
 import android.os.Build
 import android.os.Environment
 import android.os.ParcelFileDescriptor
+import android.util.Log
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.test.core.app.ActivityScenario
@@ -52,6 +54,19 @@ object Qa {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             shell("pm grant $packageName android.permission.POST_NOTIFICATIONS")
         }
+    }
+
+    /**
+     * כשל — כל הטקסטים שבמסך, ללוג: הודעת שגיאה יכולה לשבת מתחת למקלדת, ואז הצילום לא מראה אותה.
+     * בלי לחכות שהממשק יירגע — הכשל עצמו יכול להיות שהוא לא נרגע.
+     */
+    fun logTexts(compose: ComposeTestRule, tag: String) {
+        runCatching {
+            val texts = compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.Text), useUnmergedTree = true)
+                .fetchSemanticsNodes(atLeastOneRootRequired = false)
+                .flatMap { node -> node.config[SemanticsProperties.Text].map { it.text } }
+            Log.e(tag, "on screen: ${texts.joinToString(" | ")}")
+        }.onFailure { Log.e(tag, "could not read the screen", it) }
     }
 
     /** [settle] = false — באמצע מחווה (גרירה): בלי לחכות שהממשק יירגע. */
