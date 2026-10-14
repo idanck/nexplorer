@@ -528,7 +528,8 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
             shown.filter { it.name.contains(f, ignoreCase = true) }
         } ?: shown
         val sorted = filtered.sortedFor(s.view.sort)
-        return sorted to if (s.view.showSections) sectionsFor(sorted, s.view.sort, System.currentTimeMillis(), ZoneId.systemDefault()) else emptyList()
+        // רשימת השיתופים: אין לשיתוף תאריך — מדור "ינואר 1970" מעל כולם.
+        return sorted to if (s.view.showSections && !s.atShareList) sectionsFor(sorted, s.view.sort, System.currentTimeMillis(), ZoneId.systemDefault()) else emptyList()
     }
 
     private fun arrange() {

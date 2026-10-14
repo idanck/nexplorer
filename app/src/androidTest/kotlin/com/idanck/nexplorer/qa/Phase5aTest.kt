@@ -7,6 +7,7 @@ import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -145,6 +146,9 @@ class Phase5aTest {
         // בלי שיתוף: רשימת השיתופים בשרת.
         compose.waitFor(hasText("second"), 30_000)
         Qa.screenshot(compose, "109-smb-shares")
+        // לשיתוף אין תאריך: "שיתוף" בשורת הפרטים, ולא "1 בינו׳ 1970" או מדור "ינואר 1970".
+        assertEquals(2, compose.onAllNodesWithText("שיתוף").fetchSemanticsNodes().size)
+        assertTrue(compose.onAllNodesWithText("1970", substring = true).fetchSemanticsNodes().isEmpty())
         val saved = container.settings.state.value.connections.single()
         assertEquals("10.0.2.2", saved.host)
         assertNull(saved.port)
