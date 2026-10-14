@@ -4,8 +4,10 @@
     ui.py has <text>        — יציאה 0 אם יש על המסך צומת עם הטקסט / התיאור הזה
     ui.py tap <text>        — לוחץ על מרכז הצומת
     ui.py tap-desc <text>   — כמו tap, לפי התיאור בלבד (שדה שהתווית שלו מופיעה גם כטקסט מעליו)
-    ui.py focus-desc <text> — לוחץ על השדה (לפי התיאור) רק כשהמיקום שלו יציב. לחיצה על מיקום
+    ui.py focus-desc <text> [<above>]
+                            — לוחץ על השדה (לפי התיאור) רק כשהמיקום שלו יציב. לחיצה על מיקום
                               ישן לא נחתה על השדה, והטקסט נכתב לקודם ("qaqa-pass" בשדה המשתמש).
+                              עם <above>: יציאה 1 אם השדה לא כולו מעל הכפתור הזה (בסרגל התחתון).
 """
 import re
 import subprocess
@@ -52,7 +54,7 @@ def settled(text):
     return node
 
 
-def focus(text):
+def focus(text, above=None):
     # מיקום מ-dump ישן (המקלדת של השדה הקודם עוד נפתחת והטופס גולל אליו) — הלחיצה לא נוחתת על
     # השדה, והטקסט נכתב לשדה הקודם. לכן לוחצים רק על מיקום יציב, ומחכים שיתייצב שוב לפני ההקלדה.
     # uiautomator לא מדווח על שדה טקסט של Compose לא focused ולא את הטקסט שבו — אי אפשר לבדוק אחרי.
@@ -60,6 +62,14 @@ def focus(text):
     if node is None:
         return False
     x1, y1, x2, y2 = bounds(node)
+    # שדה שגלל אל מתחת לסרגל התחתון עדיין ב-dump, אבל הלחיצה נוחתת על הסרגל
+    # ("2222" של הפורט נכתב לסיסמה). המתקשר גולל ומנסה שוב.
+    if above is not None:
+        root = dump()
+        bar = find(root, above) if root is not None else None
+        # רבע גובה שדה מעל הכפתור: הריפוד והקו של הסרגל מעליו.
+        if bar is not None and y2 > bounds(bar)[1] - (y2 - y1) // 4:
+            return False
     subprocess.run(["adb", "shell", "input", "tap", str((x1 + x2) // 2), str((y1 + y2) // 2)], check=True)
     time.sleep(0.4)
     return settled(text) is not None
@@ -68,7 +78,7 @@ def focus(text):
 def main():
     command, text = sys.argv[1], sys.argv[2]
     if command == "focus-desc":
-        sys.exit(0 if focus(text) else 1)
+        sys.exit(0 if focus(text, sys.argv[3] if len(sys.argv) > 3 else None) else 1)
     root = dump()
     node = find(root, text, by_desc=command == "tap-desc") if root is not None else None
     if node is None:

@@ -43,6 +43,9 @@ ForceCommand internal-sftp
 LogLevel VERBOSE
 EOF
 
+# ההתקנה מפעילה את sshd של המערכת על פורט 22: פורט שלא הוקלד מגיע אליו, והבדיקה רואה שרת אחר
+# ("לסמוך על השרת?" עם מפתח זר, ואז סיסמה שגויה) במקום "החיבור נדחה".
+sudo systemctl stop ssh.socket ssh.service 2>/dev/null || true
 sudo mkdir -p /run/sshd
 sudo /usr/sbin/sshd -t -f "$base/sshd_config"
 sudo /usr/sbin/sshd -f "$base/sshd_config" -E "$base/sshd.log"
