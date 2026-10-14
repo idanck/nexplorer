@@ -5,6 +5,9 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.os.SystemClock
+import android.util.Log
+import android.view.View
+import android.view.ViewGroup
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasContentDescription
@@ -19,6 +22,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.Until
+import androidx.media3.ui.PlayerView
 import com.idanck.nexplorer.MainActivity
 import com.idanck.nexplorer.media.PlaybackService
 import com.idanck.nexplorer.qa.Qa.exists
@@ -51,6 +55,10 @@ class Phase3bTest {
     private lateinit var scenario: ActivityScenario<MainActivity>
     private val root get() = QaData.root
     private val app get() = ApplicationProvider.getApplicationContext<Context>()
+
+    private companion object {
+        const val TAG = "Phase3bTest"
+    }
 
     private fun playback(state: String) = SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, state)
 
@@ -119,7 +127,7 @@ class Phase3bTest {
         Thread.sleep(1_500)
         Qa.screenshot(compose, "82-video")
 
-        pauseThroughPlayerControls()
+        pauseWithPlayerButton()
         assertTrue("הפריים המושהה לא מוצג", waitForVideoFrame())
 
         // סיבוב בונה את המסך מחדש; הנגן ב-ViewModel — נשאר מושהה באותה נקודה, ולא נטען מחדש (טעינה מנגנת).
@@ -138,17 +146,36 @@ class Phase3bTest {
     }
 
     /**
-     * עצירה דרך הבקרים של Media3 עצמם. הם נעלמים אחרי כמה שניות, והקשה כשהם מוסתרים רק מציגה אותם —
-     * ולכן עד שלושה ניסיונות. ההקשה מעל המרכז: במרכז יש את כפתור הנגינה.
+     * עצירה בכפתור של Media3 עצמו (ה-View שלו — לא Player.pause מהקוד). UiAutomator לא מוצא את
+     * ה-Views שבתוך ה-AndroidView (בדיקה ב-API 29 ו-35: "Node not found"), ולכן הלחיצה דרך ה-View.
+     * לפני כן: הבקרים מוצגים, ועץ הנגישות נשמר — מה ש-TalkBack רואה מהנגן.
      */
-    private fun pauseThroughPlayerControls() {
-        val playPause = By.res(Pattern.compile(".*:id/exo_play_pause"))
-        repeat(3) {
-            if (!Qa.device.hasObject(playPause)) Qa.device.click(Qa.device.displayWidth / 2, Qa.device.displayHeight * 3 / 10)
-            Qa.device.wait(Until.findObject(playPause), 5_000)?.click()
-            if (runCatching { compose.waitFor(playback("מושהה"), 3_000) }.isSuccess) return
-        }
-        throw AssertionError("הסרטון לא נעצר דרך הבקרים של הנגן")
+    private fun pauseWithPlayerButton() {
+        withPlayerView { it.showController() }
+        val seen = Qa.device.wait(Until.hasObject(By.res(Pattern.compile(".*:id/exo_play_pause"))), 3_000)
+        Log.i(TAG, "exo_play_pause in the accessibility tree: $seen")
+        Qa.device.dumpWindowHierarchy(File(Qa.shotsDir, "84-video-a11y.xml"))
+        var clicked = false
+        withPlayerView { view -> clicked = view.findViewByEntryName("exo_play_pause")?.performClick() == true }
+        assertTrue("אין כפתור נגן/השהה בבקרי הנגן", clicked)
+        compose.waitFor(playback("מושהה"), 5_000)
+    }
+
+    private fun withPlayerView(action: (PlayerView) -> Unit) {
+        scenario.onActivity { activity -> activity.window.decorView.findPlayerView()?.let(action) }
+    }
+
+    private fun View.findPlayerView(): PlayerView? {
+        if (this is PlayerView) return this
+        if (this is ViewGroup) for (i in 0 until childCount) getChildAt(i).findPlayerView()?.let { return it }
+        return null
+    }
+
+    /** לפי שם המזהה ולא לפי R של Media3: המספרים נקבעים ב-APK של האפליקציה. */
+    private fun View.findViewByEntryName(name: String): View? {
+        if (id != View.NO_ID && runCatching { resources.getResourceEntryName(id) }.getOrNull() == name) return this
+        if (this is ViewGroup) for (i in 0 until childCount) getChildAt(i).findViewByEntryName(name)?.let { return it }
+        return null
     }
 
     /**

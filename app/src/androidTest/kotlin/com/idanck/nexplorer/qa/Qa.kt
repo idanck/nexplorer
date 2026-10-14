@@ -31,6 +31,9 @@ object Qa {
     /** צילומי המסך נאספים מכאן ע"י `.github/qa/instrumented.sh`. */
     private const val SHOTS = "/sdcard/Download/nexplorer-qa"
 
+    /** לקבצי אבחון שנאספים יחד עם הצילומים. */
+    val shotsDir: File get() = File(SHOTS).apply { mkdirs() }
+
     /** `executeShellCommand` לא מריץ shell — אין הפניות ומרכאות, רק פקודה ופרמטרים. */
     fun shell(command: String): String {
         val pfd = instrumentation.uiAutomation.executeShellCommand(command)
