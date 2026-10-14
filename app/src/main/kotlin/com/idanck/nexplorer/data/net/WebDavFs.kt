@@ -13,14 +13,14 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import okhttp3.internal.tls.OkHostnameVerifier
 import okio.BufferedSink
-import okio.source
+import okio.Pipe
+import okio.buffer
 import org.w3c.dom.Element
 import java.io.FilterInputStream
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
-import java.io.PipedInputStream
-import java.io.PipedOutputStream
+import java.net.Socket
 import java.security.KeyStore
 import java.security.MessageDigest
 import java.security.cert.CertificateException
@@ -29,8 +29,12 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLContext
+import javax.net.ssl.SSLEngine
+import javax.net.ssl.SSLHandshakeException
+import javax.net.ssl.SSLPeerUnverifiedException
 import javax.net.ssl.SSLSession
 import javax.net.ssl.TrustManagerFactory
+import javax.net.ssl.X509ExtendedTrustManager
 import javax.net.ssl.X509TrustManager
 import javax.xml.parsers.DocumentBuilderFactory
 import kotlin.concurrent.thread
@@ -64,6 +68,10 @@ class WebDavFs(private val connection: NetConnection, password: CharArray?) : Re
         .connectTimeout(CONNECT_TIMEOUT_S, TimeUnit.SECONDS)
         .readTimeout(READ_TIMEOUT_S, TimeUnit.SECONDS)
         .writeTimeout(READ_TIMEOUT_S, TimeUnit.SECONDS)
+        // OkHttp הופך הפניה ל-GET בכל שיטה חוץ מ-PROPFIND (MOVE לתיקייה בלי / ב-Apache), ומפיל את
+        // ההתחברות בהפניה ל-https. הפניות בתוך אותו שרת — ב-[execute], עם אותה שיטה.
+        .followRedirects(false)
+        .followSslRedirects(false)
         .apply {
             if (!connection.plainHttp) {
                 val context = SSLContext.getInstance("TLS").apply { init(null, arrayOf(trust), null) }
@@ -96,8 +104,8 @@ class WebDavFs(private val connection: NetConnection, password: CharArray?) : Re
 
     override fun openRead(path: String): InputStream {
         val response = execute(request(urlOf(path, directory = false)).get().build())
-        if (response.code != 200) throw failure(response)
-        val body = response.body ?: throw failure(response)
+        if (response.code != 200) response.use { throw failure(it) }
+        val body = response.body ?: response.use { throw failure(it) }
         return object : FilterInputStream(body.byteStream()) {
             override fun read(): Int = guard { super.read() }
             override fun read(b: ByteArray, off: Int, len: Int): Int = guard { super.read(b, off, len) }
@@ -106,36 +114,34 @@ class WebDavFs(private val connection: NetConnection, password: CharArray?) : Re
     }
 
     /**
-     * PUT בזרם: מה שנכתב עובר בצינור לבקשה שרצה ב-thread משלה. `If-None-Match: *` — השרת מסרב לדרוס
-     * קובץ קיים. הכשל של הבקשה (שרת מלא, אין הרשאה) נראה ב-[OutputStream.close], או בכתיבה שאחריו.
+     * PUT בזרם: מה שנכתב עובר בצינור (okio — בלי קשר ל-thread שכותב; העתקה מושהית ממשיכה מ-thread
+     * אחר) לבקשה שרצה ב-thread משלה. `If-None-Match: *` — השרת מסרב לדרוס קובץ קיים. הכשל של הבקשה
+     * (שרת מלא, אין הרשאה) נראה ב-[OutputStream.close], או בכתיבה שאחריו.
      */
     override fun openWrite(path: String): OutputStream {
-        val input = PipedInputStream(PIPE_BUFFER)
-        val output = PipedOutputStream(input)
+        val pipe = Pipe(PIPE_BUFFER)
         val body = object : RequestBody() {
             override fun contentType() = OCTET_STREAM
             override fun isOneShot() = true
             override fun writeTo(sink: BufferedSink) {
-                input.source().use { sink.writeAll(it) }
+                pipe.source.use { sink.writeAll(it) }
             }
         }
-        val request = request(urlOf(path, directory = false)).put(body).header("If-None-Match", "*").build()
-        var outcome: Result<Int>? = null
-        var error: IOException? = null
+        val call = client.newCall(request(urlOf(path, directory = false)).put(body).header("If-None-Match", "*").build())
+        var outcome: Result<IOException?>? = null
         val worker = thread(name = "webdav-put", isDaemon = true) {
             outcome = runCatching {
-                execute(request).use { response ->
-                    if (response.code !in 200..299) error = failure(response)
-                    response.code
-                }
+                call.execute().use { response -> if (response.code in 200..299) null else failure(response) }
             }
-            runCatching { input.close() }
+            // הבקשה נגמרה (גם בכשל) — כתיבה נוספת נכשלת מייד, ולא מחכה לנצח לקורא.
+            pipe.cancel()
         }
+        val output = pipe.sink.buffer()
 
         fun finish() {
             worker.join()
             outcome?.exceptionOrNull()?.let { throw map(it) }
-            error?.let { throw it }
+            outcome?.getOrNull()?.let { throw it }
         }
 
         return object : OutputStream() {
@@ -145,14 +151,18 @@ class WebDavFs(private val connection: NetConnection, password: CharArray?) : Re
                 try {
                     output.write(b, off, len)
                 } catch (e: IOException) {
-                    // הצד השני של הצינור נגמר — הבקשה נכשלה; הסיבה שלה, לא "Pipe broken".
+                    // הצד השני של הצינור נגמר — הבקשה נכשלה; הסיבה שלה, לא "canceled".
                     finish()
-                    throw e
+                    throw IOException("ההעלאה לשרת נקטעה", e)
                 }
             }
 
             override fun close() {
-                runCatching { output.close() }
+                try {
+                    output.close()
+                } catch (e: IOException) {
+                    // הבקשה כבר נגמרה; התוצאה שלה ב-finish.
+                }
                 finish()
             }
         }
@@ -179,9 +189,11 @@ class WebDavFs(private val connection: NetConnection, password: CharArray?) : Re
 
     override fun rename(path: String, target: String) {
         if (!NetPaths.sameShare(path, target)) throw IOException("אפשר להעביר בשינוי שם רק בתוך אותו שרת")
-        val request = request(urlOf(path, directory = false))
+        // תיקייה — עם / בסוף בשני הצדדים: Apache מפנה (301) תיקייה בלי /.
+        val directory = stat(path)?.isDirectory ?: throw NotFound("הפריט לא נמצא בשרת")
+        val request = request(urlOf(path, directory))
             .method("MOVE", null)
-            .header("Destination", urlOf(target, directory = false).toString())
+            .header("Destination", urlOf(target, directory).toString())
             .header("Overwrite", "F")
             .build()
         execute(request).use { response ->
@@ -213,6 +225,8 @@ class WebDavFs(private val connection: NetConnection, password: CharArray?) : Re
     }.getOrNull()?.takeIf { it.total > 0 }
 
     override fun close() {
+        // גם בקשות שרצות (העלאה שנזנחה) — אחרת ה-thread שלהן מחכה לנצח.
+        client.dispatcher.cancelAll()
         client.dispatcher.executorService.shutdown()
         client.connectionPool.evictAll()
     }
@@ -223,10 +237,31 @@ class WebDavFs(private val connection: NetConnection, password: CharArray?) : Re
         authorization?.let { header("Authorization", it) }
     }
 
-    private fun execute(request: Request): Response = try {
-        client.newCall(request).execute()
-    } catch (e: IOException) {
-        throw map(e)
+    /**
+     * הפניה (301/302/307/308) בתוך אותו שרת — עוקבים עם אותה שיטה, אותו גוף ואותה התחברות (תיקייה
+     * בלי / בסוף). לשרת אחר או ל-scheme אחר — לא: [failure] מבקש להזין את הכתובת החדשה.
+     */
+    private fun execute(request: Request): Response {
+        var current = request
+        repeat(MAX_REDIRECTS) {
+            val response = try {
+                client.newCall(current).execute()
+            } catch (e: IOException) {
+                throw map(e)
+            }
+            if (response.code !in REDIRECTS || current.body?.isOneShot() == true) return response
+            val location = response.header("Location")?.let(current.url::resolve)
+            if (location == null || location.scheme != current.url.scheme || location.host != current.url.host || location.port != current.url.port) {
+                return response
+            }
+            response.close()
+            current = current.newBuilder().url(location).build()
+        }
+        return try {
+            client.newCall(current).execute()
+        } catch (e: IOException) {
+            throw map(e)
+        }
     }
 
     private fun propfind(url: HttpUrl, depth: Int, props: String): List<DavResponse> {
@@ -250,15 +285,21 @@ class WebDavFs(private val connection: NetConnection, password: CharArray?) : Re
     private fun map(e: Throwable): IOException {
         if (e is HostKeyUntrusted || e is NotFound || e is RemoteCrossDevice) return e as IOException
         val chain = generateSequence(e) { it.cause }.toList()
-        if (chain.any { it is javax.net.ssl.SSLException || it is CertificateException }) {
+        // רק כשל בלחיצת היד (התעודה, או השם שבה) — לא ניתוק באמצע העברה, שגם הוא SSLException.
+        if (chain.any { it is SSLHandshakeException || it is SSLPeerUnverifiedException }) {
             offered?.let { if (it != connection.hostKey) return HostKeyUntrusted(it, connection.hostKey != null) }
             return IOException("החיבור המאובטח לשרת נכשל — אם השרת ב-http, כתוב http:// בכתובת", e)
         }
         // מדיניות האבטחה של אנדרואיד חוסמת http — לא אמור לקרות (network_security_config מתיר).
         if (chain.any { it is java.net.UnknownServiceException }) return IOException("המכשיר חוסם http לשרת הזה", e)
         NetErrors.network(e, connection)?.let { return it }
+        // https לשרת שמדבר http: "Unsupported or unrecognized SSL message" / "WRONG_VERSION_NUMBER".
+        val plaintext = chain.any { t -> t is javax.net.ssl.SSLException && listOf("unrecognized", "plaintext", "wrong_version").any { t.message.orEmpty().contains(it, ignoreCase = true) } }
+        if (plaintext) return IOException("החיבור המאובטח לשרת נכשל — אם השרת ב-http, כתוב http:// בכתובת", e)
+        if (chain.any { it is javax.net.ssl.SSLException || it is java.net.SocketException }) return IOException("החיבור לשרת נותק", e)
         return e as? IOException ?: IOException(e.message ?: "שגיאת WebDAV", e)
     }
+
 
     private fun failure(response: Response): IOException {
         val message = when (response.code) {
@@ -317,8 +358,12 @@ class WebDavFs(private val connection: NetConnection, password: CharArray?) : Re
         return false
     }
 
-    /** תעודה שהמערכת מכירה, או זו שאושרה בחיבור. את מה שהוצג שומר — לשאלה "לסמוך על השרת?". */
-    private inner class Trust : X509TrustManager {
+    /**
+     * תעודה שהמערכת מכירה, או זו שאושרה בחיבור. את מה שהוצג שומר — לשאלה "לסמוך על השרת?". Extended:
+     * באנדרואיד, עם network_security_config שיש בו domain-config, מנהל האמון של המערכת דוחה כל בדיקה
+     * בלי שם השרת — וכל תעודה של רשות מוכרת הייתה נראית "עצמית".
+     */
+    private inner class Trust : X509ExtendedTrustManager() {
         private val system: X509TrustManager = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
             .apply { init(null as KeyStore?) }
             .trustManagers.filterIsInstance<X509TrustManager>().first()
@@ -326,18 +371,34 @@ class WebDavFs(private val connection: NetConnection, password: CharArray?) : Re
         fun pinned(session: SSLSession): Boolean =
             connection.hostKey != null && (session.peerCertificates.firstOrNull() as? X509Certificate)?.let(::certKey) == connection.hostKey
 
-        override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) = system.checkClientTrusted(chain, authType)
-
-        override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {
+        private fun check(chain: Array<X509Certificate>, systemCheck: () -> Unit) {
             val key = certKey(chain.first())
             if (key == connection.hostKey) return
             try {
-                system.checkServerTrusted(chain, authType)
+                systemCheck()
             } catch (e: CertificateException) {
                 offered = key
                 throw e
             }
         }
+
+        override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String, socket: Socket) = check(chain) {
+            (system as? X509ExtendedTrustManager)?.checkServerTrusted(chain, authType, socket) ?: system.checkServerTrusted(chain, authType)
+        }
+
+        override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String, engine: SSLEngine) = check(chain) {
+            (system as? X509ExtendedTrustManager)?.checkServerTrusted(chain, authType, engine) ?: system.checkServerTrusted(chain, authType)
+        }
+
+        override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) = check(chain) {
+            system.checkServerTrusted(chain, authType)
+        }
+
+        override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String, socket: Socket) = system.checkClientTrusted(chain, authType)
+
+        override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String, engine: SSLEngine) = system.checkClientTrusted(chain, authType)
+
+        override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) = system.checkClientTrusted(chain, authType)
 
         override fun getAcceptedIssuers(): Array<X509Certificate> = system.acceptedIssuers
     }
@@ -348,7 +409,9 @@ class WebDavFs(private val connection: NetConnection, password: CharArray?) : Re
     companion object {
         private const val CONNECT_TIMEOUT_S = 15L
         private const val READ_TIMEOUT_S = 60L
-        private const val PIPE_BUFFER = 256 * 1024
+        private const val PIPE_BUFFER = 256 * 1024L
+        private const val MAX_REDIRECTS = 3
+        private val REDIRECTS = setOf(301, 302, 307, 308)
         private val XML = "application/xml; charset=utf-8".toMediaType()
         private val OCTET_STREAM = "application/octet-stream".toMediaType()
         private const val PROPS = """<?xml version="1.0" encoding="utf-8"?><d:propfind xmlns:d="DAV:"><d:prop>""" +
@@ -378,8 +441,14 @@ internal object DavXml {
             isExpandEntityReferences = false
             runCatching { setFeature("http://apache.org/xml/features/disallow-doctype-decl", true) }
         }
+        val bytes = input.readBytes()
+        // ה-DOM של אנדרואיד לא מכיר disallow-doctype-decl: תשובה עם DTD (ישויות — "billion laughs")
+        // נדחית כאן. ב-multistatus אמיתי אין DTD.
+        if (String(bytes, 0, minOf(bytes.size, DOCTYPE_WINDOW), Charsets.ISO_8859_1).contains("<!DOCTYPE", ignoreCase = true)) {
+            throw IOException("תשובה לא מובנת מהשרת — זו כתובת של WebDAV?")
+        }
         val document = try {
-            factory.newDocumentBuilder().parse(input)
+            factory.newDocumentBuilder().parse(bytes.inputStream())
         } catch (e: Exception) {
             throw IOException("תשובה לא מובנת מהשרת — זו כתובת של WebDAV?", e)
         }
@@ -407,6 +476,7 @@ internal object DavXml {
     }
 
     private const val DAV = "DAV:"
+    private const val DOCTYPE_WINDOW = 4096
 
     private fun Element.childElements(): List<Element> =
         (0 until childNodes.length).mapNotNull { childNodes.item(it) as? Element }

@@ -97,5 +97,9 @@ class NetConnectionTest {
         assertEquals("http://nas:5005/dav", cloud.copy(host = "nas", port = 5005, share = "dav", plainHttp = true).displayUrl(cloud.root))
         assertEquals("idan@nas:5005", cloud.copy(host = "nas", port = 5005, plainHttp = true).subtitle)
         assertEquals("Cloud › Photos", cloud.displayPath("${cloud.root}/Photos"))
+        // כתובת אמיתית — "ערוך" מדביק אותה בחזרה ל-DavAddress.
+        val odd = cloud.copy(host = "fe80::1", port = 8443, share = "dav/a b", plainHttp = false)
+        assertEquals("https://[fe80::1]:8443/dav/a%20b/x%23%25%3F", odd.displayUrl("${odd.root}/x#%?"))
+        assertEquals(com.idanck.nexplorer.core.DavAddress("fe80::1", 8443, "dav/a b", false), com.idanck.nexplorer.core.DavAddress.parse(odd.displayUrl(odd.root)))
     }
 }

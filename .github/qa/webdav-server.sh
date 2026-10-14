@@ -45,6 +45,8 @@ LoadModule authz_core_module $modules/mod_authz_core.so
 LoadModule authz_user_module $modules/mod_authz_user.so
 LoadModule auth_basic_module $modules/mod_auth_basic.so
 LoadModule alias_module $modules/mod_alias.so
+# כמו Apache רגיל: תיקייה בלי / מקבלת הפניה (301) — WebDavFs צריך לעבור את זה.
+LoadModule dir_module $modules/mod_dir.so
 LoadModule dav_module $modules/mod_dav.so
 LoadModule dav_fs_module $modules/mod_dav_fs.so
 LoadModule ssl_module $modules/mod_ssl.so

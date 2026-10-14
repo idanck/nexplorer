@@ -22,10 +22,17 @@ data class DavAddress(val host: String, val port: Int?, val path: String, val pl
                 "http", "dav", "webdav" -> true
                 else -> return null
             }
-            val host = uri.host?.removeSurrounding("[", "]")?.takeIf { it.isNotEmpty() } ?: return null
             if (uri.rawUserInfo != null || uri.rawQuery != null || uri.rawFragment != null) return null
-            if (uri.port != -1 && uri.port !in 1..65535) return null
-            val port = uri.port.takeIf { it != -1 && it != if (plainHttp) 80 else 443 }
+            // "my_nas" — שם חוקי ברשת בבית, ש-java.net.URI לא מזהה כשרת: מפרקים את ה-authority לבד.
+            val authority = uri.rawAuthority ?: return null
+            val (host, rawPort) = when {
+                uri.host != null -> uri.host.removeSurrounding("[", "]") to uri.port
+                authority.startsWith("[") || '@' in authority -> return null
+                else -> authority.substringBefore(':') to (authority.substringAfter(':', "").ifEmpty { "-1" }.toIntOrNull() ?: return null)
+            }
+            if (host.isEmpty() || host.any { it.isWhitespace() || it == '%' }) return null
+            if (rawPort != -1 && rawPort !in 1..65535) return null
+            val port = rawPort.takeIf { it != -1 && it != if (plainHttp) 80 else 443 }
             val path = uri.path.orEmpty().split('/').filter { it.isNotEmpty() }.joinToString("/")
             return DavAddress(host, port, path, plainHttp)
         }

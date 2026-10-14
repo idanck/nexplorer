@@ -2,6 +2,7 @@ package com.idanck.nexplorer.data.net
 
 import com.idanck.nexplorer.core.NetPaths
 import com.idanck.nexplorer.core.NetProtocol
+import okhttp3.HttpUrl
 import org.json.JSONArray
 import org.json.JSONObject
 import java.security.SecureRandom
@@ -62,8 +63,16 @@ data class NetConnection(
         val segments = NetPaths.segments(path)
         val authority = host + if (port != null && port != defaultPort) ":$port" else ""
         if (protocol == NetProtocol.WebDav) {
-            val all = share.split('/').filter { it.isNotEmpty() } + segments
-            return "${if (plainHttp) "http" else "https"}://$authority/" + all.joinToString("/")
+            // כתובת אמיתית: IPv6 בסוגריים, ו-# % ? ורווח מקודדים — אפשר להדביק אותה בחזרה ("ערוך").
+            return runCatching {
+                HttpUrl.Builder()
+                    .scheme(if (plainHttp) "http" else "https")
+                    .host(host)
+                    .port(effectivePort)
+                    .apply { (share.split('/').filter { it.isNotEmpty() } + segments).forEach { addPathSegment(it) } }
+                    .build()
+                    .toString()
+            }.getOrElse { "${if (plainHttp) "http" else "https"}://$authority/" + (share.split('/').filter { it.isNotEmpty() } + segments).joinToString("/") }
         }
         // SFTP: השורש הוא "/" של השרת.
         val tail = segments.joinToString("") { "/$it" }.ifEmpty { if (protocol == NetProtocol.Sftp) "/" else "" }

@@ -234,4 +234,16 @@ class Phase5cTest {
         compose.waitFor(hasText("release-smoke-dav.txt"), 30_000)
         assertEquals("x509-sha256 $fingerprint", container.settings.state.value.connections.single().hostKey)
     }
+
+    /**
+     * תעודה של רשות מוכרת (ערוץ העדכונים, Let's Encrypt / Cloudflare) — לא "תעודה עצמית". באנדרואיד,
+     * עם domain-config ב-network_security_config, בדיקה בלי שם השרת נדחית — וכל שרת רגיל היה נשאל עליו.
+     */
+    @Test
+    fun t04_aCaSignedCertificateIsTrustedWithoutAsking() = logged("t04") {
+        val public = NetConnection("qa0000000004", NetProtocol.WebDav, "", "nexplorer-updates.idanck.com", null, "", "")
+        val result = runBlocking { com.idanck.nexplorer.data.net.RemoteFiles.test(public, null) }
+        Log.i("Phase5cTest", "CA-signed: $result")
+        assertTrue("$result", result !is com.idanck.nexplorer.data.net.ConnectCheck.TrustHost)
+    }
 }

@@ -152,8 +152,11 @@ fun ConnectScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val hasKey = sftp && (keyText != null || keepKey)
+    val davAddress = if (dav) DavAddress.parse(url) else null
     // סיסמה שמורה נשארת רק כשדרך ההתחברות לא השתנתה: אותה סיסמה, או אותו מפתח (לא קובץ מפתח חדש).
-    val keepsPassword = editing != null && editing.secret != null && (editing.keySecret != null) == hasKey && (editing.keySecret == null || keepKey)
+    val keepsPassword = editing != null && editing.secret != null && (editing.keySecret != null) == hasKey && (editing.keySecret == null || keepKey) &&
+        // מ-https ל-http: הסיסמה השמורה לא נשלחת גלויה בלי שהוזנה מחדש.
+        !(editing.protocol == NetProtocol.WebDav && !editing.plainHttp && davAddress?.plainHttp == true)
     val found = allFound.filter { it.protocol == protocol }
 
     val pickKey = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -172,7 +175,6 @@ fun ConnectScreen(
     }
 
     val portValue = port.trim().takeIf { it.isNotEmpty() }?.toIntOrNull()
-    val davAddress = if (dav) DavAddress.parse(url) else null
     val problem = when {
         dav && url.isBlank() -> "צריך כתובת של שרת"
         dav && davAddress == null -> "כתובת לא תקינה — למשל https://cloud.example.com/remote.php/dav/files/idan"
@@ -441,7 +443,7 @@ private fun HostKeyDialog(host: String, ask: ConnectCheck.TrustHost, onTrust: ()
                 } else if (certificate) {
                     Text(
                         "התעודה לא חתומה על ידי רשות מוכרת (תעודה עצמית, כמו בשרת בבית). בדוק שזו הטביעה שהשרת מציג — " +
-                            "בדפדפן, בפרטי התעודה. היא נשמרת, וחיבור עם תעודה אחרת ייחסם.",
+                            "בדפדפן, בפרטי התעודה. היא נשמרת, וחיבור עם תעודה עצמית אחרת ייחסם.",
                         style = MaterialTheme.typography.bodySmall,
                         color = scheme.onSurfaceVariant,
                     )

@@ -14,6 +14,9 @@ class DavAddressTest {
         assertEquals(DavAddress("host", null, "", true), DavAddress.parse("http://host:80/"))
         assertEquals(DavAddress("host", null, "a", false), DavAddress.parse("davs://host:443/a"))
         assertEquals(DavAddress("fe80::1", 8443, "dav", false), DavAddress.parse("https://[fe80::1]:8443/dav"))
+        // שם עם קו תחתון — java.net.URI לא מזהה אותו כשרת.
+        assertEquals(DavAddress("my_nas", 5006, "dav", false), DavAddress.parse("https://my_nas:5006/dav"))
+        assertEquals(DavAddress("my_nas", null, "", true), DavAddress.parse("http://my_nas"))
     }
 
     @Test
