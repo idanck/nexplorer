@@ -2,4 +2,10 @@
 <resources>
     <!-- זהה ל-background ב-ui/theme/Color.kt -->
     <color name="window_background">#F3F5F7</color>
+
+    <!-- אייקון האפליקציה (זמני — לא עוצב). זהה ל-Banner* ב-ui/theme/Color.kt. -->
+    <color name="icon_gradient_start">#1A47A0</color>
+    <color name="icon_gradient_end">#2B6FEE</color>
+    <color name="icon_wave">#163D8A</color>
+    <color name="icon_symbol">#D5E3FE</color>
 </resources>

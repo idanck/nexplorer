@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- זמני: אייקון האפליקציה לא עוצב (docs/design/design-language.md, "פתוח"). נגזר מבאנר המגירה. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endColor="@color/icon_gradient_end"
+                android:endX="108"
+                android:endY="108"
+                android:startColor="@color/icon_gradient_start"
+                android:startX="0"
+                android:startY="0"
+                android:type="linear" />
+        </aapt:attr>
+    </path>
+    <path
+        android:fillAlpha="0.85"
+        android:fillColor="@color/icon_wave"
+        android:pathData="M-4,82C16,62 40,96 68,74C92,55 98,56 112,66L112,112L-4,112Z" />
+</vector>

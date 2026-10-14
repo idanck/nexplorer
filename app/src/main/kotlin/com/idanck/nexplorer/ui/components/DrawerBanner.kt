@@ -10,11 +10,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.outlined.Inventory2
@@ -38,8 +41,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDirection
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.idanck.nexplorer.ui.theme.BannerTitleTextStyle
 import com.idanck.nexplorer.ui.theme.NexplorerColors
 import com.idanck.nexplorer.ui.theme.NexplorerDimens
 import com.idanck.nexplorer.ui.theme.NexplorerTheme
@@ -58,11 +60,13 @@ fun DrawerBanner(
 ) {
     val c = NexplorerTheme.colors
     val isTablet = LocalConfiguration.current.smallestScreenWidthDp >= 600
+    val statusBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(NexplorerDimens.DrawerBannerHeight)
+            // המגירה מצוירת מתחת לשורת המצב: הבאנר גדל בגובה שלה, והתוכן מתחיל מתחתיה.
+            .height(NexplorerDimens.DrawerBannerHeight + statusBar)
             .background(
                 Brush.linearGradient(
                     colors = listOf(c.bannerGradientStart, c.bannerGradientEnd),
@@ -76,30 +80,26 @@ fun DrawerBanner(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(start = 20.dp, end = 14.dp, top = 24.dp, bottom = 10.dp),
+                .padding(
+                    start = NexplorerDimens.BannerPaddingStart,
+                    end = NexplorerDimens.BannerPaddingEnd,
+                    top = NexplorerDimens.BannerPaddingTop + statusBar,
+                    bottom = NexplorerDimens.BannerPaddingBottom,
+                ),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
-                        .size(32.dp)
+                        .size(NexplorerDimens.BannerLogoTile)
                         .clip(MaterialTheme.shapes.extraSmall)
                         .background(c.bannerTitle.copy(alpha = 0.18f)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(Icons.Outlined.Inventory2, contentDescription = null, tint = c.bannerTitle, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Outlined.Inventory2, contentDescription = null, tint = c.bannerTitle, modifier = Modifier.size(NexplorerDimens.BannerLogoIcon))
                 }
-                Spacer(Modifier.size(10.dp))
-                Text(
-                    text = "nexplorer",
-                    color = c.bannerTitle,
-                    style = MaterialTheme.typography.headlineLarge.copy(
-                        fontSize = 34.sp,
-                        lineHeight = 38.sp,
-                        fontWeight = FontWeight.Medium,
-                        textDirection = TextDirection.Ltr,
-                    ),
-                )
+                Spacer(Modifier.size(NexplorerDimens.BannerLogoGap))
+                Text(text = "nexplorer", color = c.bannerTitle, style = BannerTitleTextStyle)
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -107,9 +107,9 @@ fun DrawerBanner(
                     imageVector = if (isTablet) Icons.Outlined.TabletAndroid else Icons.Outlined.PhoneAndroid,
                     contentDescription = null,
                     tint = c.bannerSubtitle,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(NexplorerDimens.BannerDeviceIcon),
                 )
-                Spacer(Modifier.size(7.dp))
+                Spacer(Modifier.size(NexplorerDimens.BannerDeviceGap))
                 Text(
                     text = deviceName,
                     color = c.bannerSubtitle,
@@ -120,7 +120,7 @@ fun DrawerBanner(
                     text = "·",
                     color = c.bannerSubtitle.copy(alpha = 0.6f),
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(horizontal = 7.dp),
+                    modifier = Modifier.padding(horizontal = NexplorerDimens.BannerDeviceGap),
                 )
                 Text(
                     text = "Android ${Build.VERSION.RELEASE}",

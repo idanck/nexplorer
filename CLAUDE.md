@@ -10,7 +10,7 @@
 
 ## מצב ותיעוד
 
-שפת העיצוב אושרה ונמצאת בקוד; אין עדיין לוגיקת קבצים. לפני כל עבודה קרא את `docs/README.md`.
+שלב 1 ממומש (`docs/plan/01-phase1.md`): מנהל קבצים מקומי + עדכון מתוך האפליקציה. לפני כל עבודה קרא את `docs/README.md`.
 - **שפת העיצוב של nexplorer (מחייבת):** `docs/design/design-language.md` + `docs/design/tokens.json`. צילומי המסכים ב-`docs/design/screens/` — בנה מסכים לפיהם.
 - הקוד של העיצוב: `app/src/main/kotlin/com/idanck/nexplorer/ui/theme/`. **אל תכתוב hex או גדלים בתוך מסכים** — רק דרך `MaterialTheme`, `NexplorerTheme.colors`, `NexplorerDimens`, `NexplorerShape`.
 - שינוי ערך עיצוב = עדכון `tokens.json` + הקוד + `design-language.md` באותו PR.
@@ -19,6 +19,9 @@
 - מחקר שפת העיצוב של Solid (השראה בלבד): `docs/research/05-design-language.md`, `docs/research/solid-tokens.json`
 - החלטות פתוחות (אין לבחור במקום עידן): `docs/research/08-open-decisions.md`
 - אין להשתמש בשם, לוגו או נכסים של Solid Explorer / NeatBytes בקוד או במשאבים.
+- **הקוד של אנדרואיד נבנה רק ב-CI** — בסביבת הענן אין Android SDK (dl.google.com חסום). לוגיקה טהורה שמים ב-`core/` ובודקים ב-`src/test/`.
+- **עדכונים (D5):** `versionCode` = מספר הריצה של ה-workflow `CI` — לא לשנות את שם הקובץ `ci.yml` או את שם ה-workflow, אחרת המספור מתאפס והמכשירים לא יראו עדכון.
+- **מפתח החתימה הוא זהות האפליקציה.** אסור ליצור מפתח חדש או להחליף את `RELEASE_KEYSTORE_B64`. טביעת האצבע נעוצה ב-`ci.yml` (`RELEASE_CERT_SHA256`). פרטים: `worker/README.md`.
 
 ## Stack
 
@@ -69,6 +72,9 @@ git config core.hooksPath .githooks
 ראה `.env.example` — שמות בלבד. ערכים לעולם לא נכנסים לריפו.
 
 ## Deploy
+
+מיזוג ל-`main` = גרסה: CI בונה APK חתום, מפרסם ל-`nexplorer-updates.idanck.com`, והאפליקציות המותקנות מציעות עדכון.
+כל build חתום (גם PR) נדחף גם לענף `apk`. ה-Worker נפרס ידנית מה-Pi — `worker/README.md`.
 
 <!-- TODO: איך מדפלים, לאן, ומה בדיקת העשן שמאשרת הצלחה -->
 

@@ -73,5 +73,13 @@ val MonoTextStyle = TextStyle(
     textDirection = TextDirection.Ltr,
 )
 
+/** "nexplorer" בבאנר המגירה: 500 · 34/38, תמיד LTR. */
+val BannerTitleTextStyle = NexplorerTypography.headlineLarge.copy(
+    fontSize = 34.sp,
+    lineHeight = 38.sp,
+    fontWeight = FontWeight.Medium,
+    textDirection = TextDirection.Ltr,
+)
+
 /** שם קובץ בשורת רשימה: פונט הממשק, כיוון LTR. */
 val FileNameTextStyle = NexplorerTypography.bodyLarge.copy(textDirection = TextDirection.Ltr)

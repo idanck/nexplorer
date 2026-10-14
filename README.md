@@ -6,14 +6,22 @@
 
 ## מצב
 
-שפת העיצוב אושרה ונכנסה לקוד: פרויקט Gradle עם Compose + Material 3, ערכת נושא מלאה ומסך קטלוג זמני.
-עדיין אין לוגיקת קבצים. החלטות פתוחות: [docs/research/08-open-decisions.md](docs/research/08-open-decisions.md).
+שלב 1 ממומש ([התוכנית](docs/plan/01-phase1.md)): מנהל קבצים מקומי לפי שפת העיצוב "סלע ואות" — דפדוף, בחירה, העתקה/העברה/מחיקה בתור העברות, חיפוש עמוק, אפשרויות תצוגה, הגדרות — ועדכון מתוך האפליקציה.
+עוד אין רשת, ענן, ארכיונים, הצפנה או טאבלט. החלטות פתוחות: [docs/research/08-open-decisions.md](docs/research/08-open-decisions.md).
+
+## התקנה ועדכונים
+
+- **APK אחרון:** הענף [`apk`](https://github.com/idanck/nexplorer/tree/apk) — מתעדכן בכל build חתום (גם של PR).
+- **עדכונים:** האפליקציה בודקת פעם ביום את `https://nexplorer-updates.idanck.com/latest.json` (וגם בהגדרות ← עדכונים ← "בדוק עכשיו"). כל מיזוג ל-`main` מפרסם גרסה.
+- בהתקנה הראשונה צריך לאשר "התקנה ממקורות לא ידועים" לאפליקציה שממנה פותחים את ה-APK, ובעדכון הראשון — ל-nexplorer עצמה.
+- פרטי הערוץ, המפתח והסודות: [worker/README.md](worker/README.md).
 
 ## תיעוד
 
 | מסמך | תוכן |
 |---|---|
 | [docs/README.md](docs/README.md) | אינדקס התיעוד |
+| [תוכנית שלב 1](docs/plan/01-phase1.md) | מה נכנס, מה לא, ערכים זמניים, ארכיטקטורה |
 | [שפת העיצוב](docs/design/design-language.md) | "סלע ואות" — עקרונות, צבע, טיפוגרפיה, מסכים, החלטות |
 | [tokens.json](docs/design/tokens.json) | טוקני העיצוב של nexplorer (מקור האמת) |
 | [01 — סקירה](docs/research/01-overview.md) | עובדות מפתח וציר זמן |
@@ -50,7 +58,8 @@ git config core.hooksPath .githooks   # מפעיל את בדיקות ה-commit/p
 
 ## Deploy
 
-ייקבע בהחלטה D5 (הפצה).
+אין deploy ידני: מיזוג ל-`main` ← CI בונה APK חתום ← מפרסם ל-`nexplorer-updates.idanck.com` ← האפליקציות המותקנות מציעות עדכון.
+ה-Worker עצמו נפרס ידנית מה-Pi (ראה [worker/README.md](worker/README.md)).
 
 ## מבנה
 
@@ -59,7 +68,9 @@ git config core.hooksPath .githooks   # מפעיל את בדיקות ה-commit/p
 | `docs/research/` | מסמכי המחקר 01–08 + מקורות |
 | `docs/design/` | שפת העיצוב: מסמך, טוקנים, צילומי מסכים, מקורות הלוחות, רישיונות פונטים |
 | `docs/screenshots/` | צילומי מסך |
-| `app/` | מודול האפליקציה — ערכת נושא ומסך קטלוג ([app/README.md](app/README.md)) |
+| `docs/plan/` | תוכניות מימוש |
+| `app/` | מודול האפליקציה ([app/README.md](app/README.md)) |
+| `worker/` | ה-Worker של ערוץ העדכונים |
 
 ---
 

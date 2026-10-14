@@ -27,3 +27,6 @@ local.properties
 *.aab
 captures/
 .externalNativeBuild/
+
+# --- python ---
+__pycache__/

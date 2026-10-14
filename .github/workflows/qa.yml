@@ -1,0 +1,210 @@
+name: QA
+# בדיקות על אמולטור אנדרואיד. נפרד מ-CI בכוונה: ל-CI יש מספור ריצות שהוא ה-versionCode (D5),
+# ובדיקות אמולטור ארוכות וחשופות לרעש — הן לא צריכות לעכב build או פרסום.
+#   instrumented — בכל PR: מסלולי משתמש + monkey על API 29 ו-35, עם צילומי מסך.
+#   update-e2e   — אחרי כל פרסום ב-main: build ישן מתעדכן מתוך האפליקציה לגרסה שפורסמה.
+# התוצאות (צילומים, פלט, logcat) נדחפות לענף qa.
+on:
+  pull_request:
+    paths-ignore: ['docs/**', '**.md', 'worker/**']
+  workflow_dispatch:
+    inputs:
+      update_e2e:
+        description: 'Also run the in-app update end-to-end test against the published channel'
+        type: boolean
+        default: false
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: qa-${{ github.head_ref || github.ref_name }}-${{ github.event_name == 'workflow_run' && 'e2e' || 'ui' }}
+  cancel-in-progress: true
+
+env:
+  UPDATES_HOST: https://nexplorer-updates.idanck.com
+
+jobs:
+  instrumented:
+    if: github.event_name != 'workflow_run'
+    name: emulator (API ${{ matrix.api }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        # 29: מסלול ההרשאות הישן (Android 8–10). 35: targetSdk.
+        api: [29, 35]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          ls -l /dev/kvm
+
+      - name: Build the app and the tests
+        run: ./gradlew assembleDebug assembleDebugAndroidTest
+
+      - name: Free disk space for the emulator
+        # מ-API 24 האמולטור מעגל את מחיצת הנתונים ל-6 GiB לפחות ודורש פי 1.2 פנויים (7373 MB) — disk-size קטן לא עוזר.
+        # אחרי ה-build, כדי לא למחוק משהו שהוא צריך.
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost \
+                      /opt/hostedtoolcache/CodeQL /usr/local/lib/android/sdk/ndk
+          sudo docker image prune --all --force > /dev/null 2>&1 || true
+          df -h /
+          avail=$(df -Pm "$HOME" | awk 'NR==2{print $4}')
+          [ "$avail" -ge 9000 ] || { echo "::error::Only ${avail} MB free; the emulator needs ~7373 MB for userdata"; exit 1; }
+
+      - name: Run on the emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot
+          script: bash .github/qa/instrumented.sh qa-out
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qa-api-${{ matrix.api }}
+          path: qa-out/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  update-e2e:
+    if: >-
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+      (github.event_name == 'workflow_dispatch' && inputs.update_e2e)
+    name: in-app update end to end
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Set up the release signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE_B64 }}
+        run: |
+          set -euo pipefail
+          [ -n "${KEYSTORE_B64:-}" ] || { echo "::error::No release keystore — an old build signed with another key cannot be updated."; exit 1; }
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          echo "RELEASE_KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+
+      - name: Build an old release (versionCode 1)
+        env:
+          RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: ./gradlew assembleRelease -PversionCodeOverride=1
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Free disk space for the emulator
+        # מ-API 24 האמולטור מעגל את מחיצת הנתונים ל-6 GiB לפחות ודורש פי 1.2 פנויים (7373 MB) — disk-size קטן לא עוזר.
+        # אחרי ה-build, כדי לא למחוק משהו שהוא צריך.
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost \
+                      /opt/hostedtoolcache/CodeQL /usr/local/lib/android/sdk/ndk
+          sudo docker image prune --all --force > /dev/null 2>&1 || true
+          df -h /
+          avail=$(df -Pm "$HOME" | awk 'NR==2{print $4}')
+          [ "$avail" -ge 9000 ] || { echo "::error::Only ${avail} MB free; the emulator needs ~7373 MB for userdata"; exit 1; }
+
+      - name: Update from inside the app
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot
+          script: bash .github/qa/update-e2e.sh app/build/outputs/apk/release/app-release.apk qa-out
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qa-update-e2e
+          path: qa-out/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  publish:
+    name: publish results to the qa branch
+    needs: [instrumented, update-e2e]
+    if: always() && (needs.instrumented.result != 'skipped' || needs.update-e2e.result != 'skipped')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: qa-*
+          path: incoming
+
+      - name: Push to the qa branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha || github.sha }}
+          SOURCE_REF: ${{ github.head_ref || github.event.workflow_run.head_branch || github.ref_name }}
+          INSTRUMENTED: ${{ needs.instrumented.result }}
+          E2E: ${{ needs.update-e2e.result }}
+        run: |
+          set -euo pipefail
+          remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          work=$(mktemp -d)
+          # שומרים את התוצאות האחרונות של החלקים שלא רצו הפעם (למשל update-e2e מריצה קודמת).
+          if git ls-remote --exit-code "$remote" refs/heads/qa > /dev/null 2>&1; then
+            git clone -q --depth 1 --branch qa "$remote" "$work"
+            rm -rf "$work/.git"
+          fi
+          shopt -s nullglob
+          for dir in incoming/qa-*; do
+            part=${dir#incoming/qa-}
+            rm -rf "${work:?}/$part"
+            cp -r "$dir" "$work/$part"
+            printf '%s\n' "${HEAD_SHA}" "${SOURCE_REF}" "$(date -u '+%Y-%m-%d %H:%M UTC')" "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" > "$work/$part/SOURCE"
+          done
+          {
+            echo "# nexplorer — תוצאות QA אחרונות"
+            echo
+            echo "הענף נדחף מחדש בכל ריצה של ה-workflow ‏QA. כל תיקייה: צילומי מסך (\`screens/\`), פלט הבדיקות, logcat, ו-\`SOURCE\` (commit, ענף, זמן, ריצה)."
+            echo
+            echo "ריצה אחרונה: \`${HEAD_SHA:0:8}\` (\`${SOURCE_REF}\`) — instrumented: **${INSTRUMENTED}**, update-e2e: **${E2E}**."
+          } > "$work/README.md"
+          cd "$work"
+          git init -q -b qa
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -qm "test: QA results for ${HEAD_SHA:0:8} (${SOURCE_REF})"
+          git push -q --force "$remote" qa

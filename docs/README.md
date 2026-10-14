@@ -12,6 +12,12 @@
 | [boards/](design/boards/) | מקורות ה-HTML של הלוחות (ערכים מדויקים) |
 | [fonts/](design/fonts/) | רישיונות OFL של הפונטים |
 
+## תוכניות מימוש
+
+| מסמך | מה יש בו |
+|---|---|
+| [שלב 1](plan/01-phase1.md) | מנהל קבצים מקומי + עדכונים מתוך האפליקציה: היקף, ערכים זמניים, ארכיטקטורה |
+
 ## מחקר — Solid Explorer
 
 מיפוי של Solid Explorer File Manager (NeatBytes) כהכנה לבניית nexplorer.

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- כל מה שמנהל הקבצים מציג אפשר לשתף או לפתוח באפליקציה אחרת: האחסון הראשי וגם SD/USB. -->
+<paths>
+    <external-path name="external" path="." />
+    <root-path name="root" path="." />
+</paths>
