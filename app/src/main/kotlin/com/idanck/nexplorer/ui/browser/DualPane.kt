@@ -55,6 +55,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.idanck.nexplorer.core.Entry
 import com.idanck.nexplorer.data.files.StorageVolumeInfo
 import com.idanck.nexplorer.data.settings.AppSettings
 import com.idanck.nexplorer.data.transfer.TransferManager
@@ -86,7 +87,7 @@ fun DualPaneScreen(
     onOpenSettings: () -> Unit,
     onOpenAnalyzer: (String?) -> Unit,
     onEditText: (String) -> Unit,
-    onOpenImage: (String) -> Unit,
+    onOpenMedia: (Entry) -> Unit,
 ) {
     require(panes.size == 2)
     var active by rememberSaveable { mutableIntStateOf(0) }
@@ -202,7 +203,7 @@ fun DualPaneScreen(
                                 onOpenSettings = onOpenSettings,
                                 onOpenAnalyzer = onOpenAnalyzer,
                                 onEditText = onEditText,
-                                onOpenImage = onOpenImage,
+                                onOpenMedia = onOpenMedia,
                                 keys = keys,
                                 pane = PaneConfig(
                                     index = index,

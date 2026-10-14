@@ -74,6 +74,7 @@ import com.idanck.nexplorer.core.ArchivePaths
 import com.idanck.nexplorer.core.Counts
 import com.idanck.nexplorer.core.Entry
 import com.idanck.nexplorer.core.FileKind
+import com.idanck.nexplorer.core.MediaFormats
 import com.idanck.nexplorer.core.SizeFormat
 import com.idanck.nexplorer.core.isolated
 import com.idanck.nexplorer.data.apk.ApkInspector
@@ -158,7 +159,8 @@ fun BrowserScreen(
     onOpenSettings: () -> Unit,
     onOpenAnalyzer: (String?) -> Unit,
     onEditText: (String) -> Unit,
-    onOpenImage: (String) -> Unit,
+    /** תמונה, שמע או וידאו שנפתחים בתוך האפליקציה (MediaFormats.opensInApp). */
+    onOpenMedia: (Entry) -> Unit,
     keys: KeyBus,
     /** שני חלונות: החלון הזה הוא אחד מהם. null — מסך יחיד (טלפון). */
     pane: PaneConfig? = null,
@@ -201,9 +203,10 @@ fun BrowserScreen(
             when (event) {
                 // showSnackbar ממתין עד שההודעה נעלמת — בלי launch, פתיחת קובץ הייתה מחכה מאחוריה.
                 is BrowserEvent.Message -> launch { snackbar.showSnackbar(event.text) }
-                // תמונה נפתחת במציג המובנה (החלקה בין התמונות בתיקייה); "פתיחה באמצעות" שם פותח אחרת.
-                is BrowserEvent.OpenFile -> if (event.entry.kind == FileKind.Image) {
-                    onOpenImage(event.entry.path)
+                // תמונה, שמע ווידאו נפתחים במציג ובנגנים המובנים (עם הקבצים האחרים בתיקייה);
+                // "פתיחה באמצעות" שם פותח אחרת. פורמט שהנגן לא מכיר עובר ישר לאפליקציה אחרת.
+                is BrowserEvent.OpenFile -> if (MediaFormats.opensInApp(event.entry)) {
+                    onOpenMedia(event.entry)
                 } else if (!FileIntents.open(context, event.entry.path, event.entry.name)) {
                     // אין אפליקציה לטקסט/קוד — העורך המובנה פותח אותו.
                     if (event.entry.canEditAsText()) onEditText(event.entry.path)

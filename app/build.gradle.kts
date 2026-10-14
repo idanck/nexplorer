@@ -101,6 +101,9 @@ dependencies {
     implementation(libs.zip4j)
     implementation(libs.commons.compress)
     implementation(libs.xz)
+    implementation(libs.androidx.media3.exoplayer)
+    implementation(libs.androidx.media3.ui)
+    implementation(libs.androidx.media3.session)
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)

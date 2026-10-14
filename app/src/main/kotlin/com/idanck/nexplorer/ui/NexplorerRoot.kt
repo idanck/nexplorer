@@ -33,21 +33,34 @@ import com.idanck.nexplorer.ui.update.UpdateActions
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
+import com.idanck.nexplorer.core.Entry
 import com.idanck.nexplorer.core.FileKind
+import com.idanck.nexplorer.core.MediaFormats
 import com.idanck.nexplorer.ui.browser.DualPaneScreen
 import com.idanck.nexplorer.ui.theme.NexplorerDimens
+import com.idanck.nexplorer.ui.player.AudioPlayerScreen
+import com.idanck.nexplorer.ui.player.AudioPlayerViewModel
+import com.idanck.nexplorer.ui.player.VideoPlayerScreen
+import com.idanck.nexplorer.ui.player.VideoPlayerViewModel
 import com.idanck.nexplorer.ui.viewer.ImageViewerScreen
 import com.idanck.nexplorer.ui.viewer.ViewerViewModel
 import kotlinx.coroutines.launch
 
-private enum class Screen { Browser, Search, Settings, Analyzer, Editor, Viewer }
+private enum class Screen { Browser, Search, Settings, Analyzer, Editor, Viewer, Audio, Video }
 
 /**
  * השורש: בלי גישה לקבצים — מסך הגישה; אחרת חלון הקבצים, ומעליו חיפוש או הגדרות.
  * בכל חזרה לאפליקציה: בדיקת ההרשאות מחדש (הן ניתנות במסכי המערכת) ובדיקת עדכון יומית.
  */
 @Composable
-fun NexplorerRoot(container: AppContainer, pendingPath: String?, onPendingPathConsumed: () -> Unit) {
+fun NexplorerRoot(
+    container: AppContainer,
+    pendingPath: String?,
+    onPendingPathConsumed: () -> Unit,
+    /** הקשה על התראת הנגן. */
+    showPlayer: Boolean,
+    onShowPlayerConsumed: () -> Unit,
+) {
     val context = LocalContext.current
     val settings by container.settings.state.collectAsStateWithLifecycle()
     val updateState by container.updates.state.collectAsStateWithLifecycle()
@@ -78,12 +91,36 @@ fun NexplorerRoot(container: AppContainer, pendingPath: String?, onPendingPathCo
         viewerPath = path
         screen = Screen.Viewer
     }
+    // הנגנים נוצרים רק כשנפתח קובץ שמע או וידאו (ה-ViewModel של השמע מתחבר לשירות הניגון).
+    var audioPath by rememberSaveable { mutableStateOf<String?>(null) }
+    var audioRequest by remember { mutableStateOf<String?>(null) }
+    var videoPath by rememberSaveable { mutableStateOf<String?>(null) }
+    fun openMedia(entry: Entry) {
+        when (entry.kind) {
+            FileKind.Audio -> {
+                audioRequest = entry.path
+                audioPath = entry.path
+                screen = Screen.Audio
+            }
+            FileKind.Video -> {
+                videoPath = entry.path
+                screen = Screen.Video
+            }
+            else -> openImage(entry.path)
+        }
+    }
 
     LaunchedEffect(pendingPath) {
         if (pendingPath != null) {
             browser.openPath(pendingPath)
             screen = Screen.Browser
             onPendingPathConsumed()
+        }
+    }
+    LaunchedEffect(showPlayer) {
+        if (showPlayer) {
+            screen = Screen.Audio
+            onShowPlayerConsumed()
         }
     }
 
@@ -134,7 +171,7 @@ fun NexplorerRoot(container: AppContainer, pendingPath: String?, onPendingPathCo
                     onOpenSettings = { screen = Screen.Settings },
                     onOpenAnalyzer = onOpenAnalyzer,
                     onEditText = onEditText,
-                    onOpenImage = ::openImage,
+                    onOpenMedia = ::openMedia,
                 )
             } else {
                 BrowserScreen(
@@ -147,7 +184,7 @@ fun NexplorerRoot(container: AppContainer, pendingPath: String?, onPendingPathCo
                     onOpenSettings = { screen = Screen.Settings },
                     onOpenAnalyzer = onOpenAnalyzer,
                     onEditText = onEditText,
-                    onOpenImage = ::openImage,
+                    onOpenMedia = ::openMedia,
                     keys = container.keys,
                 )
             }
@@ -167,6 +204,31 @@ fun NexplorerRoot(container: AppContainer, pendingPath: String?, onPendingPathCo
             }
         }
 
+        Screen.Audio -> {
+            val audio = viewModel<AudioPlayerViewModel>()
+            LaunchedEffect(audioRequest) {
+                audioRequest?.let {
+                    audio.open(it)
+                    audioRequest = null
+                }
+            }
+            AudioPlayerScreen(viewModel = audio, path = audioPath, onBack = { screen = Screen.Browser })
+        }
+
+        Screen.Video -> {
+            val path = videoPath
+            if (path == null) {
+                LaunchedEffect(Unit) { screen = Screen.Browser }
+            } else {
+                VideoPlayerScreen(
+                    viewModel = viewModel<VideoPlayerViewModel>(),
+                    path = path,
+                    onPathChange = { videoPath = it },
+                    onBack = { screen = Screen.Browser },
+                )
+            }
+        }
+
         Screen.Search -> {
             BackHandler { screen = Screen.Browser }
             SearchScreen(
@@ -177,8 +239,8 @@ fun NexplorerRoot(container: AppContainer, pendingPath: String?, onPendingPathCo
                     if (entry.isDirectory) {
                         browser.navigate(Location.Folder(entry.path))
                         screen = Screen.Browser
-                    } else if (entry.kind == FileKind.Image) {
-                        openImage(entry.path)
+                    } else if (MediaFormats.opensInApp(entry)) {
+                        openMedia(entry)
                     } else if (!FileIntents.open(context, entry.path, entry.name)) {
                         Toast.makeText(context, "אין אפליקציה שפותחת קבצים מסוג זה", Toast.LENGTH_SHORT).show()
                     }

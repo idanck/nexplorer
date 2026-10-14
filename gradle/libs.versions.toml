@@ -18,6 +18,7 @@ uiautomator = "2.3.0"
 zip4j = "2.11.5"
 commonsCompress = "1.28.0"
 xz = "1.10"
+media3 = "1.5.1"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidxCore" }
@@ -41,6 +42,10 @@ zip4j = { module = "net.lingala.zip4j:zip4j", version.ref = "zip4j" }
 # 7z (כולל AES), TAR ו-GZ/BZ2/XZ. Apache 2.0. xz — LZMA/LZMA2 ל-7z ול-XZ (public domain).
 commons-compress = { module = "org.apache.commons:commons-compress", version.ref = "commonsCompress" }
 xz = { module = "org.tukaani:xz", version.ref = "xz" }
+# נגני השמע והווידאו (שלב 3ב): ExoPlayer, PlayerView, ו-MediaSession לניגון ברקע. Apache 2.0.
+androidx-media3-exoplayer = { module = "androidx.media3:media3-exoplayer", version.ref = "media3" }
+androidx-media3-ui = { module = "androidx.media3:media3-ui", version.ref = "media3" }
+androidx-media3-session = { module = "androidx.media3:media3-session", version.ref = "media3" }
 junit = { module = "junit:junit", version.ref = "junit" }
 org-json = { module = "org.json:json", version.ref = "orgJson" }
 # בדיקות על אמולטור (QA): ‏.github/workflows/qa.yml
