@@ -23,6 +23,8 @@
     <!-- העברות ארוכות ממשיכות כשהמסך כבוי. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- נגן השמע ממשיך ברקע, עם התראה ובקרים במסך הנעילה. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!--
@@ -60,6 +62,19 @@
             android:name=".data.transfer.TransferService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <!--
+          ניגון שמע ברקע. לא מיוצא: רק האפליקציה מתחברת אליו. ה-intent-filter נדרש ל-Media3
+          (SessionToken מזהה דרכו את סוג השירות), גם בתוך אותה אפליקציה.
+        -->
+        <service
+            android:name=".media.PlaybackService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
+        </service>
 
         <receiver
             android:name=".update.UpdateInstallReceiver"

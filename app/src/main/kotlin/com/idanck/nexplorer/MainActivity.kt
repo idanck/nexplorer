@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.idanck.nexplorer.data.files.FileIntents
 import com.idanck.nexplorer.data.settings.ThemeMode
+import com.idanck.nexplorer.media.PlaybackService
 import com.idanck.nexplorer.ui.NexplorerRoot
 import com.idanck.nexplorer.ui.keys.KeyShortcuts
 import com.idanck.nexplorer.ui.theme.NexplorerTheme
@@ -32,6 +33,9 @@ class MainActivity : ComponentActivity() {
 
     /** נתיב מקיצור דרך במסך הבית, עד שהמסך הראשי פותח אותו. */
     private val pendingPath = mutableStateOf<String?>(null)
+
+    /** הקשה על התראת הנגן, עד שהמסך הראשי פותח אותו. */
+    private val pendingPlayer = mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -60,6 +64,8 @@ class MainActivity : ComponentActivity() {
                         container = container,
                         pendingPath = pendingPath.value,
                         onPendingPathConsumed = { pendingPath.value = null },
+                        showPlayer = pendingPlayer.value,
+                        onShowPlayerConsumed = { pendingPlayer.value = false },
                     )
                 }
             }
@@ -142,8 +148,9 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun readIntent(intent: Intent?) {
-        if (intent?.action == FileIntents.ACTION_OPEN_FOLDER) {
-            pendingPath.value = intent.getStringExtra(FileIntents.EXTRA_PATH)
+        when (intent?.action) {
+            FileIntents.ACTION_OPEN_FOLDER -> pendingPath.value = intent.getStringExtra(FileIntents.EXTRA_PATH)
+            PlaybackService.ACTION_SHOW_PLAYER -> pendingPlayer.value = true
         }
     }
 }

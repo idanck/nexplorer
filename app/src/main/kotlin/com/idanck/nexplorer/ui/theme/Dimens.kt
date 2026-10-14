@@ -126,4 +126,11 @@ object NexplorerDimens {
     val DropTargetDash = 6.dp
     val DropTargetGap = 4.dp
     val DropTargetInset = 8.dp
+
+    /** נגן השמע: עטיפה (עד 280; קטנה יותר במסך נמוך), סמל במקום עטיפה, כפתור נגן/השהה ושאר הבקרים. */
+    val PlayerArtworkMax = 280.dp
+    val PlayerArtworkIcon = 96.dp
+    val PlayerPlayButton = 72.dp
+    val PlayerPlayIcon = 36.dp
+    val PlayerControl = 56.dp
 }

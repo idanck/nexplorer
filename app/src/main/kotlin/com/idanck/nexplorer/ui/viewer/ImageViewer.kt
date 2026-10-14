@@ -18,7 +18,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
@@ -151,7 +157,10 @@ fun ImageViewerScreen(viewModel: ViewerViewModel, path: String, onPathChange: (S
                 Modifier
                     .fillMaxWidth()
                     .background(colors.viewerChrome)
-                    .statusBarsPadding()
+                    // לרוחב שורת הניווט והמגרעת בצד: הכפתורים לא יושבים מתחתיהן.
+                    .windowInsetsPadding(
+                        WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
+                    )
                     .padding(horizontal = NexplorerDimens.Space1, vertical = NexplorerDimens.Space1),
                 verticalAlignment = Alignment.CenterVertically,
             ) {

@@ -14,6 +14,12 @@ runner="$pkg.test/androidx.test.runner.AndroidJUnitRunner"
 api=$(adb shell getprop ro.build.version.sdk | tr -d '\r')
 status=0
 
+# אמולטור עמוס: אפליקציות מערכת (Pixel Launcher) נתקעות, וחלון "isn't responding" שלהן מכסה את
+# האפליקציה — ב-API 35 כל הבדיקות נכשלו בגללו. בלי חלונות שגיאה המערכת הורגת את התוקעת; ANR או
+# קריסה של האפליקציה עצמה עדיין נתפסים בסוף מה-logcat (am_anr, crash). ראשון, לפני ההתקנות וההמתנה
+# לעומס: ה-launcher נתקע גם בזמן הזה, וחלון שכבר נפתח לא נסגר כשההגדרה נכנסת לתוקף.
+adb shell settings put global hide_error_dialogs 1 || true
+
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 # אנדרואיד 15 הורג תהליך שלא סיים לעלות תוך ~30 שניות ("failed to complete startup"). מיד אחרי
@@ -28,16 +34,26 @@ for _ in $(seq 1 60); do
   sleep 2
 done
 echo "cpu pressure before tests: ${load:-n/a}"
-# אמולטור עמוס: אפליקציות מערכת (Pixel Launcher) נתקעות, וחלון "isn't responding" שלהן מכסה את
-# האפליקציה — ב-API 35 כל הבדיקות נכשלו בגללו. בלי חלונות שגיאה המערכת הורגת את התוקעת; ANR או
-# קריסה של האפליקציה עצמה עדיין נתפסים בסוף מה-logcat (am_anr, crash).
-adb shell settings put global hide_error_dialogs 1 || true
 adb shell rm -rf /sdcard/Download/nexplorer-qa
 adb logcat -G 16M || true
 adb logcat -c
 
+# חלון "isn't responding" של אפליקציה אחרת שכבר פתוח (נפתח לפני hide_error_dialogs, או למרות
+# ההגדרה): נשאר מעל האפליקציה עד שהתהליך שלו נהרג — וכל הבדיקות אחריו נכשלות. של האפליקציה שלנו
+# לא נוגעים: הבדיקה צריכה להיכשל, ו-anr.txt מדווח עליו.
+clear_foreign_anr_dialogs() {
+  adb shell dumpsys window windows < /dev/null | tr -d '\r' \
+    | sed -n 's/.*Application Not Responding: \([A-Za-z0-9._]*\).*/\1/p' | sort -u \
+    | while read -r stuck; do
+        [ "$stuck" = "$pkg" ] && continue
+        echo "::warning::closing the ANR dialog of $stuck (API $api)"
+        adb shell am force-stop "$stuck" < /dev/null || true
+      done
+}
+
 run_class() {
   local cls="$1"
+  clear_foreign_anr_dialogs
   echo "::group::$cls (API $api)"
   adb shell am instrument -w -e class "com.idanck.nexplorer.qa.$cls" "$runner" 2>&1 | tee "$out/$cls.txt"
   echo "::endgroup::"
@@ -53,7 +69,8 @@ run_class SearchAndSettingsTest
 run_class Phase2Test
 run_class Phase2bTest
 run_class Phase3Test
-# Phase2bTest מדמה טאבלט; אם התהליך קרס לפני tearDown — שהמונקי ירוץ על המסך הרגיל.
+run_class Phase3bTest
+# Phase2bTest מדמה טאבלט ו-Phase3bTest מסובב; אם התהליך קרס לפני tearDown — שהמונקי ירוץ על המסך הרגיל.
 adb shell wm size reset || true
 adb shell wm density reset || true
 adb shell settings put system accelerometer_rotation 0 || true
