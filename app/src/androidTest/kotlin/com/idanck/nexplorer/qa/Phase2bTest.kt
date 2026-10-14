@@ -9,6 +9,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isSelected
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithText
@@ -128,7 +129,10 @@ class Phase2bTest {
         compose.waitForDisk { !File(root, "archive.zip").exists() }
 
         // Tab: החלון השני פעיל; Backspace שם עולה מ-Empty, ו-big.bin (שהועבר לתוכה) כבר לא מוצג.
+        // ב-API 29 הפוקוס חוזר מהדיאלוג באיחור — מקש שנלחץ לפני כן הולך לחלון הדיאלוג ואובד.
+        waitForWindowFocus()
         Qa.device.pressKeyCode(KeyEvent.KEYCODE_TAB)
+        compose.waitFor(hasContentDescription("חלון שני") and isSelected())
         // המקשים נרשמים מחדש אחרי ההרכבה — בלי זה Backspace עוד היה מגיע לחלון הראשון.
         compose.waitForIdle()
         Qa.device.pressKeyCode(KeyEvent.KEYCODE_DEL)
@@ -149,6 +153,14 @@ class Phase2bTest {
         longPressDrag(from, to) { Qa.screenshot(compose, "66-dual-drag-hover", settle = false) }
         compose.waitForDisk { File(root, "Empty/readme.md").isFile }
         assertTrue("גרירה מעתיקה, לא מעבירה", File(root, "readme.md").isFile)
+    }
+
+    private fun waitForWindowFocus() {
+        compose.waitUntil(10_000) {
+            var focused = false
+            scenario.onActivity { focused = it.hasWindowFocus() }
+            focused
+        }
     }
 
     private fun screenCenter(inWindow: Offset): Offset {

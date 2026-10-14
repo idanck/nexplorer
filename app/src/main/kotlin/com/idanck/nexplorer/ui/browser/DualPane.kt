@@ -50,6 +50,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -185,7 +186,11 @@ fun DualPaneScreen(
                                         active = index
                                     }
                                 }
-                                .semantics { contentDescription = if (index == 0) "חלון ראשון" else "חלון שני" },
+                                // selected: קורא המסך (והבדיקות) יודעים איזה חלון פעיל — המסגרת לבדה לא נקראת.
+                                .semantics {
+                                    contentDescription = if (index == 0) "חלון ראשון" else "חלון שני"
+                                    selected = isActive
+                                },
                         ) {
                             BrowserScreen(
                                 vm = vm,
