@@ -10,6 +10,11 @@ updates:
       # Gradle 9.6 ומעלה דורש AGP 9 (‏AGP 8 נשען על Problems API פנימי שהוסר) — עד המעבר ל-AGP 9.
       - dependency-name: "gradle-wrapper"
         update-types: ["version-update:semver-major"]
+      # דורשות compileSdk 37 ו-AGP 9 (‏core 1.19: ‏AGP 9.1; ‏Compose 1.12 — BOM 2026.08 ומעלה: ‏AGP 9.2) — עד המעבר.
+      - dependency-name: "androidx.core:core-ktx"
+        versions: [">= 1.19.0"]
+      - dependency-name: "androidx.compose:compose-bom"
+        versions: [">= 2026.08.00"]
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule: { interval: "monthly" }

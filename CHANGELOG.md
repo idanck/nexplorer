@@ -50,6 +50,7 @@
 - Worker: השוואת טוקן בזמן קבוע, 400 (לא 500) על נתיב פגום. CI: versionCode ו-minSdk נקראים מה-APK; תקלה בערוץ לא נחשבת "עוד לא פורסם"
 
 ### Changed
+- תלויות (מ-PR-ים של Dependabot, בסבב QA אחד): media3 ‏1.5.1 ← 1.11.1, ‏core-ktx ‏1.15.0 ← 1.18.0 (‏1.19 דורש compileSdk 37 ו-AGP 9), ‏androidx.test runner ‏1.7.0 ו-ext-junit ‏1.3.0; ב-CI: ‏setup-java 6, ‏upload-artifact 7, ‏download-artifact 8. ‏Kotlin ‏2.0.21 ← 2.2.21: ‏media3 1.11 (ui, ‏session) נבנה ב-Kotlin 2.2, והקומפיילר של 2.0 לא קורא את ה-metadata שלו ("compiled with an incompatible version of Kotlin")
 - Compose BOM ‏2024.12.01 ← 2026.03.01 ‏(Compose 1.10.6) ו-AGP ‏8.7.3 ← 8.13.2 עם compileSdk 36 ו-Gradle ‏8.14.6 (תיקוני האבטחה של 9.8.1; ‏Gradle 9.6 ומעלה דורש AGP 9) (ה-lint של Compose 1.9 ומעלה דורש AGP 8.8.2, ו-media3 1.11 דורש compileSdk 36; targetSdk נשאר 35). ב-ui-test של Compose 1.7 ההתאמה לצמתים רצה על חוט הבדיקה במקביל ל-layout, ובאמולטור API 29 בדיקות נפלו לסירוגין ("Detected multithreaded access to SnapshotStateObserver", "performMeasureAndLayout called during measure layout")
 - מסך הקטלוג הזמני הוסר — המסך הראשי מחליף אותו
 - build ה-debug מקבל `applicationIdSuffix ".debug"` ולא בודק עדכונים, כדי לא להתנגש בגרסה החתומה
