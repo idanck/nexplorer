@@ -110,8 +110,10 @@ jobs:
           retention-days: 14
 
   update-e2e:
+    # workflow_run.event — הסינון branches: [main] תופס גם PR מ-fork שהענף שלו נקרא main.
     if: >-
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event != 'pull_request') ||
       (github.event_name == 'workflow_dispatch' && inputs.update_e2e)
     name: in-app update end to end
     runs-on: ubuntu-latest

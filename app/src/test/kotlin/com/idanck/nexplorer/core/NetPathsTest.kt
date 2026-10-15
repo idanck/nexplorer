@@ -73,8 +73,8 @@ class NetPathsTest {
     fun `sftp paths are full server paths from the root`() {
         val sftp = NetPaths.root(NetProtocol.Sftp, "f00d")
         assertEquals("sftp://f00d", sftp)
-        assertEquals(NetProtocol.Sftp, NetPaths.protocolOf("$sftp/home/idan"))
-        assertEquals(listOf("home", "idan", "x.txt"), NetPaths.segments("$sftp/home/idan/x.txt"))
+        assertEquals(NetProtocol.Sftp, NetPaths.protocolOf("$sftp/home/pi"))
+        assertEquals(listOf("home", "pi", "x.txt"), NetPaths.segments("$sftp/home/pi/x.txt"))
         assertEquals(sftp, NetPaths.parent("$sftp/home"))
         // "/" של השרת הוא תיקייה רגילה, לא רשימת שיתופים.
         assertFalse(NetPaths.isShareList(sftp))

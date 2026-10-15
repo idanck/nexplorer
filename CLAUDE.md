@@ -46,8 +46,8 @@
 2. **Conventional Commits בלבד:** `<type>(<scope>): <subject>` —
    `feat` `fix` `docs` `style` `refactor` `perf` `test` `build` `ci` `chore` `revert`.
    subject בציווי, עד ~72 תווים.
-3. **אפס סודות ב-git.** שמות משתני סביבה ב-`.env.example`; הערכים חיים רק ב-
-   `/home/idan/.secrets/credentials.env` על ה-Pi. יש `pre-commit` hook שסורק ומסרב.
+3. **אפס סודות ב-git.** שמות משתני סביבה ב-`.env.example`; הערכים חיים רק מחוץ לריפו, על ה-Pi
+   (הסקיל `credentials-vault`). יש `pre-commit` hook שסורק ומסרב.
 4. **קרא לפני שאתה כותב.** לפני שינוי בקובץ קיים — קרא אותו והתאם לסגנון הקיים.
 5. **אמת לפני שאתה מדווח.** אחרי שינוי: build / lint / הרצה. אל תכתוב "בוצע" בלי אימות.
 6. **אל תמציא.** חסר נתון (endpoint, פורט, מבנה טבלה)? בדוק בקוד, בסקיל, או שאל את עידן.

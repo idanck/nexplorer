@@ -9,12 +9,12 @@ import java.util.Base64
 /** טביעות האצבע כמו ש-`ssh-keygen -l -E sha256` מציג אותן (הערכים נוצרו בו). */
 class SshHostKeysTest {
 
-    private val ed25519 = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIARk2H5Oiday1HWmOEmiYJHdVqW5oLiGDoUrxA4N8FWP"
+    private val ed25519 = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAwCQ3YO9UUcgTvXdrMIpuZbCOR6Pv8embB8zCEKNkUf"
     private val ecdsa = "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBBPeSEtaZo+BXrwXvQcbhN5q9ihAEVA+eUC6tcvNiA/wXYQp4nMESvLbfw1gl1QxVDK32yuQRwUJlMbEdq/W/A8="
 
     @Test
     fun `fingerprints match ssh-keygen`() {
-        assertEquals("SHA256:D5+W/fqDhQGOFlEIJr/5vInqwzAUW+13E0dY2MaF9sM", SshHostKeys.fingerprint(ed25519))
+        assertEquals("SHA256:BrfXUfJmrxs/twJKE/GTfwLPFg+919M4RqQe/vK2RXs", SshHostKeys.fingerprint(ed25519))
         assertEquals("SHA256:uQ9x6DtFonJ8O8QFJ/5oxaDsgd9HIC7sEmPZq8PpQAI", SshHostKeys.fingerprint(ecdsa))
         assertNull(SshHostKeys.fingerprint("ssh-ed25519"))
         assertNull(SshHostKeys.fingerprint("ssh-ed25519 !!!"))
