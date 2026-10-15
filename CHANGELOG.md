@@ -50,6 +50,9 @@
 - Worker: השוואת טוקן בזמן קבוע, 400 (לא 500) על נתיב פגום. CI: versionCode ו-minSdk נקראים מה-APK; תקלה בערוץ לא נחשבת "עוד לא פורסם"
 
 ### Changed
+- QA: הסיבוב בבדיקות (`Qa.setOrientationLeft/Natural`) בלי ההמתנה של UiAutomator 2.4 — היא נתקעה לפעמים ב-API 30 אחרי שהמסך כבר הסתובב (‏BrowserFlowTest ‏t10, עד תקרת 10 הדקות); בתקיעה של מחלקה נאספות גם מחסניות החוטים (`hang-<מחלקה>-stacks.txt`)
+- QA על אמולטור רק ב-PR מוכן (לא טיוטה) שמשנה את האפליקציה (`app/src/main`, ‏`app/src/androidTest`, קובצי ה-Gradle, ‏`.github/qa/`, ‏`qa.yml`), ובהפעלה ידנית; בדיקה מסכמת `qa` עוברת גם כשהאמולטור לא נדרש — לדרישת status check בהגנת `main`
+- הריפו ציבורי (15/10/2026): כלל ב-`CLAUDE.md` נגד פרטי רשת ופרטים אישיים בריפו, ודקות Actions בחינם
 - הכנה לריפו ציבורי: כתובות, משתמשים ופורטים מהרשת הביתית הוחלפו בערכי דוגמה (192.168.1.x) בבדיקות, בהערות ובלוחות העיצוב (Connect, ‏Drawer, ‏Search, ‏Main, ‏SelectList, ‏Transfer — גם הצילומים); דגם הנתב והקושחה הוסרו; מפתח השרת בבדיקות הוחלף במפתח שנוצר לבדיקה; הנתיבים לסודות ב-Pi יצאו מ-`worker/README.md`, ‏`CLAUDE.md` ו-`ci.yml`; צילומי המסך מהטלפון (`docs/screenshots/`) הוסרו. ב-QA, ‏update-e2e לא רץ מ-PR (גם מ-fork שהענף שלו נקרא `main`)
 - כלי הבנייה: AGP ‏8.13.2 ← 9.4.1 (Kotlin מובנה ב-AGP — בלי התוסף kotlin-android), ‏Gradle ‏8.14.6 ← 9.8.1, ‏compileSdk ‏36 ← 37 (‏targetSdk נשאר 35); ‏core-ktx ‏1.18.0 ← 1.19.1, ‏OkHttp ‏5.4.0 ← 5.5.0. Compose נשאר 1.10.6 (BOM ‏2026.03.01): עם Compose 1.12 האפליקציה הפסיקה להגיב (ANR) ב-API 30 תחת ה-monkey — אירועי trackball בזמן שדיאלוג או Popup נפתחים ונסגרים — ו-Dependabot מדלג עליו עד שזה ייחקר
 - תלויות (סבב Dependabot שני, בסבב QA אחד): Kotlin ‏2.2.21 ← 2.4.21, ‏OkHttp ‏4.12.0 ← 5.4.0 (‏5.5 דורש compileSdk 37), ‏xz ‏1.10 ← 1.12, ‏bcpkix ‏1.85 ← 1.86 (ואיתו bcprov), ‏org.json של הבדיקות ‏20260814; ב-CI: ‏gradle/actions ‏6 (`#23`, באישור עידן). ‏Dependabot מאחד עדכוני minor ו-patch ל-PR אחד בכל מערכת
