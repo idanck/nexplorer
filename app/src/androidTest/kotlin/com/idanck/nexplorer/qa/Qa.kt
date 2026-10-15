@@ -29,6 +29,7 @@ import com.idanck.nexplorer.data.files.FileIntents
 import java.io.File
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import kotlin.concurrent.thread
 
 /**
  * כלים משותפים לבדיקות ה-QA על האמולטור: פקודות shell (בהרשאות shell, לא של האפליקציה),
@@ -78,7 +79,7 @@ object Qa {
     fun screenshot(compose: ComposeTestRule, name: String, settle: Boolean = true) {
         if (settle) {
             assertMainLooperRuns(name)
-            compose.waitForIdle()
+            settle(compose, name)
             // הבהוב הסמן, אדוות ואנימציות כניסה של חלונות — שהצילום לא יתפוס אותם באמצע.
             Thread.sleep(400)
         }
@@ -96,20 +97,33 @@ object Qa {
         val main = Handler(Looper.getMainLooper())
         val ran = CountDownLatch(1)
         main.post { ran.countDown() }
-        if (!ran.await(10, TimeUnit.SECONDS)) mainLooperStuck(tag, "ran no message")
+        if (!ran.await(10, TimeUnit.SECONDS)) mainLooperStuck(tag, "ran no message in 10s")
         // והפריים: ‏Compose מחכה ל-callback של Choreographer (הודעת async) לפני ההודעה הרגילה.
         val framed = CountDownLatch(1)
         main.post { Choreographer.getInstance().postFrameCallback { framed.countDown() } }
-        if (!framed.await(10, TimeUnit.SECONDS)) mainLooperStuck(tag, "drew no frame")
+        if (!framed.await(10, TimeUnit.SECONDS)) mainLooperStuck(tag, "drew no frame in 10s")
+    }
+
+    /**
+     * `compose.waitForIdle()` עם תקרה של 30 שניות. ב-QA ‏127 הבדיקה של [assertMainLooperRuns] עברה, ו-`waitForIdle`
+     * נתקע אחריה: חוט הבדיקה חיכה ל-`Espresso.onIdle` (הודעה רגילה ל-main), וה-main ישן ב-`nativePollOnce`. כאן
+     * מחכים בחוט נפרד, ואם הוא לא חוזר — התור של ה-main באותו רגע, וכשל.
+     */
+    private fun settle(compose: ComposeTestRule, tag: String) {
+        var failure: Throwable? = null
+        val idle = thread(isDaemon = true, name = "qa-waitForIdle") { runCatching { compose.waitForIdle() }.onFailure { failure = it } }
+        idle.join(30_000)
+        if (idle.isAlive) mainLooperStuck(tag, "did not settle (compose.waitForIdle)")
+        failure?.let { throw it }
     }
 
     private fun mainLooperStuck(tag: String, what: String): Nothing {
         val queue = StringBuilder()
         Looper.getMainLooper().dump({ queue.append(it).append('\n') }, "")
-        Log.e("QaLooper", "$tag: the main looper $what in 10s\n$queue")
-        File(shotsDir, "looper-$tag.txt").writeText("$what in 10s\n$queue")
+        Log.e("QaLooper", "$tag: the main looper $what\n$queue")
+        File(shotsDir, "looper-$tag.txt").writeText("$what\n$queue")
         shell("screencap -p $SHOTS/looper-$tag.png")
-        throw AssertionError("$tag: the main looper $what in 10s (looper-$tag.txt)")
+        throw AssertionError("$tag: the main looper $what (looper-$tag.txt)")
     }
 
     /**
