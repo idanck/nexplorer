@@ -47,7 +47,7 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       - name: Enable KVM
         run: |
@@ -124,7 +124,7 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       - name: Set up the release signing key
         env:

@@ -6,6 +6,11 @@ updates:
     open-pull-requests-limit: 5
     labels: ["deps"]
     commit-message: { prefix: "chore(deps)" }
+    # כל PR מריץ QA על שני אמולטורים (~75 דקות): minor ו-patch יחד ב-PR אחד; major — כל אחד לבד.
+    groups:
+      gradle-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
     ignore:
       # Gradle 9.6 ומעלה דורש AGP 9 (‏AGP 8 נשען על Problems API פנימי שהוסר) — עד המעבר ל-AGP 9.
       - dependency-name: "gradle-wrapper"
@@ -15,8 +20,15 @@ updates:
         versions: [">= 1.19.0"]
       - dependency-name: "androidx.compose:compose-bom"
         versions: [">= 2026.08.00"]
+      # ‏OkHttp 5.5 דורש compileSdk 37 (‏okhttp-android: ‏minCompileSdk=37) — עד המעבר ל-AGP 9.
+      - dependency-name: "com.squareup.okhttp3:okhttp"
+        versions: [">= 5.5.0"]
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule: { interval: "monthly" }
     labels: ["deps"]
     commit-message: { prefix: "chore(ci)" }
+    groups:
+      actions-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
