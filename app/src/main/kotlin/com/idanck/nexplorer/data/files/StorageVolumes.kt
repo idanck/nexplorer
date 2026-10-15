@@ -1,11 +1,9 @@
 package com.idanck.nexplorer.data.files
 
 import android.content.Context
-import android.os.Build
 import android.os.Environment
 import android.os.StatFs
 import android.os.storage.StorageManager
-import java.io.File
 
 /** מקום אחסון במגירה: זיכרון פנימי, כרטיס SD, USB. */
 data class StorageVolumeInfo(
@@ -15,7 +13,7 @@ data class StorageVolumeInfo(
     val isRemovable: Boolean,
     val totalBytes: Long,
     val freeBytes: Long,
-    /** עד Android 10 כרטיס SD נגיש דרך java.io לקריאה בלבד (כתיבה רק דרך SAF). */
+    /** נפח שמחובר לקריאה בלבד (MEDIA_MOUNTED_READ_ONLY), או תיקייה בלי הרשאת כתיבה. */
     val writable: Boolean = true,
 ) {
     val usedBytes: Long get() = (totalBytes - freeBytes).coerceAtLeast(0)
@@ -30,19 +28,9 @@ object StorageVolumes {
 
     fun list(context: Context): List<StorageVolumeInfo> {
         val manager = context.getSystemService(Context.STORAGE_SERVICE) as StorageManager
-        val roots = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            manager.storageVolumes
-                .filter { it.state == Environment.MEDIA_MOUNTED || it.state == Environment.MEDIA_MOUNTED_READ_ONLY }
-                .mapNotNull { volume -> volume.directory?.let { it to volume } }
-        } else {
-            // לפני Android 11 אין StorageVolume.directory: גוזרים את השורש מתיקיית האפליקציה בכל נפח.
-            context.getExternalFilesDirs(null).filterNotNull().mapNotNull { appDir ->
-                val root = appDir.absolutePath.substringBefore("/Android/data/")
-                val volume = manager.getStorageVolume(appDir) ?: return@mapNotNull null
-                File(root) to volume
-            }
-        }
-        return roots
+        return manager.storageVolumes
+            .filter { it.state == Environment.MEDIA_MOUNTED || it.state == Environment.MEDIA_MOUNTED_READ_ONLY }
+            .mapNotNull { volume -> volume.directory?.let { it to volume } }
             .distinctBy { it.first.absolutePath }
             .map { (dir, volume) ->
                 val stat = runCatching { StatFs(dir.absolutePath) }.getOrNull()

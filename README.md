@@ -43,7 +43,7 @@ QA על אמולטור (API 29 + 35) רץ בכל PR; הצילומים והתוצ
 
 ## דרישות
 
-JDK 17 ו-Android SDK 35. ‏`minSdk 26` זמני עד החלטה D9.
+JDK 17 ו-Android SDK 36. ‏`minSdk 30` (Android 11, החלטה D9).
 
 ## הרצה מקומית
 

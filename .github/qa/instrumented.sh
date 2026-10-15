@@ -28,7 +28,7 @@ adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 adb shell cmd package compile -m verify -f "$pkg" > /dev/null || true
 adb shell cmd package compile -m verify -f "$pkg.test" > /dev/null || true
 for _ in $(seq 1 60); do
-  # "some avg10=NN.NN" — אחוז הזמן שתהליכים חיכו ל-CPU. אין /proc/pressure (API 29) — לא מחכים.
+  # "some avg10=NN.NN" — אחוז הזמן שתהליכים חיכו ל-CPU. בלי /proc/pressure (קרנל ישן) — לא מחכים.
   load=$(adb shell cat /proc/pressure/cpu 2>/dev/null | tr -d '\r' | awk '/^some/ { split($2, a, "="); print int(a[2]) }')
   { [ -z "$load" ] || [ "$load" -lt 40 ]; } && break
   sleep 2

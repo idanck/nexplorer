@@ -373,8 +373,8 @@ class UpdateManager(
      */
     private fun verifySignature(file: File, manifest: UpdateManifest): Result<Unit> = try {
         val pm = context.packageManager
-        val candidate = pm.getPackageArchiveInfo(file.absolutePath, PackageSigners.archiveFlags)
-        val installed = pm.getPackageInfo(context.packageName, PackageSigners.installedFlags)
+        val candidate = pm.getPackageArchiveInfo(file.absolutePath, PackageSigners.FLAGS)
+        val installed = pm.getPackageInfo(context.packageName, PackageSigners.FLAGS)
         val candidateCerts = candidate?.let { PackageSigners.of(it) }.orEmpty()
         when {
             candidate == null -> Result.failure(UpdateException("הקובץ שירד אינו APK תקין"))

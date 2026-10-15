@@ -3,7 +3,6 @@ package com.idanck.nexplorer
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.graphics.Color
-import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.Menu
@@ -90,7 +89,7 @@ class MainActivity : ComponentActivity() {
         root.descendantFocusability = ViewGroup.FOCUS_BEFORE_DESCENDANTS
         // לא תחנה ריקה ב-TalkBack; הילדים (Compose) נשארים נגישים.
         root.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) root.defaultFocusHighlightEnabled = false
+        root.defaultFocusHighlightEnabled = false
         val tree = root.viewTreeObserver
         tree.addOnGlobalFocusChangeListener { _, newFocus ->
             if (newFocus == null) root.post { if (currentFocus == null) root.requestFocus() }

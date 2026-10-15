@@ -38,7 +38,7 @@ object ApkInspector {
      */
     fun read(context: Context, path: String): ApkDetails {
         val pm = context.packageManager
-        val info = pm.getPackageArchiveInfo(path, PackageSigners.archiveFlags or PackageManager.GET_PERMISSIONS)
+        val info = pm.getPackageArchiveInfo(path, PackageSigners.FLAGS or PackageManager.GET_PERMISSIONS)
             ?: throw IOException("זה לא קובץ APK תקין")
         val app = info.applicationInfo ?: throw IOException("זה לא קובץ APK תקין")
         // בלי הנתיב השם והסמל לא נטענים מהקובץ — מתקבלים שם החבילה וסמל ברירת המחדל.
@@ -74,7 +74,7 @@ object ApkInspector {
     fun runsHere(details: ApkDetails): Boolean = details.minSdk <= Build.VERSION.SDK_INT
 
     private fun installedInfo(pm: PackageManager, packageName: String): PackageInfo? = try {
-        pm.getPackageInfo(packageName, PackageSigners.installedFlags)
+        pm.getPackageInfo(packageName, PackageSigners.FLAGS)
     } catch (e: PackageManager.NameNotFoundException) {
         null
     }

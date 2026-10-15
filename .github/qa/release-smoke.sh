@@ -29,12 +29,7 @@ wait_for() {
 }
 
 adb install -r "$apk" || fail "could not install $apk"
-if [ "$api" -ge 30 ]; then
-  adb shell appops set --uid "$pkg" MANAGE_EXTERNAL_STORAGE allow
-else
-  adb shell pm grant "$pkg" android.permission.READ_EXTERNAL_STORAGE
-  adb shell pm grant "$pkg" android.permission.WRITE_EXTERNAL_STORAGE
-fi
+adb shell appops set --uid "$pkg" MANAGE_EXTERNAL_STORAGE allow
 # ה-monkey שרץ לפני (instrumented.sh) יכול למשוך את ההגדרות המהירות ולפתוח דיאלוג של המערכת
 # (Bluetooth ב-API 35): האפליקציה נפתחת מתחתיהם ו-uiautomator לא רואה אותה. HOME סוגר את שניהם.
 adb shell input keyevent KEYCODE_HOME
@@ -74,7 +69,7 @@ ui tap "qa"
 wait_for "release-smoke.txt" 30 || fail "the qa share did not open"
 shot "release-03-share"
 
-# SFTP (שלב 5ב): sshj וההצפנה שלו (Ed25519 ו-X25519 מ-BouncyCastle ב-API 29) אחרי R8, מול sftp-server.sh.
+# SFTP (שלב 5ב): sshj וההצפנה שלו (Ed25519 ו-X25519 מ-BouncyCastle ב-API 30) אחרי R8, מול sftp-server.sh.
 ui tap "פתח מגירת מקומות" || fail "no drawer button (SFTP)"
 wait_for "הוסף מקום" 10 || fail "the drawer has no add place row (SFTP)"
 ui tap "הוסף מקום"
