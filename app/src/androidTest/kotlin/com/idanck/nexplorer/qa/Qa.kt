@@ -9,9 +9,12 @@ import android.graphics.Paint
 import android.hardware.display.DisplayManager
 import android.os.Build
 import android.os.Environment
+import android.os.Handler
+import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import android.util.Log
+import android.view.Choreographer
 import android.view.Display
 import android.view.Surface
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -24,6 +27,8 @@ import androidx.test.uiautomator.UiDevice
 import com.idanck.nexplorer.MainActivity
 import com.idanck.nexplorer.data.files.FileIntents
 import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /**
  * כלים משותפים לבדיקות ה-QA על האמולטור: פקודות shell (בהרשאות shell, לא של האפליקציה),
@@ -72,12 +77,39 @@ object Qa {
     /** [settle] = false — באמצע מחווה (גרירה): בלי לחכות שהממשק יירגע. */
     fun screenshot(compose: ComposeTestRule, name: String, settle: Boolean = true) {
         if (settle) {
+            assertMainLooperRuns(name)
             compose.waitForIdle()
             // הבהוב הסמן, אדוות ואנימציות כניסה של חלונות — שהצילום לא יתפוס אותם באמצע.
             Thread.sleep(400)
         }
         shell("mkdir -p $SHOTS")
         shell("screencap -p $SHOTS/$name.png")
+    }
+
+    /**
+     * ה-main מריץ הודעה רגילה, ואחריה פריים, תוך 10 שניות כל אחד? ‏`waitForIdle` של Compose מחכה לפריים ואז
+     * להודעה רגילה — בלי תקרת זמן. ב-API 30, אחרי סיבוב, הוא חיכה עד תקרת המחלקה (‏BrowserFlowTest ‏t10, ‏QA ‏125:
+     * חוט הבדיקה ב-`waitForNextChoreographerFrame`, וה-main בלולאה של Espresso). כאן — כשל עם התור של ה-main
+     * (`looper-<שם>.txt`; ‏sync barrier נראה בו כ-"barrier=") במקום תקיעה.
+     */
+    fun assertMainLooperRuns(tag: String) {
+        val main = Handler(Looper.getMainLooper())
+        val ran = CountDownLatch(1)
+        main.post { ran.countDown() }
+        if (!ran.await(10, TimeUnit.SECONDS)) mainLooperStuck(tag, "ran no message")
+        // והפריים: ‏Compose מחכה ל-callback של Choreographer (הודעת async) לפני ההודעה הרגילה.
+        val framed = CountDownLatch(1)
+        main.post { Choreographer.getInstance().postFrameCallback { framed.countDown() } }
+        if (!framed.await(10, TimeUnit.SECONDS)) mainLooperStuck(tag, "drew no frame")
+    }
+
+    private fun mainLooperStuck(tag: String, what: String): Nothing {
+        val queue = StringBuilder()
+        Looper.getMainLooper().dump({ queue.append(it).append('\n') }, "")
+        Log.e("QaLooper", "$tag: the main looper $what in 10s\n$queue")
+        File(shotsDir, "looper-$tag.txt").writeText("$what in 10s\n$queue")
+        shell("screencap -p $SHOTS/looper-$tag.png")
+        throw AssertionError("$tag: the main looper $what in 10s (looper-$tag.txt)")
     }
 
     /**
