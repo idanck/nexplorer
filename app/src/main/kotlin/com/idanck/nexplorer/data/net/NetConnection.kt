@@ -50,7 +50,7 @@ data class NetConnection(
     val root: String
         get() = NetPaths.root(protocol, id).let { if (share.isBlank() || protocol == NetProtocol.WebDav) it else NetPaths.child(it, share) }
 
-    /** "idanc@192.168.50.171" — בשורה שמתחת לשם במגירה (כמו "idan@192.168.50.83:41725" בלוח). */
+    /** "alex@192.168.1.20" — בשורה שמתחת לשם במגירה (כמו "pi@192.168.1.30:2222" בלוח). */
     val subtitle: String
         get() = buildString {
             if (user.isNotBlank()) append(user).append('@')
@@ -58,7 +58,7 @@ data class NetConnection(
             if (port != null && port != defaultPort) append(':').append(port)
         }
 
-    /** "smb://192.168.50.171/volume2/Photos" או "sftp://192.168.50.83/home/idan" — מה ש"העתק נתיב" נותן בתוך החיבור. */
+    /** "smb://192.168.1.20/volume2/Photos" או "sftp://192.168.1.30/home/pi" — מה ש"העתק נתיב" נותן בתוך החיבור. */
     fun displayUrl(path: String): String {
         val segments = NetPaths.segments(path)
         val authority = host + if (port != null && port != defaultPort) ":$port" else ""

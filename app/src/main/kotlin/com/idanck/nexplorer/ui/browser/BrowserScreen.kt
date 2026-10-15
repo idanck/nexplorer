@@ -527,7 +527,7 @@ fun BrowserScreen(
                                     onMove = { vm.copyToClipboard(selected.map { it.path }, cut = true) },
                                     onCopyPath = {
                                         single?.let {
-                                            // ברשת: הכתובת בשרת (smb://192.168.50.171/volume2/…), לא המזהה הפנימי.
+                                            // ברשת: הכתובת בשרת (smb://192.168.1.20/volume2/…), לא המזהה הפנימי.
                                             clipboardManager.setText(AnnotatedString(state.connection?.displayUrl(it.path) ?: it.path))
                                             message("הנתיב הועתק")
                                         }

@@ -15,7 +15,7 @@ concurrency:
 
 env:
   UPDATES_HOST: https://nexplorer-updates.idanck.com
-  # טביעת האצבע של מפתח ה-release (נוצר 13/10/2026, /home/idan/.secrets/nexplorer/ על ה-Pi).
+  # טביעת האצבע של מפתח ה-release (נוצר 13/10/2026; המפתח עצמו מחוץ לריפו).
   # נעוצה כאן כדי ש-secret שהוחלף בטעות לא ינתק התקנות קיימות מעדכונים (הלקח מ-TiviCopy).
   RELEASE_CERT_SHA256: 301ebd265a5b5d2264a697549bb6d14267ea66f4f21d5fbfb66cdc9298880f6f
 

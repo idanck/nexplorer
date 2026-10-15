@@ -14,7 +14,7 @@ while IFS= read -r f; do
   case "$(basename "$f")" in
     .env|.env.*) case "$f" in *.example|*.sample|*.template) ;; *)
         fail "refusing to commit environment file: $f"
-        fail "put NAMES in .env.example and values in /home/idan/.secrets/credentials.env"
+        fail "put NAMES in .env.example and keep the values outside the repo"
         exit 1 ;;
       esac ;;
   esac

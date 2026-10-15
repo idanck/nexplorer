@@ -39,7 +39,6 @@ QA על אמולטור (API 29 + 35) רץ בכל PR; הצילומים והתוצ
 | [07 — מיפוי טכני](docs/research/07-technical-mapping.md) | API וספריות אפשריות |
 | [08 — החלטות](docs/research/08-open-decisions.md) | החלטות פתוחות |
 | [solid-tokens.json](docs/research/solid-tokens.json) | ערכים שנדגמו מ-Solid (השראה) |
-| [צילומי מסך](docs/screenshots/README.md) | 4 מסכי מקור |
 
 ## דרישות
 
@@ -73,7 +72,6 @@ git config core.hooksPath .githooks   # מפעיל את בדיקות ה-commit/p
 |---|---|
 | `docs/research/` | מסמכי המחקר 01–08 + מקורות |
 | `docs/design/` | שפת העיצוב: מסמך, טוקנים, צילומי מסכים, מקורות הלוחות, רישיונות פונטים |
-| `docs/screenshots/` | צילומי מסך |
 | `docs/plan/` | תוכניות מימוש |
 | `app/` | מודול האפליקציה ([app/README.md](app/README.md)) |
 | `worker/` | ה-Worker של ערוץ העדכונים |
