@@ -50,6 +50,7 @@
 - Worker: השוואת טוקן בזמן קבוע, 400 (לא 500) על נתיב פגום. CI: versionCode ו-minSdk נקראים מה-APK; תקלה בערוץ לא נחשבת "עוד לא פורסם"
 
 ### Changed
+- כלי הבנייה: AGP ‏8.13.2 ← 9.4.1 (Kotlin מובנה ב-AGP — בלי התוסף kotlin-android), ‏Gradle ‏8.14.6 ← 9.8.1, ‏compileSdk ‏36 ← 37 (‏targetSdk נשאר 35); ‏Compose BOM ‏2026.03.01 ← 2026.09.00 ‏(Compose 1.12.1), ‏core-ktx ‏1.18.0 ← 1.19.1, ‏OkHttp ‏5.4.0 ← 5.5.0. ‏Dependabot כבר לא מדלג על אף אחת מהן
 - תלויות (סבב Dependabot שני, בסבב QA אחד): Kotlin ‏2.2.21 ← 2.4.21, ‏OkHttp ‏4.12.0 ← 5.4.0 (‏5.5 דורש compileSdk 37), ‏xz ‏1.10 ← 1.12, ‏bcpkix ‏1.85 ← 1.86 (ואיתו bcprov), ‏org.json של הבדיקות ‏20260814; ב-CI: ‏gradle/actions ‏6 (`#23`, באישור עידן). ‏Dependabot מאחד עדכוני minor ו-patch ל-PR אחד בכל מערכת
 - **D9 הוכרעה:** ‏minSdk ‏26 ← 30 (Android 11 ומעלה). מודל גישה אחד — "גישה לכל הקבצים"; הוסרו מסלול ההרשאות של Android 8–10 (READ/WRITE_EXTERNAL_STORAGE, ‏`requestLegacyExternalStorage`), סריקת המדיה הידנית אחרי העברות (`MediaScan`) והענפים ל-Android 8–10 בזיהוי האחסונים ובחותמי APK. ‏QA על API 30 ו-35 (במקום 29). מכשיר ישן מ-Android 11 נשאר בגרסה שמותקנת בו
 - תלויות (מ-PR-ים של Dependabot, בסבב QA אחד): media3 ‏1.5.1 ← 1.11.1, ‏core-ktx ‏1.15.0 ← 1.18.0 (‏1.19 דורש compileSdk 37 ו-AGP 9), ‏androidx.test runner ‏1.7.0 ו-ext-junit ‏1.3.0; ב-CI: ‏setup-java 6, ‏upload-artifact 7, ‏download-artifact 8. ‏Kotlin ‏2.0.21 ← 2.2.21: ‏media3 1.11 (ui, ‏session) נבנה ב-Kotlin 2.2, והקומפיילר של 2.0 לא קורא את ה-metadata שלו ("compiled with an incompatible version of Kotlin")
