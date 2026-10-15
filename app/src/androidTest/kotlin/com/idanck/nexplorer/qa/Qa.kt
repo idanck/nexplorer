@@ -1,14 +1,19 @@
 package com.idanck.nexplorer.qa
 
+import android.app.UiAutomation
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.hardware.display.DisplayManager
 import android.os.Build
 import android.os.Environment
 import android.os.ParcelFileDescriptor
+import android.os.SystemClock
 import android.util.Log
+import android.view.Display
+import android.view.Surface
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.junit4.ComposeTestRule
@@ -73,6 +78,26 @@ object Qa {
         }
         shell("mkdir -p $SHOTS")
         shell("screencap -p $SHOTS/$name.png")
+    }
+
+    /**
+     * סיבוב ונעילה, כמו `UiDevice.setOrientationLeft/Natural` — בלי ההמתנה שלו: UiAutomator 2.4 בודק את הסיבוב
+     * דרך `getDisplayRotation`, שקורא קודם ל-`waitForIdle` של UiAutomation. ב-API 30 זה נתקע לפעמים אחרי שהמסך
+     * כבר הסתובב (‏BrowserFlowTest ‏t10, ב-QA ‏116 וב-121: "Waiting 2000ms for Condition[displayRotation=1…]",
+     * ואז 9 דקות בלי תשובה). כאן בודקים את ה-`Display` ישירות, עם תקרת זמן — כשל ולא תקיעה.
+     */
+    fun setOrientationLeft() = rotate(UiAutomation.ROTATION_FREEZE_90, Surface.ROTATION_90)
+
+    fun setOrientationNatural() = rotate(UiAutomation.ROTATION_FREEZE_0, Surface.ROTATION_0)
+
+    private fun rotate(freeze: Int, expected: Int) {
+        instrumentation.uiAutomation.setRotation(freeze)
+        val display = checkNotNull(instrumentation.targetContext.getSystemService(DisplayManager::class.java)?.getDisplay(Display.DEFAULT_DISPLAY))
+        val deadline = SystemClock.uptimeMillis() + 5_000
+        while (display.rotation != expected) {
+            check(SystemClock.uptimeMillis() < deadline) { "the display did not rotate to $expected (now ${display.rotation})" }
+            Thread.sleep(50)
+        }
     }
 
     fun launch(path: String? = null): ActivityScenario<MainActivity> {
