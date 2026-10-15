@@ -55,9 +55,21 @@ run_class() {
   local cls="$1"
   clear_foreign_anr_dialogs
   echo "::group::$cls (API $api)"
-  adb shell am instrument -w -e class "com.idanck.nexplorer.qa.$cls" "$runner" 2>&1 | tee "$out/$cls.txt"
+  # תקרת זמן, כמו ל-monkey: בדיקה שנתקעת לא שורפת את כל ה-job (‏t10 של BrowserFlowTest נתקע ב-API 30
+  # ‏~37 דקות, ‏PR #34), המחלקות הבאות עוד רצות, ו-logcat נאסף בסוף. הארוכה ביותר לוקחת ~4 דקות.
+  timeout 600 adb shell am instrument -w -e class "com.idanck.nexplorer.qa.$cls" "$runner" 2>&1 | tee "$out/$cls.txt"
+  local rc=${PIPESTATUS[0]}
   echo "::endgroup::"
-  if ! grep -q '^OK (' "$out/$cls.txt"; then
+  if [ "$rc" -eq 124 ]; then
+    echo "::error::$cls did not finish within 10 minutes on API $api (screens/hang-$cls.png, hang-$cls.txt)"
+    adb exec-out screencap -p > "$out/screens/hang-$cls.png" || true
+    { timeout 30 adb shell dumpsys window < /dev/null | grep -E 'mCurrentFocus|mFocusedApp|mRotation|mDisplayRotation'
+      timeout 30 adb shell dumpsys activity activities < /dev/null | grep -E 'ResumedActivity|mLastPausedActivity'
+    } > "$out/hang-$cls.txt" 2>&1 || true
+    # ה-instrumentation רץ בתהליך של האפליקציה, ו-timeout סוגר רק את צד ה-adb: עוצרים אותו לפני המחלקה הבאה.
+    adb shell am force-stop "$pkg" < /dev/null || true
+    status=1
+  elif ! grep -q '^OK (' "$out/$cls.txt"; then
     echo "::error::$cls failed on API $api"
     status=1
   fi
@@ -142,7 +154,9 @@ adb logcat -d -b events -s am_anr > "$out/anr.txt" || true
 # הצד של השרת: חיבור שנתקע ב"מתחבר…" — האם הגיע ל-sshd, ואיפה נעצר (sftp-server.sh, ‏LogLevel VERBOSE).
 sudo cat /tmp/nexplorer-sftp/sshd.log > "$out/sshd.log" 2>/dev/null || true
 if grep -q "$pkg" "$out/anr.txt"; then
-  echo "::error::the app stopped responding on API $api (anr.txt)"
+  echo "::error::the app stopped responding on API $api (anr.txt, anr-traces.txt)"
+  # המחסנית של ה-main בזמן ה-ANR: ‏DropBox שומר אותה (data_app_anr), בלי root. בלעדיה רואים רק "Waited 5012ms".
+  adb shell dumpsys dropbox --print data_app_anr > "$out/anr-traces.txt" 2>&1 || true
   status=1
 fi
 

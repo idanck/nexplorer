@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
 }
 
@@ -20,7 +19,7 @@ val releaseKeystore: File? = System.getenv("RELEASE_KEYSTORE_PATH")?.let(::file)
 
 android {
     namespace = "com.idanck.nexplorer"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.idanck.nexplorer"
@@ -82,12 +81,6 @@ android {
     lint {
         abortOnError = true
         warningsAsErrors = false
-    }
-}
-
-kotlin {
-    compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 
