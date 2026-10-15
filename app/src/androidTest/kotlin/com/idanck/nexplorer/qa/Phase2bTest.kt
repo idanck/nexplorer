@@ -64,7 +64,7 @@ class Phase2bTest {
 
     @After
     fun tearDown() {
-        Qa.device.setOrientationNatural()
+        Qa.setOrientationNatural()
         Qa.shell("wm size reset")
         Qa.shell("wm density reset")
         scenario.close()

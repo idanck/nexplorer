@@ -61,11 +61,25 @@ run_class() {
   local rc=${PIPESTATUS[0]}
   echo "::endgroup::"
   if [ "$rc" -eq 124 ]; then
-    echo "::error::$cls did not finish within 10 minutes on API $api (screens/hang-$cls.png, hang-$cls.txt)"
+    echo "::error::$cls did not finish within 10 minutes on API $api (screens/hang-$cls.png, hang-$cls.txt, hang-$cls-stacks.txt)"
     adb exec-out screencap -p > "$out/screens/hang-$cls.png" || true
     { timeout 30 adb shell dumpsys window < /dev/null | grep -E 'mCurrentFocus|mFocusedApp|mRotation|mDisplayRotation'
       timeout 30 adb shell dumpsys activity activities < /dev/null | grep -E 'ResumedActivity|mLastPausedActivity'
     } > "$out/hang-$cls.txt" 2>&1 || true
+    # איפה נתקע: המחסניות של כל החוטים (חוט הבדיקה, ה-main). ‏SIGQUIT כותב אותן ל-/data/anr, שנקרא רק ב-root
+    # (תמונת google_apis). אחר כך חוזרים ל-adbd רגיל, כמו בשאר הריצה.
+    local pid
+    pid=$(timeout 30 adb shell pidof "$pkg" < /dev/null | tr -d '\r')
+    if [ -n "$pid" ] && timeout 60 adb root < /dev/null > /dev/null 2>&1; then
+      sleep 3
+      timeout 60 adb wait-for-device < /dev/null || true
+      timeout 30 adb shell kill -3 "$pid" < /dev/null || true
+      sleep 5
+      timeout 30 adb shell 'cat "$(ls -t /data/anr/trace_* | head -n 1)"' < /dev/null > "$out/hang-$cls-stacks.txt" 2>&1 || true
+      timeout 60 adb unroot < /dev/null > /dev/null 2>&1 || true
+      sleep 3
+      timeout 60 adb wait-for-device < /dev/null || true
+    fi
     # ה-instrumentation רץ בתהליך של האפליקציה, ו-timeout סוגר רק את צד ה-adb: עוצרים אותו לפני המחלקה הבאה.
     adb shell am force-stop "$pkg" < /dev/null || true
     status=1

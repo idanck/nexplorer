@@ -83,7 +83,7 @@ class Phase3bTest {
 
     @After
     fun tearDown() {
-        Qa.device.setOrientationNatural()
+        Qa.setOrientationNatural()
         scenario.close()
         // השירות ממשיך לנגן גם בלי מסך — זו הכוונה; בין בדיקות עוצרים אותו.
         app.stopService(Intent(app, PlaybackService::class.java))
@@ -132,14 +132,14 @@ class Phase3bTest {
 
         // סיבוב בונה את המסך מחדש; הנגן ב-ViewModel — נשאר מושהה באותה נקודה, ולא נטען מחדש (טעינה מנגנת).
         // המשטח החדש ריק, והפריים המושהה מצויר עליו מחדש (ב-API 35 בלי זה המסך נשאר שחור).
-        Qa.device.setOrientationLeft()
+        Qa.setOrientationLeft()
         Thread.sleep(2_000)
         compose.waitFor(playback("מושהה"), 15_000)
         assertFalse("הסרטון נטען מחדש אחרי הסיבוב", compose.exists(playback("מנגן")))
         assertTrue("אחרי הסיבוב המסך שחור — הפריים המושהה לא צויר מחדש", waitForVideoFrame())
         Qa.screenshot(compose, "83-video-rotated")
 
-        Qa.device.setOrientationNatural()
+        Qa.setOrientationNatural()
         Qa.device.pressBack()
         compose.waitFor(hasText("clip.mp4"), 10_000)
         compose.waitGone(playback("מושהה"))

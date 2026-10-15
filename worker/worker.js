@@ -1,9 +1,9 @@
 // nexplorer update channel — nexplorer-updates.idanck.com
 //
 // Serves the update manifest and APKs from the R2 bucket bound as BUCKET, and accepts uploads
-// from CI on PUT /publish/<key> with a bearer token (secret UPLOAD_TOKEN). The repository is
-// private, so this is the only place the app can fetch a build from without carrying a
-// credential inside the APK.
+// from CI on PUT /publish/<key> with a bearer token (secret UPLOAD_TOKEN). The app fetches its
+// builds from here, not from GitHub, so it never carries a credential and keeps working
+// whatever the repository's visibility.
 //
 // Same shape as the tivicopy-updates worker, with one fix: a 206 is returned only when the
 // request actually asked for a range (an unconditional 206 broke a client that accepts 200 only).
