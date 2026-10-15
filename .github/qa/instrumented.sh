@@ -68,6 +68,10 @@ run_class BrowserFlowTest
 run_class SearchAndSettingsTest
 run_class Phase2Test
 run_class Phase2bTest
+# גיליון ה-APK פותח את מתקין המערכת. ב-Android 11 (API 30) שינוי של REQUEST_INSTALL_PACKAGES הורג את
+# התהליך — ובאמצע הבדיקה זה "Process crashed" ("Killing …: REQUEST_INSTALL_PACKAGES changed"). כמו משתמש
+# שכבר אישר, ולפני שהתהליך עולה (כמו ב-update-e2e.sh).
+adb shell appops set "$pkg" REQUEST_INSTALL_PACKAGES allow || true
 run_class Phase3Test
 run_class Phase3bTest
 run_class Phase4Test
