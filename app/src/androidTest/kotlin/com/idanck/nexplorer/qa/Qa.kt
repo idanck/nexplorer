@@ -29,6 +29,7 @@ import com.idanck.nexplorer.data.files.FileIntents
 import java.io.File
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
 /**
@@ -118,12 +119,47 @@ object Qa {
     }
 
     private fun mainLooperStuck(tag: String, what: String): Nothing {
-        val queue = StringBuilder()
-        Looper.getMainLooper().dump({ queue.append(it).append('\n') }, "")
-        Log.e("QaLooper", "$tag: the main looper $what\n$queue")
-        File(shotsDir, "looper-$tag.txt").writeText("$what\n$queue")
-        shell("screencap -p $SHOTS/looper-$tag.png")
+        dumpMainLooper(tag, what)
         throw AssertionError("$tag: the main looper $what (looper-$tag.txt)")
+    }
+
+    /** התור של ה-main (‏sync barrier נראה בו כ-"barrier="), והמחסניות של ה-main ושל חוט הבדיקה — ללוג ול-`looper-<שם>.txt`. */
+    private fun dumpMainLooper(tag: String, what: String) {
+        val text = StringBuilder("$what\n")
+        Looper.getMainLooper().dump({ text.append(it).append('\n') }, "")
+        Thread.getAllStackTraces()
+            .filterKeys { it.name == "main" || it.name.startsWith("Instr") }
+            .forEach { (thread, frames) -> text.append("\n\"${thread.name}\" ${thread.state}\n").append(frames.joinToString("\n") { "  at $it" }).append('\n') }
+        Log.e("QaLooper", "$tag: the main looper $text")
+        runCatching { File(shotsDir, "looper-$tag.txt").writeText(text.toString()) }
+        runCatching { shell("screencap -p $SHOTS/looper-$tag.png") }
+    }
+
+    private val watchdogStarted = AtomicBoolean(false)
+
+    /**
+     * שומר על ה-main לאורך כל הבדיקות, לא רק בצילומים: אחרי שהפעילות נבנית מחדש (סיבוב, ‏wm size) ה-main הפסיק
+     * לפעמים להריץ הודעות רגילות, וכל המתנה של Compose נתקעה — גם ב-`waitFor` (‏Phase2bTest ב-API 35, ‏QA ‏132).
+     * כל 5 שניות הודעה רגילה ל-main; אם לא רצה תוך 20 — [dumpMainLooper] פעם אחת לכל תקיעה. לא מכשיל: התקרה של
+     * המחלקה ב-`instrumented.sh` עוצרת את התהליך.
+     */
+    private fun startMainLooperWatchdog() {
+        if (!watchdogStarted.compareAndSet(false, true)) return
+        thread(isDaemon = true, name = "qa-looper-watchdog") {
+            val main = Handler(Looper.getMainLooper())
+            var reported = false
+            while (true) {
+                val ran = CountDownLatch(1)
+                main.post { ran.countDown() }
+                if (ran.await(20, TimeUnit.SECONDS)) {
+                    reported = false
+                    Thread.sleep(5_000)
+                } else if (!reported) {
+                    reported = true
+                    dumpMainLooper("watchdog-${SystemClock.uptimeMillis()}", "ran no message in 20s")
+                }
+            }
+        }
     }
 
     /**
@@ -147,6 +183,7 @@ object Qa {
     }
 
     fun launch(path: String? = null): ActivityScenario<MainActivity> {
+        startMainLooperWatchdog()
         val intent = Intent(ApplicationProvider.getApplicationContext(), MainActivity::class.java)
         if (path != null) intent.setAction(FileIntents.ACTION_OPEN_FOLDER).putExtra(FileIntents.EXTRA_PATH, path)
         return ActivityScenario.launch(intent)
