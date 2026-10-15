@@ -11,6 +11,11 @@ updates:
       gradle-minor-patch:
         patterns: ["*"]
         update-types: ["minor", "patch"]
+    ignore:
+      # Compose 1.12 (BOM 2026.08 ומעלה): ה-monkey ב-API 30 נתקע על ANR — אירועי trackball בזמן שדיאלוג או Popup
+      # נפתחים ונסגרים (2 מ-2 נכשלו; עם 1.10 ‏4 מ-4 עברו, PR #34). עד שזה ייחקר.
+      - dependency-name: "androidx.compose:compose-bom"
+        versions: [">= 2026.08.00"]
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule: { interval: "monthly" }
