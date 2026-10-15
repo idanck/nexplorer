@@ -1,8 +1,8 @@
 # מקור אמת יחיד לגרסאות. הבסיס זהה ל-ats-mobile-app, שנבנה בהצלחה ב-CI.
 [versions]
-agp = "8.13.2"
+agp = "9.4.1"
 kotlin = "2.4.21"
-androidxCore = "1.18.0"
+androidxCore = "1.19.1"
 lifecycle = "2.8.7"
 activityCompose = "1.9.3"
 composeBom = "2026.03.01"
@@ -23,7 +23,7 @@ smbj = "0.15.0"
 dcerpc = "0.12.13"
 sshj = "0.41.1"
 bcpkix = "1.86"
-okhttp = "5.4.0"
+okhttp = "5.5.0"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidxCore" }
@@ -70,5 +70,7 @@ androidx-test-uiautomator = { module = "androidx.test.uiautomator:uiautomator", 
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
+# AGP 9 מקמפל Kotlin בעצמו (built-in Kotlin) — התוסף לא מוחל. הוא נטען ב-build.gradle.kts הראשי (apply false)
+# רק כדי ש-KGP יהיה בגרסה של `kotlin` ולא ב-2.2.10 של AGP, כמו קומפיילר ה-Compose.
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }

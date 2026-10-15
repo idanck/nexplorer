@@ -12,17 +12,10 @@ updates:
         patterns: ["*"]
         update-types: ["minor", "patch"]
     ignore:
-      # Gradle 9.6 ומעלה דורש AGP 9 (‏AGP 8 נשען על Problems API פנימי שהוסר) — עד המעבר ל-AGP 9.
-      - dependency-name: "gradle-wrapper"
-        update-types: ["version-update:semver-major"]
-      # דורשות compileSdk 37 ו-AGP 9 (‏core 1.19: ‏AGP 9.1; ‏Compose 1.12 — BOM 2026.08 ומעלה: ‏AGP 9.2) — עד המעבר.
-      - dependency-name: "androidx.core:core-ktx"
-        versions: [">= 1.19.0"]
+      # Compose 1.12 (BOM 2026.08 ומעלה): ה-monkey ב-API 30 נתקע על ANR — אירועי trackball בזמן שדיאלוג או Popup
+      # נפתחים ונסגרים (2 מ-2 נכשלו; עם 1.10 ‏4 מ-4 עברו, PR #34). עד שזה ייחקר.
       - dependency-name: "androidx.compose:compose-bom"
         versions: [">= 2026.08.00"]
-      # ‏OkHttp 5.5 דורש compileSdk 37 (‏okhttp-android: ‏minCompileSdk=37) — עד המעבר ל-AGP 9.
-      - dependency-name: "com.squareup.okhttp3:okhttp"
-        versions: [">= 5.5.0"]
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule: { interval: "monthly" }
