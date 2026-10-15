@@ -1,5 +1,6 @@
 package com.idanck.nexplorer.qa
 
+import android.app.Activity
 import android.app.UiAutomation
 import android.content.Intent
 import android.graphics.Bitmap
@@ -9,12 +10,9 @@ import android.graphics.Paint
 import android.hardware.display.DisplayManager
 import android.os.Build
 import android.os.Environment
-import android.os.Handler
-import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
 import android.util.Log
-import android.view.Choreographer
 import android.view.Display
 import android.view.Surface
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -23,14 +21,12 @@ import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
 import androidx.test.uiautomator.UiDevice
 import com.idanck.nexplorer.MainActivity
 import com.idanck.nexplorer.data.files.FileIntents
 import java.io.File
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.concurrent.thread
 
 /**
  * כלים משותפים לבדיקות ה-QA על האמולטור: פקודות shell (בהרשאות shell, לא של האפליקציה),
@@ -79,8 +75,7 @@ object Qa {
     /** [settle] = false — באמצע מחווה (גרירה): בלי לחכות שהממשק יירגע. */
     fun screenshot(compose: ComposeTestRule, name: String, settle: Boolean = true) {
         if (settle) {
-            assertMainLooperRuns(name)
-            settle(compose, name)
+            compose.waitForIdle()
             // הבהוב הסמן, אדוות ואנימציות כניסה של חלונות — שהצילום לא יתפוס אותם באמצע.
             Thread.sleep(400)
         }
@@ -89,101 +84,60 @@ object Qa {
     }
 
     /**
-     * ה-main מריץ הודעה רגילה, ואחריה פריים, תוך 10 שניות כל אחד? ‏`waitForIdle` של Compose מחכה לפריים ואז
-     * להודעה רגילה — בלי תקרת זמן. ב-API 30, אחרי סיבוב, הוא חיכה עד תקרת המחלקה (‏BrowserFlowTest ‏t10, ‏QA ‏125:
-     * חוט הבדיקה ב-`waitForNextChoreographerFrame`, וה-main בלולאה של Espresso). כאן — כשל עם התור של ה-main
-     * (`looper-<שם>.txt`; ‏sync barrier נראה בו כ-"barrier=") במקום תקיעה.
-     */
-    fun assertMainLooperRuns(tag: String) {
-        val main = Handler(Looper.getMainLooper())
-        val ran = CountDownLatch(1)
-        main.post { ran.countDown() }
-        if (!ran.await(10, TimeUnit.SECONDS)) mainLooperStuck(tag, "ran no message in 10s")
-        // והפריים: ‏Compose מחכה ל-callback של Choreographer (הודעת async) לפני ההודעה הרגילה.
-        val framed = CountDownLatch(1)
-        main.post { Choreographer.getInstance().postFrameCallback { framed.countDown() } }
-        if (!framed.await(10, TimeUnit.SECONDS)) mainLooperStuck(tag, "drew no frame in 10s")
-    }
-
-    /**
-     * `compose.waitForIdle()` עם תקרה של 30 שניות. ב-QA ‏127 הבדיקה של [assertMainLooperRuns] עברה, ו-`waitForIdle`
-     * נתקע אחריה: חוט הבדיקה חיכה ל-`Espresso.onIdle` (הודעה רגילה ל-main), וה-main ישן ב-`nativePollOnce`. כאן
-     * מחכים בחוט נפרד, ואם הוא לא חוזר — התור של ה-main באותו רגע, וכשל.
-     */
-    private fun settle(compose: ComposeTestRule, tag: String) {
-        var failure: Throwable? = null
-        val idle = thread(isDaemon = true, name = "qa-waitForIdle") { runCatching { compose.waitForIdle() }.onFailure { failure = it } }
-        idle.join(30_000)
-        if (idle.isAlive) mainLooperStuck(tag, "did not settle (compose.waitForIdle)")
-        failure?.let { throw it }
-    }
-
-    private fun mainLooperStuck(tag: String, what: String): Nothing {
-        dumpMainLooper(tag, what)
-        throw AssertionError("$tag: the main looper $what (looper-$tag.txt)")
-    }
-
-    /** התור של ה-main (‏sync barrier נראה בו כ-"barrier="), והמחסניות של ה-main ושל חוט הבדיקה — ללוג ול-`looper-<שם>.txt`. */
-    private fun dumpMainLooper(tag: String, what: String) {
-        val text = StringBuilder("$what\n")
-        Looper.getMainLooper().dump({ text.append(it).append('\n') }, "")
-        Thread.getAllStackTraces()
-            .filterKeys { it.name == "main" || it.name.startsWith("Instr") }
-            .forEach { (thread, frames) -> text.append("\n\"${thread.name}\" ${thread.state}\n").append(frames.joinToString("\n") { "  at $it" }).append('\n') }
-        Log.e("QaLooper", "$tag: the main looper $text")
-        runCatching { File(shotsDir, "looper-$tag.txt").writeText(text.toString()) }
-        runCatching { shell("screencap -p $SHOTS/looper-$tag.png") }
-    }
-
-    private val watchdogStarted = AtomicBoolean(false)
-
-    /**
-     * שומר על ה-main לאורך כל הבדיקות, לא רק בצילומים: אחרי שהפעילות נבנית מחדש (סיבוב, ‏wm size) ה-main הפסיק
-     * לפעמים להריץ הודעות רגילות, וכל המתנה של Compose נתקעה — גם ב-`waitFor` (‏Phase2bTest ב-API 35, ‏QA ‏132).
-     * כל 5 שניות הודעה רגילה ל-main; אם לא רצה תוך 20 — [dumpMainLooper] פעם אחת לכל תקיעה. לא מכשיל: התקרה של
-     * המחלקה ב-`instrumented.sh` עוצרת את התהליך.
-     */
-    private fun startMainLooperWatchdog() {
-        if (!watchdogStarted.compareAndSet(false, true)) return
-        thread(isDaemon = true, name = "qa-looper-watchdog") {
-            val main = Handler(Looper.getMainLooper())
-            var reported = false
-            while (true) {
-                val ran = CountDownLatch(1)
-                main.post { ran.countDown() }
-                if (ran.await(20, TimeUnit.SECONDS)) {
-                    reported = false
-                    Thread.sleep(5_000)
-                } else if (!reported) {
-                    reported = true
-                    dumpMainLooper("watchdog-${SystemClock.uptimeMillis()}", "ran no message in 20s")
-                }
-            }
-        }
-    }
-
-    /**
      * סיבוב ונעילה, כמו `UiDevice.setOrientationLeft/Natural` — בלי ההמתנה שלו: UiAutomator 2.4 בודק את הסיבוב
      * דרך `getDisplayRotation`, שקורא קודם ל-`waitForIdle` של UiAutomation. ב-API 30 זה נתקע לפעמים אחרי שהמסך
      * כבר הסתובב (‏BrowserFlowTest ‏t10, ב-QA ‏116 וב-121: "Waiting 2000ms for Condition[displayRotation=1…]",
-     * ואז 9 דקות בלי תשובה). כאן בודקים את ה-`Display` ישירות, עם תקרת זמן — כשל ולא תקיעה.
+     * ואז 9 דקות בלי תשובה). כאן בודקים את ה-`Display` ישירות, עם תקרת זמן — כשל ולא תקיעה. סיבוב בונה את
+     * הפעילות מחדש — ראה [recreating].
      */
     fun setOrientationLeft() = rotate(UiAutomation.ROTATION_FREEZE_90, Surface.ROTATION_90)
 
     fun setOrientationNatural() = rotate(UiAutomation.ROTATION_FREEZE_0, Surface.ROTATION_0)
 
     private fun rotate(freeze: Int, expected: Int) {
-        instrumentation.uiAutomation.setRotation(freeze)
         val display = checkNotNull(instrumentation.targetContext.getSystemService(DisplayManager::class.java)?.getDisplay(Display.DEFAULT_DISPLAY))
-        val deadline = SystemClock.uptimeMillis() + 5_000
-        while (display.rotation != expected) {
-            check(SystemClock.uptimeMillis() < deadline) { "the display did not rotate to $expected (now ${display.rotation})" }
+        val turn = {
+            instrumentation.uiAutomation.setRotation(freeze)
+            val deadline = SystemClock.uptimeMillis() + 5_000
+            while (display.rotation != expected) {
+                check(SystemClock.uptimeMillis() < deadline) { "the display did not rotate to $expected (now ${display.rotation})" }
+                Thread.sleep(50)
+            }
+        }
+        // כבר בכיוון הזה — רק נעילה, והפעילות לא נבנית מחדש.
+        if (display.rotation == expected) turn() else recreating(turn)
+    }
+
+    /**
+     * [change] משנה את התצורה (סיבוב, ‏wm size) והפעילות נבנית מחדש; חוזר רק כשהחדשה RESUMED, והישנה כבר
+     * הוסרה מהמסך (באותה הודעה של ה-main). עד אז — בלי אף קריאה ל-Compose: ‏`waitForIdle` בוחר מחוט הבדיקה
+     * root שמחובר לחלון ומבקש ממנו פריים, ושם `view.post` שמסמן שהפריים עבר. אם החלון הוסר באמצע, ה-`post`
+     * נשאר בתור של view מנותק ולא רץ לעולם, ו-Compose מחכה לו בלולאה בלי תקרה (‏`waitForNextChoreographerFrame`;
+     * ‏QA ‏133: ה-main רץ כל הזמן בלולאה של Espresso — 267 שניות CPU — והבדיקה ב-`waitFor` אחרי הסיבוב).
+     * בלי פעילות פעילה — אין מה לחכות לו.
+     */
+    fun recreating(change: () -> Unit) {
+        val before = resumedActivity()
+        change()
+        if (before == null) return
+        val deadline = SystemClock.uptimeMillis() + 20_000
+        while (true) {
+            val now = resumedActivity()
+            if (now != null && now !== before) return
+            check(SystemClock.uptimeMillis() < deadline) { "the activity was not recreated" }
             Thread.sleep(50)
         }
     }
 
+    private fun resumedActivity(): Activity? {
+        var resumed: Activity? = null
+        instrumentation.runOnMainSync {
+            resumed = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).firstOrNull()
+        }
+        return resumed
+    }
+
     fun launch(path: String? = null): ActivityScenario<MainActivity> {
-        startMainLooperWatchdog()
         val intent = Intent(ApplicationProvider.getApplicationContext(), MainActivity::class.java)
         if (path != null) intent.setAction(FileIntents.ACTION_OPEN_FOLDER).putExtra(FileIntents.EXTRA_PATH, path)
         return ActivityScenario.launch(intent)
