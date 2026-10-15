@@ -14,7 +14,7 @@ data class DavAddress(val host: String, val port: Int?, val path: String, val pl
         fun parse(text: String): DavAddress? {
             val raw = text.trim()
             if (raw.isEmpty()) return null
-            // רווח בנתיב (תיקייה בשם "Idan Cohen") — כמו שדפדפן מקודד אותו.
+            // רווח בנתיב (תיקייה בשם "Jane Doe") — כמו שדפדפן מקודד אותו.
             val withScheme = (if ("://" in raw) raw else "https://$raw").replace(" ", "%20")
             val uri = runCatching { URI(withScheme) }.getOrNull() ?: return null
             val plainHttp = when (uri.scheme?.lowercase()) {

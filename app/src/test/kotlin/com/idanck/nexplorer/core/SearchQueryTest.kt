@@ -15,7 +15,7 @@ class SearchQueryTest {
 
     @Test
     fun `wildcards anchor to the whole name`() {
-        assertTrue(SearchQuery.parse("router*").matches("router-backup-388.1.cfg"))
+        assertTrue(SearchQuery.parse("router*").matches("router-backup-2.1.cfg"))
         assertFalse(SearchQuery.parse("router*").matches("old-router.cfg"))
         assertTrue(SearchQuery.parse("*.jpg").matches("IMG_1.JPG"))
         assertTrue(SearchQuery.parse("IMG_?.jpg").matches("IMG_1.jpg"))
@@ -25,7 +25,7 @@ class SearchQueryTest {
     @Test
     fun `not and or`() {
         val q = SearchQuery.parse("router* !old")
-        assertTrue(q.matches("router-backup-388.1.cfg"))
+        assertTrue(q.matches("router-backup-2.1.cfg"))
         assertFalse(q.matches("router-old.cfg"))
         val or = SearchQuery.parse("*.jpg | *.png")
         assertTrue(or.matches("a.png"))

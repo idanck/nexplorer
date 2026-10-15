@@ -1,6 +1,6 @@
 {
   "$schema-note": "Observed tokens from Solid Explorer 3.6.x screenshots (light theme, Hebrew UI, 1080x2340). Colors sampled from JPEG pixels (+/-2 per channel). Sizes in px at 1080 width; device density unknown, so no dp conversion.",
-  "source": "docs/screenshots/01-04, sampled 2026-10-13",
+  "source": "4 device screenshots, sampled 2026-10-13 (not kept in the repo)",
   "color": {
     "brand": {
       "primary": "#377AFF",
