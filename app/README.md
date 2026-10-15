@@ -1,6 +1,6 @@
 # app — מודול האנדרואיד
 
-Kotlin + Jetpack Compose + Material 3. ‏`minSdk 26`, ‏`targetSdk 35`, חבילה `com.idanck.nexplorer`.
+Kotlin + Jetpack Compose + Material 3. ‏`minSdk 30` (D9), ‏`targetSdk 35`, חבילה `com.idanck.nexplorer`.
 הגרסאות ב-`gradle/libs.versions.toml` (זהות ל-ats-mobile-app, שנבנה בהצלחה ב-CI).
 
 | נתיב | מה יש בו |

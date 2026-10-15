@@ -1,7 +1,7 @@
 name: QA
 # בדיקות על אמולטור אנדרואיד. נפרד מ-CI בכוונה: ל-CI יש מספור ריצות שהוא ה-versionCode (D5),
 # ובדיקות אמולטור ארוכות וחשופות לרעש — הן לא צריכות לעכב build או פרסום.
-#   instrumented — בכל PR: מסלולי משתמש + monkey על API 29 ו-35, עם צילומי מסך.
+#   instrumented — בכל PR: מסלולי משתמש + monkey על API 30 ו-35, עם צילומי מסך.
 #   update-e2e   — אחרי כל פרסום ב-main: build ישן מתעדכן מתוך האפליקציה לגרסה שפורסמה.
 # התוצאות (צילומים, פלט, logcat) נדחפות לענף qa.
 on:
@@ -37,8 +37,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 29: מסלול ההרשאות הישן (Android 8–10). 35: targetSdk.
-        api: [29, 35]
+        # 30: minSdk (Android 11, D9). 35: targetSdk.
+        api: [30, 35]
     steps:
       - uses: actions/checkout@v7
 

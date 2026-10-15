@@ -28,7 +28,7 @@ adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 adb shell cmd package compile -m verify -f "$pkg" > /dev/null || true
 adb shell cmd package compile -m verify -f "$pkg.test" > /dev/null || true
 for _ in $(seq 1 60); do
-  # "some avg10=NN.NN" — אחוז הזמן שתהליכים חיכו ל-CPU. אין /proc/pressure (API 29) — לא מחכים.
+  # "some avg10=NN.NN" — אחוז הזמן שתהליכים חיכו ל-CPU. בלי /proc/pressure (קרנל ישן) — לא מחכים.
   load=$(adb shell cat /proc/pressure/cpu 2>/dev/null | tr -d '\r' | awk '/^some/ { split($2, a, "="); print int(a[2]) }')
   { [ -z "$load" ] || [ "$load" -lt 40 ]; } && break
   sleep 2
@@ -68,6 +68,10 @@ run_class BrowserFlowTest
 run_class SearchAndSettingsTest
 run_class Phase2Test
 run_class Phase2bTest
+# גיליון ה-APK פותח את מתקין המערכת. ב-Android 11 (API 30) שינוי של REQUEST_INSTALL_PACKAGES הורג את
+# התהליך — ובאמצע הבדיקה זה "Process crashed" ("Killing …: REQUEST_INSTALL_PACKAGES changed"). כמו משתמש
+# שכבר אישר, ולפני שהתהליך עולה (כמו ב-update-e2e.sh).
+adb shell appops set "$pkg" REQUEST_INSTALL_PACKAGES allow || true
 run_class Phase3Test
 run_class Phase3bTest
 run_class Phase4Test

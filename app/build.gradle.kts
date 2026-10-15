@@ -24,7 +24,8 @@ android {
 
     defaultConfig {
         applicationId = "com.idanck.nexplorer"
-        minSdk = 26
+        // D9: Android 11 ומעלה — מודל גישה אחד, "גישה לכל הקבצים" (docs/research/08-open-decisions.md).
+        minSdk = 30
         targetSdk = 35
         versionCode = buildNumber
         versionName = "$appVersionName.$buildNumber"

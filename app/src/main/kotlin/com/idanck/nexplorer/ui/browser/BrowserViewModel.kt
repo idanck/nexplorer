@@ -26,7 +26,6 @@ import com.idanck.nexplorer.data.crypto.Vaults
 import com.idanck.nexplorer.data.files.LocalFiles
 import com.idanck.nexplorer.data.files.MediaCollection
 import com.idanck.nexplorer.data.files.MediaCollections
-import com.idanck.nexplorer.data.files.MediaScan
 import com.idanck.nexplorer.data.files.StorageVolumeInfo
 import com.idanck.nexplorer.data.files.StorageVolumes
 import com.idanck.nexplorer.data.net.NetConnection
@@ -835,7 +834,6 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
                 ?: File(dir, FileNames.unique(step.from) { File(dir, it).exists() })
             failed += if (temp.renameTo(back)) step.from else "${step.from} (נשאר בשם ${temp.name})"
         }
-        MediaScan.changed(getApplication(), moved.flatMap { listOf(it.first, it.second) })
         return BatchRenameResult(renamed, failed, moved)
     }
 
@@ -854,7 +852,6 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
         (if (isRemote) remote.rename(path, newName) else LocalFiles.rename(path, newName)).onSuccess { newPath ->
             clearSelection()
             if (newPath != path) {
-                if (!isRemote) MediaScan.changed(getApplication(), listOf(path, newPath))
                 settings.update { it.relocated(path, newPath) }
             }
         }

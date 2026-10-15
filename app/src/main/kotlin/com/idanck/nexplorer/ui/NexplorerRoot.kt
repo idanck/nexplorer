@@ -73,16 +73,16 @@ fun NexplorerRoot(
     val settings by container.settings.state.collectAsStateWithLifecycle()
     val updateState by container.updates.state.collectAsStateWithLifecycle()
     val canInstall by container.updates.canInstall.collectAsStateWithLifecycle()
-    var granted by remember { mutableStateOf(StorageAccess.granted(context)) }
+    var granted by remember { mutableStateOf(StorageAccess.granted()) }
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-        granted = StorageAccess.granted(context)
+        granted = StorageAccess.granted()
         container.updates.refreshInstallPermission()
         container.scope.launch { container.updates.check(force = false) }
     }
 
     if (!granted) {
-        StorageAccessScreen(onGrantedLegacy = { granted = StorageAccess.granted(context) })
+        StorageAccessScreen()
         return
     }
 

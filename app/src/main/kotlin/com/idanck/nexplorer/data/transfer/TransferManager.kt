@@ -1,7 +1,6 @@
 package com.idanck.nexplorer.data.transfer
 
 import android.content.Context
-import android.os.Build
 import com.idanck.nexplorer.core.FileNames
 import com.idanck.nexplorer.core.NetPaths
 import com.idanck.nexplorer.core.NetProtocol
@@ -11,7 +10,6 @@ import com.idanck.nexplorer.data.crypto.KeyRing
 import com.idanck.nexplorer.data.crypto.VaultKeys
 import com.idanck.nexplorer.data.crypto.Vaults
 import com.idanck.nexplorer.data.files.LocalFiles
-import com.idanck.nexplorer.data.files.MediaScan
 import com.idanck.nexplorer.data.net.RemoteFiles
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -202,7 +200,6 @@ class TransferManager(
         cancelled -= id
         paused -= id
         secrets.remove(id)?.fill('\u0000')
-        flushScan()
         get(id)?.let { _finished.tryEmit(it) }
     }
 
@@ -268,7 +265,6 @@ class TransferManager(
                 }
                 val dest = File(targetDir, uniqueIn(targetDir, source.name))
                 if (source.renameTo(dest)) {
-                    touched(source, dest)
                     recordMove(job.id, source, dest)
                     doneItems++
                     continue
@@ -340,9 +336,8 @@ class TransferManager(
             return
         }
         set(id) { it.copy(currentName = source.name) }
-        val sealed = EncryptedFiles.encryptFile(source, destDir, keys, { checkpoint(id) }, progress::add)
+        EncryptedFiles.encryptFile(source, destDir, keys, { checkpoint(id) }, progress::add)
         if (move && !source.delete()) throw IOException("ההצפנה הצליחה, אבל לא ניתן למחוק את המקור \"${source.name}\"")
-        touched(if (move) source else null, sealed)
     }
 
     // ---------- ברשת (שלב 5א) ----------
@@ -353,9 +348,6 @@ class TransferManager(
         checkpoint = { checkpoint(id) },
         onBytes = progress::add,
         onName = { name -> set(id) { it.copy(currentName = name) } },
-        onFile = { dest, removed ->
-            touched(removed?.takeIf { !NetPaths.isRemote(it) }?.let(::File), dest.takeIf { !NetPaths.isRemote(it) }?.let(::File))
-        },
     )
 
     /**
@@ -467,8 +459,7 @@ class TransferManager(
         val dest = File(targetDir, uniqueIn(targetDir, requireNotNull(job.archiveName)))
         set(job.id) { it.copy(status = TransferStatus.Running, totalBytes = total, currentName = dest.name) }
         val progress = Progress(job.id)
-        val created = Archives.compress(sources, dest, secrets[job.id], checkpoint = { checkpoint(job.id) }, onBytes = progress::add)
-        touched(null, created)
+        Archives.compress(sources, dest, secrets[job.id], checkpoint = { checkpoint(job.id) }, onBytes = progress::add)
     }
 
     private suspend fun extract(job: Transfer) {
@@ -497,8 +488,6 @@ class TransferManager(
             folder?.deleteRecursively()
             throw e
         }
-        folder?.let { touched(null, it) }
-        result.created.forEach { touched(null, it) }
         val notes = listOfNotNull(
             "${result.unsafe} רשומות דולגו — הנתיב שלהן יוצא מתיקיית החילוץ".takeIf { result.unsafe > 0 },
             "${result.special} קישורים או קבצים מיוחדים לא נוצרו".takeIf { result.special > 0 },
@@ -530,11 +519,10 @@ class TransferManager(
                 checkpoint(job.id)
                 set(job.id) { it.copy(currentName = file.name) }
                 val dir = file.parentFile ?: continue
-                val sealed = EncryptedFiles.encryptFile(file, dir, keys, { checkpoint(job.id) }, progress::add)
+                EncryptedFiles.encryptFile(file, dir, keys, { checkpoint(job.id) }, progress::add)
                 if (!file.delete()) {
                     throw IOException("\"${file.name}\" הוצפן, אבל לא ניתן למחוק את המקור — יש עכשיו גם עותק מוצפן וגם המקור")
                 }
-                touched(file, sealed)
                 done++
                 set(job.id) { it.copy(doneItems = done) }
             }
@@ -579,7 +567,6 @@ class TransferManager(
                     if (!file.delete()) {
                         throw IOException("\"${restored.name}\" פוענח, אבל לא ניתן למחוק את הקובץ המוצפן")
                     }
-                    touched(file, restored)
                     done++
                     set(job.id) { it.copy(doneItems = done) }
                 } catch (e: EncryptedFiles.WrongPassword) {
@@ -705,7 +692,6 @@ class TransferManager(
         }
         dest.setLastModified(source.lastModified())
         if (move && !source.delete()) throw IOException("ההעתקה הצליחה, אבל לא ניתן למחוק את המקור \"${source.name}\"")
-        touched(if (move) source else null, dest)
     }
 
     private suspend fun delete(job: Transfer) {
@@ -727,7 +713,6 @@ class TransferManager(
             } catch (e: IOException) {
                 throw IOException("לא ניתן למחוק את \"${file.name}\"", e)
             }
-            touched(file, null)
             done++
             val now = System.currentTimeMillis()
             if (now - lastPublish > PUBLISH_MS) {
@@ -736,21 +721,6 @@ class TransferManager(
             }
         }
         set(job.id) { it.copy(doneItems = done) }
-    }
-
-    /** נאסף לאורך הפעולה ונשלח לסורק בסופה — ראה [MediaScan]. */
-    private val toScan = mutableListOf<String>()
-
-    private fun touched(removed: File?, added: File?) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R || toScan.size >= MAX_SCAN) return
-        removed?.let { toScan += it.absolutePath }
-        added?.let { toScan += it.absolutePath }
-    }
-
-    private fun flushScan() {
-        if (toScan.isEmpty()) return
-        MediaScan.changed(context, toScan.toList())
-        toScan.clear()
     }
 
     /** מצרף בתים ומפרסם לממשק לכל היותר כל [PUBLISH_MS], עם מהירות על חלון של שנייה. */
@@ -783,6 +753,5 @@ class TransferManager(
         val NETWORK_KINDS = setOf(TransferKind.Copy, TransferKind.Move, TransferKind.Delete)
         const val BUFFER = 256 * 1024
         const val PUBLISH_MS = 150L
-        const val MAX_SCAN = 5_000
     }
 }

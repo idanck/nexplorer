@@ -4,7 +4,6 @@ import android.os.SystemClock
 import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
-import android.view.Surface
 import android.view.ViewConfiguration
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.doubleClick
@@ -74,15 +73,12 @@ class Phase2bTest {
     private fun count(text: String): Int = compose.onAllNodesWithText(text).fetchSemanticsNodes().size
 
     /**
-     * לרוחב: שני חלונות, שניהם בתיקייה של הראשון. ב-API 29 תחת עומס הסיבוב לפעמים פשוט לא קורה
-     * (UiDevice: "Didn't detect rotation within 2000ms", והתצוגה נשארת לאורך) — עוד ניסיון, עד שלושה.
+     * לרוחב: שני חלונות, שניהם בתיקייה של הראשון. הטאבלט עובר לרוחב דרך wm size בממדי רוחב, ולא
+     * בסיבוב: ב-API 29 תחת עומס הסיבוב לפעמים לא קרה ("Didn't detect rotation within 2000ms"), וב-API 30
+     * עם wm size התצוגה הסתובבה וחזרה לאורך לבד אחרי כשלוש שניות. הפעילות נבנית מחדש כמו בסיבוב.
      */
     private fun enterDualPane() {
-        for (attempt in 1..3) {
-            Qa.device.setOrientationLeft()
-            if (Qa.device.displayRotation != Surface.ROTATION_0) break
-            Qa.device.setOrientationNatural()
-        }
+        Qa.shell("wm size $TABLET_LANDSCAPE_SIZE")
         compose.waitFor(hasText("גרירה בין החלונות", substring = true), 15_000)
         compose.waitUntil(15_000) { count("readme.md") == 2 }
     }
@@ -224,6 +220,8 @@ class Phase2bTest {
     private companion object {
         /** 1600×2560 ב-320dpi = 800×1280dp — טאבלט 10 אינץ'. */
         const val TABLET_SIZE = "1600x2560"
+        /** אותו טאבלט לרוחב: 1280×800dp. */
+        const val TABLET_LANDSCAPE_SIZE = "2560x1600"
         const val TABLET_DENSITY = 320
 
         const val HOLD_STEP_MS = 50L
