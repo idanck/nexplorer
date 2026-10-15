@@ -67,9 +67,15 @@ def focus(text, above=None):
     if above is not None:
         root = dump()
         bar = find(root, above) if root is not None else None
-        # רבע גובה שדה מעל הכפתור: הריפוד והקו של הסרגל מעליו.
-        if bar is not None and y2 > bounds(bar)[1] - (y2 - y1) // 4:
-            return False
+        if bar is not None:
+            bx1, by1, bx2, by2 = bounds(bar)
+            # רבע גובה שדה מעל הכפתור: הריפוד והקו של הסרגל מעליו.
+            if y2 > by1 - (y2 - y1) // 4:
+                return False
+            # הגבולות ב-dump הם רק החלק הנראה: פס דק מהשדה שמציץ מעל הסרגל עובר את הבדיקה הקודמת, והלחיצה
+            # נוחתת ליד הסרגל (QA ‏129, ‏API 30: "2222" שוב בסיסמה). שדה נמוך משלושה רבעים מהכפתור — עוד לא על המסך.
+            if y2 - y1 < (by2 - by1) * 3 // 4:
+                return False
     subprocess.run(["adb", "shell", "input", "tap", str((x1 + x2) // 2), str((y1 + y2) // 2)], check=True)
     time.sleep(0.4)
     return settled(text) is not None
