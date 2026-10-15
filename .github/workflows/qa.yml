@@ -1,12 +1,16 @@
 name: QA
 # בדיקות על אמולטור אנדרואיד. נפרד מ-CI בכוונה: ל-CI יש מספור ריצות שהוא ה-versionCode (D5),
 # ובדיקות אמולטור ארוכות וחשופות לרעש — הן לא צריכות לעכב build או פרסום.
-#   instrumented — בכל PR: מסלולי משתמש + monkey על API 30 ו-35, עם צילומי מסך.
+#   instrumented — ב-PR שמוכן למיזוג (לא טיוטה) ומשנה משהו שהאמולטור בודק (changes), ובהפעלה ידנית:
+#                  מסלולי משתמש + monkey על API 30 ו-35, עם צילומי מסך.
+#   qa           — הסיכום: ירוק כשה-QA עבר או דולג. זו הבדיקה שמחייבים בהגנת הענף — אם ה-workflow
+#                  כולו לא רץ (paths), בדיקה נדרשת נשארת "ממתינה" לנצח.
 #   update-e2e   — אחרי כל פרסום ב-main: build ישן מתעדכן מתוך האפליקציה לגרסה שפורסמה.
 # התוצאות (צילומים, פלט, logcat) נדחפות לענף qa.
 on:
   pull_request:
-    paths-ignore: ['docs/**', '**.md', 'worker/**']
+    # ready_for_review: טיוטה שמסומנת כמוכנה מריצה את ה-QA, בלי push נוסף.
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
     inputs:
       update_e2e:
@@ -29,8 +33,38 @@ env:
   UPDATES_HOST: https://nexplorer-updates.idanck.com
 
 jobs:
+  changes:
+    name: what changed
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.diff.outputs.app }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: diff
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          # כל ה-PR מול הבסיס, לא רק ה-push האחרון. מה שהאמולטור בודק: קוד האפליקציה, בדיקות האמולטור,
+          # הבנייה וה-QA עצמו. בדיקות יחידה, מסמכים, לוחות העיצוב וה-Worker — לא (ה-CI מכסה אותם).
+          files=$(git diff --name-only "$BASE_SHA"...HEAD)
+          printf '%s\n' "$files"
+          if grep -qE '^(app/src/main/|app/src/androidTest/|app/build\.gradle\.kts$|app/proguard-rules\.pro$|build\.gradle\.kts$|settings\.gradle\.kts$|gradle\.properties$|gradle/|\.github/qa/|\.github/workflows/qa\.yml$)' <<< "$files"; then
+            echo "app=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "app=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::no change the emulator tests — QA skipped"
+          fi
+
   instrumented:
-    if: github.event_name != 'workflow_run'
+    needs: changes
+    # !cancelled(): ‏changes מדולג בהפעלה ידנית, ובלי זה גם ה-job הזה היה מדולג.
+    if: >-
+      !cancelled() && (github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' && needs.changes.outputs.app == 'true'))
     name: emulator (API ${{ matrix.api }})
     runs-on: ubuntu-latest
     timeout-minutes: 50
@@ -108,6 +142,22 @@ jobs:
           path: qa-out/
           if-no-files-found: ignore
           retention-days: 14
+
+  verdict:
+    name: qa
+    needs: [changes, instrumented]
+    if: always() && github.event_name != 'workflow_run'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Emulator QA result
+        env:
+          CHANGES: ${{ needs.changes.result }}
+          QA: ${{ needs.instrumented.result }}
+        run: |
+          echo "changes: $CHANGES, instrumented: $QA"
+          # skipped — טיוטה, או שאין שינוי שהאמולטור בודק. failure או cancelled בכל אחד מהם — אדום.
+          case "$CHANGES" in failure|cancelled) exit 1 ;; esac
+          case "$QA" in success|skipped) ;; *) exit 1 ;; esac
 
   update-e2e:
     # workflow_run.event — הסינון branches: [main] תופס גם PR מ-fork שהענף שלו נקרא main.
