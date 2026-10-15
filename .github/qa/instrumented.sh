@@ -142,7 +142,9 @@ adb logcat -d -b events -s am_anr > "$out/anr.txt" || true
 # הצד של השרת: חיבור שנתקע ב"מתחבר…" — האם הגיע ל-sshd, ואיפה נעצר (sftp-server.sh, ‏LogLevel VERBOSE).
 sudo cat /tmp/nexplorer-sftp/sshd.log > "$out/sshd.log" 2>/dev/null || true
 if grep -q "$pkg" "$out/anr.txt"; then
-  echo "::error::the app stopped responding on API $api (anr.txt)"
+  echo "::error::the app stopped responding on API $api (anr.txt, anr-traces.txt)"
+  # המחסנית של ה-main בזמן ה-ANR: ‏DropBox שומר אותה (data_app_anr), בלי root. בלעדיה רואים רק "Waited 5012ms".
+  adb shell dumpsys dropbox --print data_app_anr > "$out/anr-traces.txt" 2>&1 || true
   status=1
 fi
 
