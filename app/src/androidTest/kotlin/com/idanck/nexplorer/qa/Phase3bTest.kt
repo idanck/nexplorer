@@ -83,8 +83,9 @@ class Phase3bTest {
 
     @After
     fun tearDown() {
-        Qa.setOrientationNatural()
+        // קודם סוגרים: סיבוב עם פעילות פתוחה בונה אותה מחדש (ראה Qa.recreating).
         scenario.close()
+        Qa.setOrientationNatural()
         // השירות ממשיך לנגן גם בלי מסך — זו הכוונה; בין בדיקות עוצרים אותו.
         app.stopService(Intent(app, PlaybackService::class.java))
     }

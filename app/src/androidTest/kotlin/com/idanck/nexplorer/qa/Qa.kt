@@ -1,5 +1,6 @@
 package com.idanck.nexplorer.qa
 
+import android.app.Activity
 import android.app.UiAutomation
 import android.content.Intent
 import android.graphics.Bitmap
@@ -20,6 +21,8 @@ import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
 import androidx.test.uiautomator.UiDevice
 import com.idanck.nexplorer.MainActivity
 import com.idanck.nexplorer.data.files.FileIntents
@@ -84,20 +87,54 @@ object Qa {
      * סיבוב ונעילה, כמו `UiDevice.setOrientationLeft/Natural` — בלי ההמתנה שלו: UiAutomator 2.4 בודק את הסיבוב
      * דרך `getDisplayRotation`, שקורא קודם ל-`waitForIdle` של UiAutomation. ב-API 30 זה נתקע לפעמים אחרי שהמסך
      * כבר הסתובב (‏BrowserFlowTest ‏t10, ב-QA ‏116 וב-121: "Waiting 2000ms for Condition[displayRotation=1…]",
-     * ואז 9 דקות בלי תשובה). כאן בודקים את ה-`Display` ישירות, עם תקרת זמן — כשל ולא תקיעה.
+     * ואז 9 דקות בלי תשובה). כאן בודקים את ה-`Display` ישירות, עם תקרת זמן — כשל ולא תקיעה. סיבוב בונה את
+     * הפעילות מחדש — ראה [recreating].
      */
     fun setOrientationLeft() = rotate(UiAutomation.ROTATION_FREEZE_90, Surface.ROTATION_90)
 
     fun setOrientationNatural() = rotate(UiAutomation.ROTATION_FREEZE_0, Surface.ROTATION_0)
 
     private fun rotate(freeze: Int, expected: Int) {
-        instrumentation.uiAutomation.setRotation(freeze)
         val display = checkNotNull(instrumentation.targetContext.getSystemService(DisplayManager::class.java)?.getDisplay(Display.DEFAULT_DISPLAY))
-        val deadline = SystemClock.uptimeMillis() + 5_000
-        while (display.rotation != expected) {
-            check(SystemClock.uptimeMillis() < deadline) { "the display did not rotate to $expected (now ${display.rotation})" }
+        val turn = {
+            instrumentation.uiAutomation.setRotation(freeze)
+            val deadline = SystemClock.uptimeMillis() + 5_000
+            while (display.rotation != expected) {
+                check(SystemClock.uptimeMillis() < deadline) { "the display did not rotate to $expected (now ${display.rotation})" }
+                Thread.sleep(50)
+            }
+        }
+        // כבר בכיוון הזה — רק נעילה, והפעילות לא נבנית מחדש.
+        if (display.rotation == expected) turn() else recreating(turn)
+    }
+
+    /**
+     * [change] משנה את התצורה (סיבוב, ‏wm size) והפעילות נבנית מחדש; חוזר רק כשהחדשה RESUMED, והישנה כבר
+     * הוסרה מהמסך (באותה הודעה של ה-main). עד אז — בלי אף קריאה ל-Compose: ‏`waitForIdle` בוחר מחוט הבדיקה
+     * root שמחובר לחלון ומבקש ממנו פריים, ושם `view.post` שמסמן שהפריים עבר. אם החלון הוסר באמצע, ה-`post`
+     * נשאר בתור של view מנותק ולא רץ לעולם, ו-Compose מחכה לו בלולאה בלי תקרה (‏`waitForNextChoreographerFrame`;
+     * ‏QA ‏133: ה-main רץ כל הזמן בלולאה של Espresso — 267 שניות CPU — והבדיקה ב-`waitFor` אחרי הסיבוב).
+     * בלי פעילות פעילה — אין מה לחכות לו.
+     */
+    fun recreating(change: () -> Unit) {
+        val before = resumedActivity()
+        change()
+        if (before == null) return
+        val deadline = SystemClock.uptimeMillis() + 20_000
+        while (true) {
+            val now = resumedActivity()
+            if (now != null && now !== before) return
+            check(SystemClock.uptimeMillis() < deadline) { "the activity was not recreated" }
             Thread.sleep(50)
         }
+    }
+
+    private fun resumedActivity(): Activity? {
+        var resumed: Activity? = null
+        instrumentation.runOnMainSync {
+            resumed = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).firstOrNull()
+        }
+        return resumed
     }
 
     fun launch(path: String? = null): ActivityScenario<MainActivity> {

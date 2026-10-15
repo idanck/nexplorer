@@ -62,12 +62,13 @@ class Phase2bTest {
         compose.waitFor(hasText("readme.md"), 15_000)
     }
 
+    /** קודם סוגרים: שינוי גודל מסך עם פעילות פתוחה בונה אותה מחדש (ראה [Qa.recreating]). */
     @After
     fun tearDown() {
+        scenario.close()
         Qa.setOrientationNatural()
         Qa.shell("wm size reset")
         Qa.shell("wm density reset")
-        scenario.close()
     }
 
     private fun count(text: String): Int = compose.onAllNodesWithText(text).fetchSemanticsNodes().size
@@ -78,7 +79,7 @@ class Phase2bTest {
      * עם wm size התצוגה הסתובבה וחזרה לאורך לבד אחרי כשלוש שניות. הפעילות נבנית מחדש כמו בסיבוב.
      */
     private fun enterDualPane() {
-        Qa.shell("wm size $TABLET_LANDSCAPE_SIZE")
+        Qa.recreating { Qa.shell("wm size $TABLET_LANDSCAPE_SIZE") }
         compose.waitFor(hasText("גרירה בין החלונות", substring = true), 15_000)
         compose.waitUntil(15_000) { count("readme.md") == 2 }
     }

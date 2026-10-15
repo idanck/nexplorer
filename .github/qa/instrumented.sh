@@ -82,6 +82,12 @@ run_class() {
     fi
     # ה-instrumentation רץ בתהליך של האפליקציה, ו-timeout סוגר רק את צד ה-adb: עוצרים אותו לפני המחלקה הבאה.
     adb shell am force-stop "$pkg" < /dev/null || true
+    # ה-tearDown לא רץ: מחלקה שנתקעה באמצע מצב טאבלט (Phase2bTest) או סיבוב השאירה אותו, וכל המחלקות אחריה
+    # רצו בשני חלונות ונכשלו ("Failed to inject touch input", ‏QA ‏132). מחזירים את המסך לפני המחלקה הבאה.
+    adb shell wm size reset < /dev/null || true
+    adb shell wm density reset < /dev/null || true
+    adb shell settings put system accelerometer_rotation 0 < /dev/null || true
+    adb shell settings put system user_rotation 0 < /dev/null || true
     status=1
   elif ! grep -q '^OK (' "$out/$cls.txt"; then
     echo "::error::$cls failed on API $api"
