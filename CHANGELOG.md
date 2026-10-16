@@ -50,6 +50,8 @@
 - Worker: השוואת טוקן בזמן קבוע, 400 (לא 500) על נתיב פגום. CI: versionCode ו-minSdk נקראים מה-APK; תקלה בערוץ לא נחשבת "עוד לא פורסם"
 
 ### Changed
+- Compose BOM ‏2026.03.01 ← 2026.09.00 ‏(Compose 1.10.6 ← 1.12.1), ו-Dependabot כבר לא מדלג עליו. ב-ANR של QA נשמר גם מצב ה-InputDispatcher ברגע ה-ANR (`anr-input.txt`), והסיבה והתור מודפסים ללוג
+- QA: כללי הבדיקה של Compose מ-`junit4.v2` ‏(StandardTestDispatcher). ב-v1 ה-dispatcher של ה-composition הוא Unconfined: האיסוף של `collectAsStateWithLifecycle` חזר לרוץ על חוט ה-IO שפרסם את תוצאות החיפוש, וכתב state של Compose באמצע measure — ‏IndexOutOfBoundsException ב-LazyColumn של החיפוש (‏SearchAndSettingsTest ‏t01, ‏QA ‏137). באפליקציה עצמה האיסוף רץ על ה-main
 - QA, בדיקת העשן של release: שדה שרק פס דק ממנו נראה מעל הסרגל התחתון לא נחשב "על המסך" — הלחיצה נחתה ליד הסרגל, ו-"2222" של הפורט נכתב שוב לסיסמה (API 30)
 - QA: אחרי סיבוב או `wm size` הבדיקה מחכה שהפעילות החדשה תהיה RESUMED לפני כל קריאה ל-Compose (`Qa.recreating`). ‏`waitForIdle` שנקרא באמצע הבנייה מחדש ביקש פריים מה-root של החלון שהוסר, וחיכה לו בלי סוף — ‏BrowserFlowTest ‏t10 ב-API 30 ו-Phase2bTest ב-API 35, עד תקרת המחלקה. ב-tearDown סוגרים את הפעילות לפני שמחזירים את המסך; ואחרי מחלקה שנתקעה המסך חוזר לגודל ולסיבוב הרגילים
 - QA: הסיבוב בבדיקות (`Qa.setOrientationLeft/Natural`) בלי ההמתנה של UiAutomator 2.4 — היא נתקעה לפעמים ב-API 30 אחרי שהמסך כבר הסתובב (‏BrowserFlowTest ‏t10, עד תקרת 10 הדקות); בתקיעה של מחלקה נאספות גם מחסניות החוטים (`hang-<מחלקה>-stacks.txt`)

@@ -177,6 +177,11 @@ if grep -q "$pkg" "$out/anr.txt"; then
   echo "::error::the app stopped responding on API $api (anr.txt, anr-traces.txt)"
   # המחסנית של ה-main בזמן ה-ANR: ‏DropBox שומר אותה (data_app_anr), בלי root. בלעדיה רואים רק "Waited 5012ms".
   adb shell dumpsys dropbox --print data_app_anr > "$out/anr-traces.txt" 2>&1 || true
+  # מצב ה-InputDispatcher ברגע ה-ANR ("Input Dispatcher State at time of last ANR"): החלון שבפוקוס, ואיזה אירוע
+  # מחכה בתור של איזה חלון. בלי זה רואים רק "Waited 5012ms" ולא איפה.
+  adb shell dumpsys input > "$out/anr-input.txt" 2>&1 || true
+  grep -m 3 -E 'Subject:|Reason:' "$out/anr-traces.txt" || true
+  sed -n '/Input Dispatcher State at time of last ANR/,/^  Configuration:/p' "$out/anr-input.txt" | head -n 80 || true
   status=1
 fi
 
