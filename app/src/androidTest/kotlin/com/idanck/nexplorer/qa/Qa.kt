@@ -31,6 +31,8 @@ import java.io.File
 /**
  * כלים משותפים לבדיקות ה-QA על האמולטור: פקודות shell (בהרשאות shell, לא של האפליקציה),
  * צילומי מסך מלאים (כולל חלונות מערכת ודיאלוגים) ותיקיית נתונים קבועה.
+ * הכללים מ-`junit4.v2`: ב-v1 קורוטינות של ה-composition חוזרות לרוץ על החוט שחידש אותן — איסוף StateFlow
+ * שמתעדכן מ-IO כתב state באמצע measure (‏IndexOutOfBoundsException ב-LazyColumn של החיפוש, ‏QA ‏137).
  */
 object Qa {
 
