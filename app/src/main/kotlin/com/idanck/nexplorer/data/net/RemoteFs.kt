@@ -26,8 +26,11 @@ interface RemoteFs : Closeable {
 
     fun openRead(path: String): InputStream
 
-    /** קובץ חדש. קיים כבר — כשל ("כבר קיים פריט בשם הזה"): העתקה אף פעם לא דורסת. */
-    fun openWrite(path: String): OutputStream
+    /**
+     * קובץ חדש. קיים כבר — כשל ("כבר קיים פריט בשם הזה"): העתקה אף פעם לא דורסת. [size] — הגודל שייכתב, כשידוע
+     * (-1 — לא ידוע); OneDrive צריך אותו מראש לקובץ גדול.
+     */
+    fun openWrite(path: String, size: Long = -1): OutputStream
 
     fun mkdir(path: String)
 

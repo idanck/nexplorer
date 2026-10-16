@@ -10,6 +10,8 @@ import java.security.SecureRandom
 /**
  * מקום ברשת שנשמר במגירה ("הוסף מקום"). הסיסמה לא כאן כמו שהיא: [secret] הוא הצופן שלה במפתח של
  * Android Keystore ([ConnectionSecrets]) — המפתח לא יוצא מהמכשיר, ונמחק עם הסרת האפליקציה.
+ * ענן ([NetProtocol.cloud]): [user] הוא החשבון, ו-[host] הוא השרת של ה-API (בבדיקות — שרת מדומה). אין סיסמה:
+ * ב-Google ההרשאה אצל Play services, וב-OneDrive ה-refresh token ב-[CloudTokens].
  */
 data class NetConnection(
     val id: String,
@@ -36,7 +38,7 @@ data class NetConnection(
     /** WebDAV: http בלי הצפנה (שרת בבית). ברירת המחדל — https. */
     val plainHttp: Boolean = false,
 ) {
-    val label: String get() = name.ifBlank { host }
+    val label: String get() = name.ifBlank { if (protocol.cloud) user.ifBlank { protocol.label } else host }
 
     /** WebDAV ב-http — 80; אחרת של הפרוטוקול. */
     val defaultPort: Int get() = if (protocol == NetProtocol.WebDav && plainHttp) 80 else protocol.defaultPort
@@ -50,9 +52,9 @@ data class NetConnection(
     val root: String
         get() = NetPaths.root(protocol, id).let { if (share.isBlank() || protocol == NetProtocol.WebDav) it else NetPaths.child(it, share) }
 
-    /** "alex@192.168.1.20" — בשורה שמתחת לשם במגירה (כמו "pi@192.168.1.30:2222" בלוח). */
+    /** "alex@192.168.1.20" — בשורה שמתחת לשם במגירה (כמו "pi@192.168.1.30:2222" בלוח). בענן — החשבון. */
     val subtitle: String
-        get() = buildString {
+        get() = if (protocol.cloud) user.ifBlank { protocol.label } else buildString {
             if (user.isNotBlank()) append(user).append('@')
             append(host)
             if (port != null && port != defaultPort) append(':').append(port)
@@ -61,6 +63,8 @@ data class NetConnection(
     /** "smb://192.168.1.20/volume2/Photos" או "sftp://192.168.1.30/home/pi" — מה ש"העתק נתיב" נותן בתוך החיבור. */
     fun displayUrl(path: String): String {
         val segments = NetPaths.segments(path)
+        // ענן: אין כתובת אמיתית לנתיב — החשבון במקום השרת ("gdrive://alex@example.com/Photos").
+        if (protocol.cloud) return "${protocol.scheme}://${user.ifBlank { id }}" + segments.joinToString("") { "/$it" }
         val authority = host + if (port != null && port != defaultPort) ":$port" else ""
         if (protocol == NetProtocol.WebDav) {
             // כתובת אמיתית: IPv6 בסוגריים, ו-# % ? ורווח מקודדים — אפשר להדביק אותה בחזרה ("ערוך").

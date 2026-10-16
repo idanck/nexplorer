@@ -32,6 +32,9 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "UPDATE_MANIFEST_URL", "\"https://nexplorer-updates.idanck.com/latest.json\"")
+        // OneDrive (D4, שלב 6): ה-client ID של האפליקציה אצל Microsoft — לא סוד, הוא בכל APK. ריק — OneDrive לא זמין.
+        val microsoftClientId = providers.gradleProperty("nexplorer.microsoftClientId").orNull.orEmpty()
+        buildConfigField("String", "MICROSOFT_CLIENT_ID", "\"$microsoftClientId\"")
     }
 
     signingConfigs {
@@ -105,6 +108,8 @@ dependencies {
     implementation(libs.sshj)
     implementation(libs.bcpkix)
     implementation(libs.okhttp)
+    implementation(libs.play.services.auth)
+    implementation(libs.androidx.browser)
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)

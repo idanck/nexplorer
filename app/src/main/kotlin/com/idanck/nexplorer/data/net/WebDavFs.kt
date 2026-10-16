@@ -118,7 +118,7 @@ class WebDavFs(private val connection: NetConnection, password: CharArray?) : Re
      * אחר) לבקשה שרצה ב-thread משלה. `If-None-Match: *` — השרת מסרב לדרוס קובץ קיים. הכשל של הבקשה
      * (שרת מלא, אין הרשאה) נראה ב-[OutputStream.close], או בכתיבה שאחריו.
      */
-    override fun openWrite(path: String): OutputStream {
+    override fun openWrite(path: String, size: Long): OutputStream {
         val pipe = Pipe(PIPE_BUFFER)
         val body = object : RequestBody() {
             override fun contentType() = OCTET_STREAM

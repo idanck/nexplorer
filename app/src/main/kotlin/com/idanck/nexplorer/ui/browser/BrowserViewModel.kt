@@ -881,7 +881,7 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
         }
     }
 
-    /** "הסר" במגירה: החיבור, הסיסמה שלו, והמועדפים והתצוגות בתוכו. */
+    /** "הסר" במגירה: החיבור, הסיסמה שלו (ובענן — האסימון), והמועדפים והתצוגות בתוכו. */
     fun removeConnection(id: String) {
         val connection = _state.value.connections.firstOrNull { it.id == id } ?: return
         val root = NetPaths.root(connection.protocol, id)
@@ -896,6 +896,7 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
                 )
             }
             remote.forget(id)
+            container.cloud.tokens.remove(id)
             if (_state.value.folderPath?.let(::inside) == true) navigate(Location.Folder(StorageVolumes.primaryPath()))
             emit("\"${connection.label}\" הוסר מהמגירה")
         }

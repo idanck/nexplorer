@@ -17,13 +17,20 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.idanck.nexplorer.AppContainer
 import com.idanck.nexplorer.data.crypto.EncryptedFiles
 import com.idanck.nexplorer.data.files.FileIntents
+import com.idanck.nexplorer.data.net.CloudAuth
+import com.idanck.nexplorer.data.net.CloudAuths
+import com.idanck.nexplorer.data.net.CloudGrant
 import com.idanck.nexplorer.data.net.ConnectCheck
 import com.idanck.nexplorer.data.net.ConnectionSecrets
+import com.idanck.nexplorer.data.net.FixedToken
 import com.idanck.nexplorer.data.net.NetConnection
 import com.idanck.nexplorer.data.net.NetDiscovery
 import com.idanck.nexplorer.data.net.RemoteFiles
+import com.idanck.nexplorer.data.net.TokenStore
 import com.idanck.nexplorer.ui.net.ConnectScreen
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import com.idanck.nexplorer.ui.analyzer.AnalyzerScreen
 import com.idanck.nexplorer.ui.analyzer.AnalyzerViewModel
 import com.idanck.nexplorer.ui.browser.BrowserScreen
@@ -223,6 +230,11 @@ fun NexplorerRoot(
                     if (result is ConnectCheck.Ok) (connectTarget ?: browser).navigate(Location.Folder(result.connection.root))
                     result
                 },
+                onCloudConnect = { draft, grant ->
+                    val result = connectCloudAndSave(container, draft, grant)
+                    if (result is ConnectCheck.Ok) (connectTarget ?: browser).navigate(Location.Folder(result.connection.root))
+                    result
+                },
                 onClose = {
                     connectEditing = null
                     screen = Screen.Browser
@@ -352,6 +364,47 @@ fun NexplorerRoot(
 
 /** המפתח של ה-ViewModel של החלון השני (הראשון הוא ברירת המחדל, משותף עם תצוגת הטלפון). */
 private const val SECOND_PANE = "pane-2"
+
+/**
+ * ענן, אחרי ההתחברות: Microsoft — הקוד מוחלף באסימונים; אחר כך החשבון ורשימת השורש ([RemoteFiles.testCloud]),
+ * ורק אם עבדו — ה-refresh token (OneDrive) מוצפן ב-Keystore, והחיבור נשמר. "התחבר מחדש" בעריכה — אותו מזהה,
+ * ואולי חשבון אחר.
+ */
+private suspend fun connectCloudAndSave(container: AppContainer, draft: NetConnection, grant: CloudGrant): ConnectCheck {
+    var refresh: String? = null
+    val auth: CloudAuth = when (grant) {
+        is CloudGrant.Google -> FixedToken(grant.accessToken)
+        is CloudGrant.Microsoft -> try {
+            val memory = object : TokenStore {
+                override fun get(): String? = refresh
+
+                override fun put(token: String) {
+                    refresh = token
+                }
+            }
+            withContext(Dispatchers.IO) { CloudAuths.microsoft(memory).also { it.exchange(grant.code, grant.redirectUri, grant.pkce) } }
+        } catch (e: java.io.IOException) {
+            return ConnectCheck.Failed(e.message ?: "ההתחברות ל-Microsoft נכשלה")
+        }
+    }
+    val checked = RemoteFiles.testCloud(draft, auth)
+    if (checked !is ConnectCheck.Ok) return checked
+    val saved = checked.connection
+    refresh?.let { token ->
+        try {
+            withContext(Dispatchers.IO) { container.cloud.tokens.store(saved.id).put(token) }
+        } catch (e: Exception) {
+            return ConnectCheck.Failed("לא ניתן לשמור את ההרשאה ב-Keystore: ${e.message}")
+        }
+    }
+    container.settings.update { s ->
+        val exists = s.connections.any { it.id == saved.id }
+        s.copy(connections = if (exists) s.connections.map { if (it.id == saved.id) saved else it } else s.connections + saved)
+    }
+    container.settings.state.first { s -> saved in s.connections }
+    container.remote.forget(saved.id)
+    return ConnectCheck.Ok(saved)
+}
 
 /**
  * "בדוק והתחבר": בדיקה מול השרת, ורק אם עבדה — הצפנה ב-Keystore ושמירה, ומחכה שהחיבור כבר בהעדפות,

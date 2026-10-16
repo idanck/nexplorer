@@ -78,10 +78,14 @@ import com.idanck.nexplorer.core.DavAddress
 import com.idanck.nexplorer.core.NetPaths
 import com.idanck.nexplorer.core.NetProtocol
 import com.idanck.nexplorer.core.isolated
+import com.idanck.nexplorer.data.net.CloudAuths
+import com.idanck.nexplorer.data.net.CloudGrant
 import com.idanck.nexplorer.data.net.ConnectCheck
+import com.idanck.nexplorer.data.net.DriveFs
 import com.idanck.nexplorer.data.net.FoundServer
 import com.idanck.nexplorer.data.net.NetConnection
 import com.idanck.nexplorer.data.net.NetDiscovery
+import com.idanck.nexplorer.data.net.OneDriveFs
 import com.idanck.nexplorer.data.net.SshHostKeys
 import com.idanck.nexplorer.ui.theme.MonoTextStyle
 import com.idanck.nexplorer.ui.theme.NexplorerDimens
@@ -92,12 +96,15 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
 
-/** סוג במסך "הוסף מקום" — לפי הלוח. SMB, ‏SFTP ו-WebDAV פעילים; לשאר — הסבר למה לא. */
+/**
+ * סוג במסך "הוסף מקום" — לפי הלוח. SMB, ‏SFTP, ‏WebDAV וענן פעילים; לשאר — הסבר למה לא. "ענן" — Google Drive
+ * כברירת מחדל, והשירות נבחר בפרטי החיבור.
+ */
 private enum class PlaceType(val label: String, val icon: ImageVector, val protocol: NetProtocol?, val unavailable: String?) {
     Smb("SMB", Icons.Outlined.Dns, NetProtocol.Smb, null),
     Sftp("SFTP", Icons.Outlined.Terminal, NetProtocol.Sftp, null),
     WebDav("WebDAV", Icons.Outlined.Language, NetProtocol.WebDav, null),
-    Cloud("ענן", Icons.Outlined.Cloud, null, "ענן — מחכה להחלטה D4"),
+    Cloud("ענן", Icons.Outlined.Cloud, NetProtocol.GoogleDrive, null),
     Ftp("FTP/S", Icons.Outlined.Download, null, "FTP/S לא בתוכנית: ב-D3 נבחרו SMB, SFTP ו-WebDAV"),
     S3("S3", Icons.Outlined.Storage, null, "S3 לא בתוכנית: ב-D3 נבחרו SMB, SFTP ו-WebDAV"),
     Vault("כספת", Icons.Outlined.Lock, null, "תיקייה מוצפנת נוצרת מהכפתור הצף: חדש ← תיקייה מוצפנת"),
@@ -108,6 +115,7 @@ private enum class PlaceType(val label: String, val icon: ImageVector, val proto
  * "הוסף מקום" (לוח "חיבור חדש"): סוג, שרתים שנמצאו ברשת, ופרטי החיבור. "בדוק והתחבר" מתחבר באמת
  * ([onConnect]) — רק חיבור שעבד נשמר. [editing] — "ערוך" מהמגירה: אותו מסך עם הפרטים השמורים, ושדה
  * סיסמה ריק משאיר את השמורה. ב-SFTP: מפתח פרטי מקובץ (במקום סיסמה), ושרת חדש — אישור טביעת האצבע שלו.
+ * ענן: "התחבר" — בחלון של Google או בדף של Microsoft ([rememberCloudSignIn]), ואז [onCloudConnect].
  */
 @Composable
 fun ConnectScreen(
@@ -115,6 +123,7 @@ fun ConnectScreen(
     discovery: NetDiscovery,
     /** הסיסמה והמפתח (קובץ שנבחר עכשיו) נמחקים אחרי הקריאה. */
     onConnect: suspend (NetConnection, CharArray?, CharArray?) -> ConnectCheck,
+    onCloudConnect: suspend (NetConnection, CloudGrant) -> ConnectCheck,
     onClose: () -> Unit,
 ) {
     BackHandler(onBack = onClose)
@@ -128,6 +137,7 @@ fun ConnectScreen(
     var protocol by rememberSaveable { mutableStateOf(editing?.protocol ?: NetProtocol.Smb) }
     val sftp = protocol == NetProtocol.Sftp
     val dav = protocol == NetProtocol.WebDav
+    val cloud = protocol.cloud
     var host by rememberSaveable { mutableStateOf(editing?.host.orEmpty()) }
     // WebDAV: כתובת אחת (scheme, שרת, פורט ונתיב) במקום שרת ושיתוף.
     var url by rememberSaveable { mutableStateOf(editing?.takeIf { it.protocol == NetProtocol.WebDav }?.let { it.displayUrl(it.root) }.orEmpty()) }
@@ -176,6 +186,9 @@ fun ConnectScreen(
 
     val portValue = port.trim().takeIf { it.isNotEmpty() }?.toIntOrNull()
     val problem = when {
+        protocol == NetProtocol.OneDrive && CloudAuths.microsoftClientId.isBlank() ->
+            "OneDrive עוד לא מוגדר בגרסה הזו: האפליקציה צריכה להיות רשומה אצל Microsoft"
+        cloud -> null
         dav && url.isBlank() -> "צריך כתובת של שרת"
         dav && davAddress == null -> "כתובת לא תקינה — למשל https://cloud.example.com/remote.php/dav/files/idan"
         dav -> null
@@ -191,6 +204,18 @@ fun ConnectScreen(
     }
 
     fun draft(): NetConnection {
+        // ענן: השרת של ה-API קבוע, והחשבון נקבע בהתחברות.
+        if (cloud) {
+            return NetConnection(
+                id = editing?.id ?: NetConnection.newId(),
+                protocol = protocol,
+                name = name.trim(),
+                host = if (protocol == NetProtocol.GoogleDrive) DriveFs.HOST else OneDriveFs.HOST,
+                port = null,
+                share = "",
+                user = editing?.user.orEmpty(),
+            )
+        }
         val base = NetConnection(
             id = editing?.id ?: NetConnection.newId(),
             protocol = protocol,
@@ -236,6 +261,28 @@ fun ConnectScreen(
         }
     }
 
+    val signIn = rememberCloudSignIn(
+        onGrant = { grant ->
+            val draft = draft()
+            scope.launch {
+                val result = try {
+                    onCloudConnect(draft, grant)
+                } finally {
+                    busy = false
+                }
+                when (result) {
+                    is ConnectCheck.Ok -> onClose()
+                    is ConnectCheck.Failed -> error = result.message
+                    is ConnectCheck.TrustHost -> error = "תשובה לא צפויה"
+                }
+            }
+        },
+        onFailed = { message ->
+            busy = false
+            error = message
+        },
+    )
+
     trust?.let { (draft, ask) ->
         HostKeyDialog(
             host = draft.host,
@@ -273,8 +320,9 @@ fun ConnectScreen(
                 PlaceType.entries.chunked(4).forEach { row ->
                     Row(horizontalArrangement = Arrangement.spacedBy(NexplorerDimens.Space2)) {
                         row.forEach { type ->
-                            TypeTile(type, selected = type.protocol == protocol, modifier = Modifier.weight(1f)) {
-                                val chosen = type.protocol
+                            TypeTile(type, selected = type.protocol == protocol || (type == PlaceType.Cloud && cloud), modifier = Modifier.weight(1f)) {
+                                // "ענן" — השירות שכבר נבחר, אם נבחר.
+                                val chosen = if (type == PlaceType.Cloud && cloud) protocol else type.protocol
                                 if (chosen == null) {
                                     note = type.unavailable
                                 } else if (editing != null && chosen != protocol) {
@@ -291,18 +339,38 @@ fun ConnectScreen(
                 }
                 note?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
 
-                SectionLabel("נמצאו ברשת")
-                FoundCard(found, searching, selectedHost = host.trim()) { server ->
-                    host = server.host
-                    if (server.port != protocol.defaultPort) {
-                        port = server.port.toString()
-                        advanced = true
+                if (!cloud) {
+                    SectionLabel("נמצאו ברשת")
+                    FoundCard(found, searching, selectedHost = host.trim()) { server ->
+                        host = server.host
+                        if (server.port != protocol.defaultPort) {
+                            port = server.port.toString()
+                            advanced = true
+                        }
+                        if (name.isBlank()) name = server.name
                     }
-                    if (name.isBlank()) name = server.name
                 }
 
                 SectionLabel("פרטי חיבור")
-                Card {
+                if (cloud) Card {
+                    CloudServices(protocol, enabled = editing == null && !busy) {
+                        protocol = it
+                        error = null
+                    }
+                    editing?.user?.takeIf { it.isNotBlank() }?.let { CloudAccount(it) }
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NexplorerDimens.Space2 + NexplorerDimens.Space1 / 2)) {
+                        Icon(Icons.Outlined.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(NexplorerDimens.ConnectHintIcon))
+                        Text(
+                            if (protocol == NetProtocol.GoogleDrive) {
+                                "ההתחברות בחלון של Google — הסיסמה לא עוברת באפליקציה, וההרשאה נשמרת ב-${"Google Play services".isolated()}."
+                            } else {
+                                "ההתחברות בדף של Microsoft — הסיסמה לא עוברת באפליקציה, וההרשאה נשמרת מוצפנת ב-${"Android Keystore".isolated()}."
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                } else Card {
                     if (dav) {
                         Field("כתובת", url, { url = it; error = null }, keyboard = KeyboardType.Uri, placeholder = "https://cloud.example.com/remote.php/dav/files/…")
                     } else {
@@ -361,16 +429,16 @@ fun ConnectScreen(
                 if (advanced) {
                     SectionLabel("מתקדם")
                     Card {
-                        Field("שם במגירה", name, { name = it }, placeholder = host.trim().ifEmpty { null }, mono = false)
-                        // WebDAV: הפורט בתוך הכתובת.
-                        if (!dav) Row(horizontalArrangement = Arrangement.spacedBy(NexplorerDimens.Space2 + NexplorerDimens.Space1 / 2)) {
+                        Field("שם במגירה", name, { name = it }, placeholder = (if (cloud) editing?.user?.ifBlank { null } ?: protocol.label else host.trim()).ifEmpty { null }, mono = false)
+                        // WebDAV: הפורט בתוך הכתובת. בענן אין שרת לבחור.
+                        if (!dav && !cloud) Row(horizontalArrangement = Arrangement.spacedBy(NexplorerDimens.Space2 + NexplorerDimens.Space1 / 2)) {
                             Field("פורט", port, { port = it.filter(Char::isDigit); error = null }, keyboard = KeyboardType.Number, placeholder = protocol.defaultPort.toString(), modifier = Modifier.weight(1f))
                             if (!sftp) Field("דומיין", domain, { domain = it }, placeholder = "—", modifier = Modifier.weight(1f))
                         }
                     }
                 }
 
-                (error ?: problem?.takeIf { (if (dav) url else host).isNotBlank() })?.let {
+                (error ?: problem?.takeIf { cloud || (if (dav) url else host).isNotBlank() })?.let {
                     Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
                 }
                 if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -386,11 +454,29 @@ fun ConnectScreen(
                         .padding(start = NexplorerDimens.Space4, end = NexplorerDimens.Space4, top = NexplorerDimens.Space2 + NexplorerDimens.Space1 / 2, bottom = NexplorerDimens.Space4),
                 ) {
                     Button(
-                        onClick = { connect(draft()) },
+                        onClick = {
+                            if (cloud) {
+                                busy = true
+                                error = null
+                                signIn.start(protocol)
+                            } else {
+                                connect(draft())
+                            }
+                        },
                         enabled = problem == null && !busy,
                         shape = NexplorerShape.Pill,
                         modifier = Modifier.weight(1f).height(NexplorerDimens.BottomBarButton),
-                    ) { Text(if (busy) "מתחבר…" else "בדוק והתחבר", style = MaterialTheme.typography.labelLarge) }
+                    ) {
+                        Text(
+                            when {
+                                busy -> "מתחבר…"
+                                cloud && editing != null -> "התחבר מחדש"
+                                cloud -> "התחבר"
+                                else -> "בדוק והתחבר"
+                            },
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                    }
                     OutlinedButton(
                         onClick = { advanced = !advanced },
                         shape = NexplorerShape.Pill,

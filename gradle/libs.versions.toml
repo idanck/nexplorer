@@ -24,6 +24,8 @@ dcerpc = "0.12.13"
 sshj = "0.41.2"
 bcpkix = "1.86"
 okhttp = "5.5.0"
+playServicesAuth = "21.5.0"
+androidxBrowser = "1.8.0"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidxCore" }
@@ -59,6 +61,10 @@ sshj = { module = "com.hierynomus:sshj", version.ref = "sshj" }
 bcpkix = { module = "org.bouncycastle:bcpkix-jdk18on", version.ref = "bcpkix" }
 # שלב 5ג: WebDAV (OkHttp, Apache 2.0) — PROPFIND, ‏MKCOL ו-MOVE, ש-HttpURLConnection לא שולח.
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
+# שלב 6 (D4): ענן. ההתחברות ל-Google Drive — Google Play services (AuthorizationClient; רישיון Android SDK).
+play-services-auth = { module = "com.google.android.gms:play-services-auth", version.ref = "playServicesAuth" }
+# ההתחברות ל-Microsoft (OneDrive) ב-Custom Tab. Apache 2.0.
+androidx-browser = { module = "androidx.browser:browser", version.ref = "androidxBrowser" }
 junit = { module = "junit:junit", version.ref = "junit" }
 org-json = { module = "org.json:json", version.ref = "orgJson" }
 # בדיקות על אמולטור (QA): ‏.github/workflows/qa.yml
