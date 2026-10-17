@@ -74,6 +74,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.Player
 import com.idanck.nexplorer.core.MediaTime
+import com.idanck.nexplorer.core.NetPaths
 import com.idanck.nexplorer.data.files.FileIntents
 import com.idanck.nexplorer.ui.theme.FileNameTextStyle
 import com.idanck.nexplorer.ui.theme.MonoTextStyle
@@ -120,7 +121,8 @@ fun AudioPlayerScreen(viewModel: AudioPlayerViewModel, path: String?, onBack: ()
                     }
                 }
                 val current = state.current
-                if (current != null) {
+                // ברשת אין קובץ במכשיר לתת לאפליקציה אחרת ("פתיחה באמצעות" בחלון הקבצים מוריד עותק).
+                if (current != null && !NetPaths.isRemote(current.path)) {
                     IconButton(onClick = { FileIntents.openWith(context, current.path, current.name) }) {
                         Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = "פתיחה באמצעות")
                     }
@@ -202,7 +204,7 @@ private fun NowPlaying(state: AudioState, viewModel: AudioPlayerViewModel, artSi
         state.error?.let { error ->
             Text(error, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
             val current = state.current
-            if (current != null) {
+            if (current != null && !NetPaths.isRemote(current.path)) {
                 TextButton(onClick = { FileIntents.openWith(context, current.path, current.name) }) { Text("פתיחה באמצעות") }
             }
         }

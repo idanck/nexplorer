@@ -56,7 +56,8 @@ data class AudioState(
  */
 class AudioPlayerViewModel(app: Application) : AndroidViewModel(app) {
 
-    private val settings = (app as NexplorerApp).container.settings
+    private val container = (app as NexplorerApp).container
+    private val settings = container.settings
     private val _state = MutableStateFlow(AudioState())
     val state: StateFlow<AudioState> = _state
 
@@ -124,7 +125,7 @@ class AudioPlayerViewModel(app: Application) : AndroidViewModel(app) {
         loadJob?.cancel()
         _state.update { it.copy(loading = true, error = null) }
         loadJob = viewModelScope.launch {
-            val queue = folderQueue(settings, path)
+            val queue = folderQueue(settings, container.remote, path)
             c.setMediaItems(queue.items.map(::mediaItemFor), queue.start, 0)
             start(c)
             _state.update { it.copy(loading = false) }

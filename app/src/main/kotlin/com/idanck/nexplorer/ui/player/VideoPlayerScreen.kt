@@ -61,6 +61,7 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.PlayerView
+import com.idanck.nexplorer.core.NetPaths
 import com.idanck.nexplorer.data.files.FileIntents
 import com.idanck.nexplorer.ui.theme.FileNameTextStyle
 import com.idanck.nexplorer.ui.theme.MonoTextStyle
@@ -155,11 +156,15 @@ fun VideoPlayerScreen(viewModel: VideoPlayerViewModel, path: String, onPathChang
             modifier = Modifier.fillMaxSize(),
         )
 
+        // ברשת אין קובץ במכשיר לתת לאפליקציה אחרת ("פתיחה באמצעות" בחלון הקבצים מוריד עותק).
+        val local = !NetPaths.isRemote(state.path ?: path)
         state.error?.let { error ->
             Column(Modifier.align(Alignment.Center).padding(NexplorerDimens.Space5), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(error, style = MaterialTheme.typography.bodyLarge, color = colors.onViewer, textAlign = TextAlign.Center)
-                TextButton(onClick = { FileIntents.openWith(context, state.path ?: path, state.name ?: path.substringAfterLast('/')) }) {
-                    Text("פתיחה באמצעות", color = colors.onViewer)
+                if (local) {
+                    TextButton(onClick = { FileIntents.openWith(context, state.path ?: path, state.name ?: path.substringAfterLast('/')) }) {
+                        Text("פתיחה באמצעות", color = colors.onViewer)
+                    }
                 }
             }
         }
@@ -181,8 +186,10 @@ fun VideoPlayerScreen(viewModel: VideoPlayerViewModel, path: String, onPathChang
                     Text(name, style = FileNameTextStyle, color = colors.onViewer, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (state.count > 1) Text("${state.index + 1} / ${state.count}", style = MonoTextStyle, color = colors.onViewer)
                 }
-                IconButton(onClick = { FileIntents.openWith(context, state.path ?: path, name) }, colors = tint) {
-                    Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = "פתיחה באמצעות")
+                if (local) {
+                    IconButton(onClick = { FileIntents.openWith(context, state.path ?: path, name) }, colors = tint) {
+                        Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = "פתיחה באמצעות")
+                    }
                 }
             }
         }

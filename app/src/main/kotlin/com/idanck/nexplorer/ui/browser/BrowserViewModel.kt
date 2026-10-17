@@ -12,6 +12,7 @@ import com.idanck.nexplorer.core.BatchRename
 import com.idanck.nexplorer.core.Entry
 import com.idanck.nexplorer.core.FileNames
 import com.idanck.nexplorer.core.FolderSizes
+import com.idanck.nexplorer.core.MediaFormats
 import com.idanck.nexplorer.core.NetPaths
 import com.idanck.nexplorer.core.RenamePattern
 import com.idanck.nexplorer.core.Section
@@ -332,11 +333,12 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
         }
         when {
             entry.isDirectory -> navigate(Location.Folder(entry.path))
-            // ברשת: עותק זמני במכשיר, ואז פתיחה רגילה. קובץ מוצפן, ארכיון ו-APK — מהעותק, כקובץ.
-            NetPaths.isRemote(entry.path) -> if (EncryptedFiles.hasEncryptedName(entry.name)) {
-                emit("קובץ מוצפן ברשת — העתק אותו למכשיר כדי לפתוח או לפענח")
-            } else {
-                emitEvent(BrowserEvent.Fetch(listOf(entry), FetchPurpose.Open))
+            // ברשת: שמע ווידאו — הנגנים קוראים ישירות מהשרת. כל השאר — עותק זמני במכשיר, ואז פתיחה רגילה
+            // (ארכיון ו-APK — מהעותק, כקובץ).
+            NetPaths.isRemote(entry.path) -> when {
+                EncryptedFiles.hasEncryptedName(entry.name) -> emit("קובץ מוצפן ברשת — העתק אותו למכשיר כדי לפתוח או לפענח")
+                MediaFormats.playable(entry) -> emitEvent(BrowserEvent.OpenFile(entry))
+                else -> emitEvent(BrowserEvent.Fetch(listOf(entry), FetchPurpose.Open))
             }
             EncryptedFiles.hasEncryptedName(entry.name) -> {
                 val vault = Vaults.rootOf(File(entry.path))
