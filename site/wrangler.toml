@@ -1,0 +1,7 @@
+# Public home page and privacy policy for the Google OAuth consent screen (Branding).
+# Deployed by hand from the Pi, like worker/ (see site/README.md).
+name = "nexplorer-site"
+main = "worker.js"
+compatibility_date = "2026-09-01"
+workers_dev = false
+routes = [{ pattern = "nexplorer.idanck.com", custom_domain = true }]
