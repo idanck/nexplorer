@@ -24,7 +24,11 @@ interface RemoteFs : Closeable {
     /** null — לא קיים. */
     fun stat(path: String): Entry?
 
-    fun openRead(path: String): InputStream
+    /**
+     * מ-[offset] (דילוג בנגן, שקורא מהשרת בלי עותק) — בלי לקרוא את מה שלפניו. מעבר לסוף הקובץ — זרם
+     * ריק.
+     */
+    fun openRead(path: String, offset: Long = 0): InputStream
 
     /** קובץ חדש. קיים כבר — כשל ("כבר קיים פריט בשם הזה"): העתקה אף פעם לא דורסת. */
     fun openWrite(path: String): OutputStream

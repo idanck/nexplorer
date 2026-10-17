@@ -90,9 +90,11 @@ class SmbFs(private val connection: NetConnection, password: CharArray?) : Remot
         }
     }
 
-    override fun openRead(path: String): InputStream = withShare(path) { share, inner ->
+    override fun openRead(path: String, offset: Long): InputStream = withShare(path) { share, inner ->
         val file = share.openFile(inner, EnumSet.of(AccessMask.GENERIC_READ), null, SMB2ShareAccess.ALL, SMB2CreateDisposition.FILE_OPEN, null)
-        object : FilterInputStream(file.inputStream) {
+        // smbj מדלג בלי לקרוא: הבקשה הראשונה כבר מ-offset.
+        val input = file.inputStream.apply { if (offset > 0) skip(offset) }
+        object : FilterInputStream(input) {
             override fun read(): Int = guard { super.read() }
             override fun read(b: ByteArray, off: Int, len: Int): Int = guard { super.read(b, off, len) }
             override fun close() {
