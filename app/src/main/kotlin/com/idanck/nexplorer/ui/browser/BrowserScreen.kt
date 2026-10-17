@@ -519,9 +519,13 @@ fun BrowserScreen(
                                     isFavorite = single != null && single.path in state.favorites,
                                     // קיצור דרך פותח נתיב במכשיר; לחיבור ברשת — מהמגירה.
                                     canPinShortcut = canPin && !state.isRemote,
-                                    // גם ברשת: האפליקציה שנבחרה קוראת ישירות מהשרת (RemoteFilesProvider).
+                                    // גם ברשת: האפליקציה שנבחרה קוראת ישירות מהשרת (RemoteFilesProvider) — חוץ מקובץ
+                                    // בלי גודל ידוע (Google Docs), שעובר דרך עותק.
                                     onOpenWith = {
-                                        single?.let { if (!FileIntents.openWith(context, it.path, it.name)) message("אין אפליקציה מתאימה") }
+                                        single?.let {
+                                            if (state.isRemote && it.size <= 0) dialog = BrowserDialog.Fetch(listOf(it), FetchPurpose.OpenWith)
+                                            else if (!FileIntents.openWith(context, it.path, it.name)) message("אין אפליקציה מתאימה")
+                                        }
                                     },
                                     onMove = { vm.copyToClipboard(selected.map { it.path }, cut = true) },
                                     onCopyPath = {
@@ -722,6 +726,7 @@ fun BrowserScreen(
                             !FileIntents.open(context, copy.path, copy.name) -> message("אין אפליקציה שפותחת קבצים מסוג זה")
                         }
                     }
+                    FetchPurpose.OpenWith -> local.singleOrNull()?.let { if (!FileIntents.openWith(context, it.path, it.name)) message("אין אפליקציה מתאימה") }
                     FetchPurpose.Share -> if (FileIntents.share(context, local.map { it.path to it.name }) == 0) message("אין אפליקציה לשיתוף")
                 }
             },
