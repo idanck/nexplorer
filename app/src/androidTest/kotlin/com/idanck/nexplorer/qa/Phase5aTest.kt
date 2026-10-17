@@ -2,6 +2,8 @@ package com.idanck.nexplorer.qa
 
 import android.content.Context
 import android.util.Log
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
@@ -24,6 +26,7 @@ import com.idanck.nexplorer.core.NetPaths
 import com.idanck.nexplorer.core.NetProtocol
 import com.idanck.nexplorer.data.net.ConnectionSecrets
 import com.idanck.nexplorer.data.net.NetConnection
+import com.idanck.nexplorer.data.net.RemoteFiles
 import com.idanck.nexplorer.data.net.RemoteFs
 import com.idanck.nexplorer.data.net.SmbFs
 import com.idanck.nexplorer.data.transfer.TransferKind
@@ -274,5 +277,29 @@ class Phase5aTest {
         assertEquals(listOf(root.absolutePath), container.settings.state.value.favorites)
         // היינו בתוך החיבור — חוזרים למכשיר.
         compose.waitGone(hasText("readme.txt"), 15_000)
+    }
+
+    @Test
+    fun t05_videoPlaysStraightFromTheServer() = logged("t05") {
+        val clip = Qa.asset("clip.mp4")
+        SmbFs(server, password.toCharArray()).use { fs ->
+            fs.mkdir("$base/Videos")
+            fs.openWrite("$base/Videos/clip.mp4").use { it.write(clip) }
+            // דילוג: קריאה מאמצע הקובץ, בלי לקרוא את מה שלפניו.
+            Qa.assertReadsFromOffsets(fs, "$base/Videos/clip.mp4", clip)
+        }
+        saveConnection()
+        launch(base)
+        compose.waitFor(hasText("Videos"), 30_000)
+        compose.onNodeWithText("Videos").performClick()
+        compose.waitFor(hasText("clip.mp4"), 30_000)
+        compose.onNodeWithText("clip.mp4").performClick()
+        // ישר לנגן, בלי חלון ההורדה: מנגן מהשרת, ואין עותק במכשיר.
+        compose.waitFor(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "מנגן"), 30_000)
+        Qa.screenshot(compose, "138-smb-video-streaming")
+        val copies = File(ApplicationProvider.getApplicationContext<Context>().cacheDir, RemoteFiles.CACHE_DIR).walk().filter { it.name == "clip.mp4" }.toList()
+        assertTrue("הסרטון הורד למכשיר: $copies", copies.isEmpty())
+        Qa.device.pressBack()
+        compose.waitFor(hasText("clip.mp4"), 10_000)
     }
 }

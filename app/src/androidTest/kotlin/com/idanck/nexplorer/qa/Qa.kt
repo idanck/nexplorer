@@ -26,7 +26,13 @@ import androidx.test.runner.lifecycle.Stage
 import androidx.test.uiautomator.UiDevice
 import com.idanck.nexplorer.MainActivity
 import com.idanck.nexplorer.data.files.FileIntents
+import com.idanck.nexplorer.data.net.RemoteFs
+import org.junit.Assert.assertArrayEquals
 import java.io.File
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import kotlin.math.PI
+import kotlin.math.sin
 
 /**
  * כלים משותפים לבדיקות ה-QA על האמולטור: פקודות shell (בהרשאות shell, לא של האפליקציה),
@@ -160,6 +166,17 @@ object Qa {
     fun ComposeTestRule.waitForDisk(timeoutMs: Long = 15_000, condition: () -> Boolean) {
         waitUntil(timeoutMs) { condition() }
     }
+
+    /** קובץ מ-`androidTest/assets` (‏clip.mp4). */
+    fun asset(name: String): ByteArray = instrumentation.context.assets.open(name).use { it.readBytes() }
+
+    /** דילוג בנגן שקורא מהשרת: מכל מקום בקובץ — אותם בתים כמו ב-[expected], עד הסוף. */
+    fun assertReadsFromOffsets(fs: RemoteFs, path: String, expected: ByteArray) {
+        for (offset in listOf(0, 1, 65_537, expected.size - 1, expected.size)) {
+            val read = fs.openRead(path, offset.toLong()).use { it.readBytes() }
+            assertArrayEquals("$path מ-$offset", expected.copyOfRange(offset, expected.size), read)
+        }
+    }
 }
 
 /** עץ קבוע שכל בדיקה מתחילה ממנו מחדש. */
@@ -183,6 +200,29 @@ object QaData {
         File(root, "archive.zip").writeBytes(ByteArray(12 * 1024))
         File(root, "big.bin").writeBytes(ByteArray(3 * 1024 * 1024))
         File(root, ".hidden").writeText("hidden\n")
+    }
+
+    /** צליל (WAV, ‏PCM 16 ביט, ‏8kHz, מונו) — שמע אמיתי שהנגן מנגן. */
+    fun wav(seconds: Int, frequency: Double): ByteArray {
+        val rate = 8_000
+        val samples = rate * seconds
+        val data = ByteBuffer.allocate(44 + samples * 2).order(ByteOrder.LITTLE_ENDIAN).apply {
+            put("RIFF".toByteArray())
+            putInt(36 + samples * 2)
+            put("WAVE".toByteArray())
+            put("fmt ".toByteArray())
+            putInt(16)
+            putShort(1)
+            putShort(1)
+            putInt(rate)
+            putInt(rate * 2)
+            putShort(2)
+            putShort(16)
+            put("data".toByteArray())
+            putInt(samples * 2)
+        }
+        for (i in 0 until samples) data.putShort((sin(2 * PI * frequency * i / rate) * 6_000).toInt().toShort())
+        return data.array()
     }
 
     private fun png(file: File, color: Int) {

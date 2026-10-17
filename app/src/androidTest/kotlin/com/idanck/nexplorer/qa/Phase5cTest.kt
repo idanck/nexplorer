@@ -183,6 +183,12 @@ class Phase5cTest {
             File(root, "big.bin").readBytes().toList().hashCode(),
             container.remote.fsFor(base).openRead("$base/big.bin").use { it.readBytes() }.toList().hashCode(),
         )
+        // דילוג בנגן: קריאה מאמצע הקובץ.
+        val clip = Qa.asset("clip.mp4")
+        container.remote.fsFor(base).let { fs ->
+            fs.openWrite("$base/clip.mp4").use { it.write(clip) }
+            Qa.assertReadsFromOffsets(fs, "$base/clip.mp4", clip)
+        }
 
         container.transfers.enqueue(TransferKind.Move, listOf("$base/readme.txt"), File(root, "Empty").absolutePath)
         compose.waitForDisk(60_000) { File(root, "Empty/readme.txt").isFile && remoteStat("$base/readme.txt") == null }

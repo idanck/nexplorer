@@ -38,11 +38,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.MethodSorters
 import java.io.File
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import java.util.regex.Pattern
-import kotlin.math.PI
-import kotlin.math.sin
 
 /** שלב 3ב: נגן השמע (רשימה מהתיקייה, ניגון ברקע, חזרה מההתראה) ונגן הווידאו (סיבוב בלי לאבד מקום). */
 @RunWith(AndroidJUnit4::class)
@@ -208,29 +204,5 @@ class Phase3bTest {
     }
 
     /** WAV ‏16 ביט מונו: צליל סינוס, בלי תגיות — הכותרת בנגן היא שם הקובץ. */
-    private fun wav(file: File, seconds: Int, frequency: Double) {
-        val rate = 8_000
-        val samples = rate * seconds
-        val data = ByteBuffer.allocate(samples * 2).order(ByteOrder.LITTLE_ENDIAN)
-        for (i in 0 until samples) data.putShort((sin(2 * PI * frequency * i / rate) * 6_000).toInt().toShort())
-        val header = ByteBuffer.allocate(44).order(ByteOrder.LITTLE_ENDIAN).apply {
-            put("RIFF".toByteArray())
-            putInt(36 + samples * 2)
-            put("WAVE".toByteArray())
-            put("fmt ".toByteArray())
-            putInt(16)
-            putShort(1)
-            putShort(1)
-            putInt(rate)
-            putInt(rate * 2)
-            putShort(2)
-            putShort(16)
-            put("data".toByteArray())
-            putInt(samples * 2)
-        }
-        file.outputStream().use {
-            it.write(header.array())
-            it.write(data.array())
-        }
-    }
+    private fun wav(file: File, seconds: Int, frequency: Double) = file.writeBytes(QaData.wav(seconds, frequency))
 }
