@@ -251,6 +251,9 @@ class SmbFs(private val connection: NetConnection, password: CharArray?) : Remot
     }
 
     private fun isStale(e: Throwable): Boolean {
+        // החוט נקטע (דילוג בנגן מבטל את הטעינה ב-interrupt), לא החיבור: איפוס היה מפיל גם העברה שרצה בו.
+        // smbj מחזיר את הדגל לפני שהוא זורק — לפעמים בלי InterruptedException בשרשרת (המתנה ל-credits).
+        if (Thread.currentThread().isInterrupted || generateSequence(e) { it.cause }.any { it is InterruptedException }) return false
         if (e is SMBApiException) {
             return e.status == NtStatus.STATUS_NETWORK_NAME_DELETED || e.status == NtStatus.STATUS_USER_SESSION_DELETED ||
                 e.status == NtStatus.STATUS_NETWORK_SESSION_EXPIRED
