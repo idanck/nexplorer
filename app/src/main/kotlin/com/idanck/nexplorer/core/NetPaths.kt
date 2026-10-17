@@ -62,6 +62,27 @@ object NetPaths {
     /** שם הפריט האחרון בנתיב מקומי או ברשת. */
     fun nameOf(path: String): String = if (isRemote(path)) name(path) else File(path).name
 
+    /**
+     * הנתיב כרכיבים — [פרוטוקול, חיבור, שיתוף/תיקייה, ..., שם] — לכתובת `content://` שאפליקציה אחרת קוראת
+     * ממנה (`RemoteFilesProvider`): כל רכיב מקודד לבד, והרכיב האחרון הוא שם הקובץ. null — לא נתיב ברשת.
+     */
+    fun parts(path: String): List<String>? {
+        val protocol = protocolOf(path) ?: return null
+        val id = connectionId(path) ?: return null
+        return listOf(protocol.scheme, id) + segments(path)
+    }
+
+    /** ההפך מ-[parts]. null — פרוטוקול לא מוכר, בלי חיבור, או רכיב שאינו שם (ריק, `.`, `..`, עם `/`). */
+    fun fromParts(parts: List<String>): String? {
+        val protocol = NetProtocol.entries.firstOrNull { it.scheme == parts.getOrNull(0) } ?: return null
+        val id = parts.getOrNull(1)?.takeIf(::isName) ?: return null
+        val rest = parts.drop(2)
+        if (!rest.all(::isName)) return null
+        return rest.fold(root(protocol, id), ::child)
+    }
+
+    private fun isName(part: String) = part.isNotEmpty() && part != "." && part != ".." && '/' !in part
+
     /** [path] בתוך [dir] או זהה לו — בנתיבים באותה צורה (שניהם ברשת או שניהם מקומיים). */
     fun isInside(path: String, dir: String): Boolean = FileNames.isInside(path, dir)
 

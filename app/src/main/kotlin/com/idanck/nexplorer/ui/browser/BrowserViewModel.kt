@@ -10,6 +10,7 @@ import com.idanck.nexplorer.core.ArchiveFormats
 import com.idanck.nexplorer.core.ArchivePaths
 import com.idanck.nexplorer.core.BatchRename
 import com.idanck.nexplorer.core.Entry
+import com.idanck.nexplorer.core.FileKind
 import com.idanck.nexplorer.core.FileNames
 import com.idanck.nexplorer.core.FolderSizes
 import com.idanck.nexplorer.core.NetPaths
@@ -183,7 +184,7 @@ sealed interface BrowserEvent {
 }
 
 /** מה עושים עם קובץ מהרשת אחרי שהורד לעותק זמני. */
-enum class FetchPurpose { Open, OpenWith, Share }
+enum class FetchPurpose { Open, Share }
 
 /** תוצאה של שינוי שם מרובה. */
 data class BatchRenameResult(val renamed: Int, val failed: List<String>, val moved: List<Pair<String, String>>)
@@ -332,11 +333,12 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
         }
         when {
             entry.isDirectory -> navigate(Location.Folder(entry.path))
-            // ברשת: עותק זמני במכשיר, ואז פתיחה רגילה. קובץ מוצפן, ארכיון ו-APK — מהעותק, כקובץ.
-            NetPaths.isRemote(entry.path) -> if (EncryptedFiles.hasEncryptedName(entry.name)) {
-                emit("קובץ מוצפן ברשת — העתק אותו למכשיר כדי לפתוח או לפענח")
-            } else {
-                emitEvent(BrowserEvent.Fetch(listOf(entry), FetchPurpose.Open))
+            // ברשת: הנגנים ואפליקציות אחרות (גם לארכיון — חילוץ ברשת אין) קוראים ישירות מהשרת. מציג התמונות
+            // וגיליון ה-APK צריכים קובץ — עותק זמני במכשיר, ואז פתיחה רגילה.
+            NetPaths.isRemote(entry.path) -> when {
+                EncryptedFiles.hasEncryptedName(entry.name) -> emit("קובץ מוצפן ברשת — העתק אותו למכשיר כדי לפתוח או לפענח")
+                entry.kind == FileKind.Image || entry.extension == "apk" -> emitEvent(BrowserEvent.Fetch(listOf(entry), FetchPurpose.Open))
+                else -> emitEvent(BrowserEvent.OpenFile(entry))
             }
             EncryptedFiles.hasEncryptedName(entry.name) -> {
                 val vault = Vaults.rootOf(File(entry.path))

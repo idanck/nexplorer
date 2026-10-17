@@ -13,6 +13,7 @@ import com.idanck.nexplorer.NexplorerApp
 import com.idanck.nexplorer.media.fileName
 import com.idanck.nexplorer.media.folderQueue
 import com.idanck.nexplorer.media.mediaItemFor
+import com.idanck.nexplorer.media.mediaSources
 import com.idanck.nexplorer.media.playbackMessage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,9 +36,11 @@ data class VideoState(
 @OptIn(UnstableApi::class)
 class VideoPlayerViewModel(app: Application) : AndroidViewModel(app) {
 
-    private val settings = (app as NexplorerApp).container.settings
+    private val container = (app as NexplorerApp).container
+    private val settings = container.settings
 
-    val player: ExoPlayer = ExoPlayer.Builder(app)
+    // ברשת — ישירות מהשרת, בלי עותק במכשיר.
+    val player: ExoPlayer = ExoPlayer.Builder(app, mediaSources(app, container.remote))
         .setAudioAttributes(
             AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(),
             // וידאו לוקח את השמע: נגן המוזיקה עוצר.
@@ -65,7 +68,7 @@ class VideoPlayerViewModel(app: Application) : AndroidViewModel(app) {
         loadJob?.cancel()
         _state.value = VideoState(path = path, name = path.substringAfterLast('/'))
         loadJob = viewModelScope.launch {
-            val queue = folderQueue(settings, path)
+            val queue = folderQueue(settings, container.remote, path)
             player.setMediaItems(queue.items.map(::mediaItemFor), queue.start, positionMs)
             player.prepare()
             player.play()

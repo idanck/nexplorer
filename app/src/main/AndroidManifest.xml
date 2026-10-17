@@ -19,6 +19,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <!-- נגן השמע ממשיך ברקע, עם התראה ובקרים במסך הנעילה. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- שיר מהרשת כשהמסך כבוי: WakeLock ו-WifiLock בזמן ניגון (הרשאה רגילה, בלי שאלה). -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!--
@@ -103,6 +105,13 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- קבצים ברשת לאפליקציה אחרת, ישירות מהשרת (קריאה בלבד). כמו FileProvider: לא מיוצא, גישה ל-URI שנשלח. -->
+        <provider
+            android:name=".data.net.RemoteFilesProvider"
+            android:authorities="${applicationId}.remote"
+            android:exported="false"
+            android:grantUriPermissions="true" />
     </application>
 
 </manifest>

@@ -48,6 +48,9 @@ class NexplorerApp : Application(), ImageLoaderFactory {
     lateinit var container: AppContainer
         private set
 
+    /** ספק תוכן נקרא כבר לפני onCreate (‏RemoteFilesProvider) — אז עוד אין [container]. */
+    val isReady: Boolean get() = ::container.isInitialized
+
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
