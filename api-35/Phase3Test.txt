@@ -1,0 +1,8 @@
+
+com.idanck.nexplorer.qa.Phase3Test:...
+
+Time: 39.426
+
+OK (3 tests)
+
+

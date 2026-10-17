@@ -1,0 +1,8 @@
+
+com.idanck.nexplorer.qa.SearchAndSettingsTest:..
+
+Time: 21.481
+
+OK (2 tests)
+
+

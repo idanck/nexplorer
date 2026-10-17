@@ -1,0 +1,8 @@
+
+com.idanck.nexplorer.qa.Phase6Test:....
+
+Time: 57.11
+
+OK (4 tests)
+
+
