@@ -72,8 +72,8 @@ fun BrowserTopBar(
             .padding(
                 start = NexplorerDimens.Space3,
                 end = NexplorerDimens.Space3,
-                top = NexplorerDimens.Space3 + NexplorerDimens.Space1 / 2,
-                bottom = NexplorerDimens.Space2,
+                top = NexplorerDimens.Space2,
+                bottom = NexplorerDimens.Space1,
             ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(NexplorerDimens.Space2),
@@ -82,12 +82,12 @@ fun BrowserTopBar(
             Icon(Icons.Filled.Menu, contentDescription = "פתח מגירת מקומות", tint = MaterialTheme.colorScheme.primary)
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NexplorerDimens.Space1 / 2)) {
+            // ברוחב הטבעי (לא fillMaxWidth): כותרת LTR ("Pictures") נצמדת לצד ההתחלה, מעל הסיכום — לא לקצה הרחוק.
             Text(
                 title,
                 style = MaterialTheme.typography.titleLarge.let { if (titleIsLtr) it.copy(textDirection = TextDirection.Ltr) else it },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth(),
             )
             Text(
                 summary,
@@ -139,7 +139,7 @@ fun Breadcrumbs(
         start = NexplorerDimens.Space4,
         end = NexplorerDimens.Space4,
         top = NexplorerDimens.Space1,
-        bottom = NexplorerDimens.Space3,
+        bottom = NexplorerDimens.Space2,
     ),
 ) {
     val listState = rememberLazyListState()

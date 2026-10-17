@@ -263,7 +263,6 @@ fun BrowserScreen(
         FileListActions(
             onClick = vm::open,
             onLongClick = { vm.longPress(it.path) },
-            onIconClick = { vm.toggle(it.path) },
             scrollFor = vm::scrollFor,
             onScrolled = vm::saveScroll,
             drag = drag,

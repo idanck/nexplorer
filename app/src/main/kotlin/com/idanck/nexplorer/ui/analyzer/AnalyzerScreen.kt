@@ -372,7 +372,9 @@ private fun BigFolders(folders: List<AnalyzedItem>, onOpenFolder: (String) -> Un
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(NexplorerDimens.Space3),
                 ) {
-                    Text(folder.name, style = FileNameTextStyle, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                        Text(folder.name, style = FileNameTextStyle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
                     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                         Box(
                             Modifier
@@ -509,7 +511,7 @@ private fun ItemRow(item: AnalyzedItem, rootPath: String, selected: Boolean, now
     ) {
         Checkbox(checked = selected, onCheckedChange = { onToggle() })
         Column(Modifier.weight(1f)) {
-            Text(item.name, style = FileNameTextStyle, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth())
+            Text(item.name, style = FileNameTextStyle, maxLines = 1, overflow = TextOverflow.Ellipsis)
             val parent = item.path.substringBeforeLast('/').removePrefix(rootPath).trimStart('/').ifEmpty { "/" }
             Text(
                 buildString {

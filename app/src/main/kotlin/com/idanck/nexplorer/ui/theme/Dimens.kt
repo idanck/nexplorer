@@ -11,8 +11,8 @@ object NexplorerDimens {
     val Space5 = 24.dp
     val Space6 = 32.dp
 
-    /** גובה מינימלי של שורה ברשימת קבצים. */
-    val RowHeight = 64.dp
+    /** גובה מינימלי של שורה ברשימת קבצים (צפיפות רגילה; מרווח +8, צפוף −8). */
+    val RowHeight = 56.dp
 
     /** יעד מגע מינימלי לכל רכיב לחיץ. */
     val TouchTarget = 44.dp
@@ -50,10 +50,10 @@ object NexplorerDimens {
     val BannerDeviceGap = 7.dp
 
     /** ריפוד אנכי של שורת קובץ (ברמת צפיפות רגילה). */
-    val RowPaddingVertical = 10.dp
+    val RowPaddingVertical = 6.dp
 
     /** רווח בין האריח לטקסט בשורה. */
-    val RowGap = 14.dp
+    val RowGap = 12.dp
 
     /** שורה בתצוגה קומפקטית. */
     val CompactRowHeight = 48.dp
