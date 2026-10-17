@@ -79,10 +79,10 @@ class SftpFs(private val connection: NetConnection, password: CharArray?, privat
         if (e.statusCode == Response.StatusCode.NO_SUCH_FILE) null else throw e
     }
 
-    override fun openRead(path: String): InputStream = retrying {
+    override fun openRead(path: String, offset: Long): InputStream = retrying {
         val file = client().open(remoteOf(path), EnumSet.of(OpenMode.READ))
         val stream = try {
-            file.ReadAheadRemoteFileInputStream(UNCONFIRMED)
+            file.ReadAheadRemoteFileInputStream(UNCONFIRMED, offset)
         } catch (e: Exception) {
             runCatching { file.close() }
             throw e
@@ -100,7 +100,7 @@ class SftpFs(private val connection: NetConnection, password: CharArray?, privat
         }
     }
 
-    override fun openWrite(path: String): OutputStream {
+    override fun openWrite(path: String, size: Long): OutputStream {
         val file = retrying {
             try {
                 // EXCL: נכשל כשהקובץ קיים — אף פעם לא דורסים.

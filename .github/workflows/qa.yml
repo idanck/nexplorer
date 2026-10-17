@@ -114,15 +114,17 @@ jobs:
           avail=$(df -Pm "$HOME" | awk 'NR==2{print $4}')
           [ "$avail" -ge 9000 ] || { echo "::error::Only ${avail} MB free; the emulator needs ~7373 MB for userdata"; exit 1; }
 
-      - name: Start SMB, SFTP and WebDAV servers for the emulator
-        # שלב 5א: Samba, שלב 5ב: OpenSSH (פורט 2222), ושלב 5ג: Apache WebDAV (8080, ‏8443) על המארח —
-        # האמולטור מגיע אליהם ב-10.0.2.2 (Phase5aTest, Phase5bTest, Phase5cTest, release-smoke.sh).
+      - name: Start SMB, SFTP, WebDAV and cloud servers for the emulator
+        # שלב 5א: Samba, שלב 5ב: OpenSSH (פורט 2222), שלב 5ג: Apache WebDAV (8080, ‏8443), ושלב 6: שרת מדומה של
+        # Google Drive ו-OneDrive (8090) על המארח — האמולטור מגיע אליהם ב-10.0.2.2 (Phase5aTest–Phase6Test, release-smoke.sh).
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq --no-install-recommends samba openssh-server apache2 apache2-utils > /dev/null
           bash .github/qa/smb-server.sh
           bash .github/qa/sftp-server.sh
           bash .github/qa/webdav-server.sh
+          nohup python3 .github/qa/cloud-server.py --port 8090 > /tmp/nexplorer-cloud.log 2>&1 &
+          for i in $(seq 1 20); do curl -fsS -X POST http://127.0.0.1:8090/qa/reset && break; sleep 0.5; done
 
       - name: Run on the emulator
         uses: reactivecircus/android-emulator-runner@v2

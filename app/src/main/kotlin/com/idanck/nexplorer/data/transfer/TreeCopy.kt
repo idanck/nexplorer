@@ -26,8 +26,8 @@ internal interface Side {
     fun child(dir: String, name: String): String
     fun mkdir(path: String)
     fun read(path: String): InputStream
-    /** קובץ חדש; קיים — כשל. */
-    fun write(path: String): OutputStream
+    /** קובץ חדש; קיים — כשל. [size] — כמה בתים ייכתבו (OneDrive צריך את זה מראש). */
+    fun write(path: String, size: Long): OutputStream
     /** שם זמני → שם סופי, באותה תיקייה. */
     fun finish(temp: String, dest: String)
     fun delete(path: String, isDirectory: Boolean)
@@ -58,7 +58,7 @@ internal object LocalSide : Side {
 
     override fun read(path: String): InputStream = File(path).inputStream()
 
-    override fun write(path: String): OutputStream {
+    override fun write(path: String, size: Long): OutputStream {
         val file = File(path)
         if (file.exists()) throw IOException("כבר קיים פריט בשם \"${file.name}\"")
         val stream = FileOutputStream(file)
@@ -109,7 +109,7 @@ internal class RemoteSide(val fs: RemoteFs) : Side {
 
     override fun read(path: String): InputStream = fs.openRead(path)
 
-    override fun write(path: String): OutputStream = fs.openWrite(path)
+    override fun write(path: String, size: Long): OutputStream = fs.openWrite(path, size)
 
     override fun finish(temp: String, dest: String) = fs.rename(temp, dest)
 
@@ -184,7 +184,7 @@ internal class TreeCopy(
         if (to.stat(temp) != null) to.delete(temp, isDirectory = false)
         try {
             from.read(src.path).use { input ->
-                to.write(temp).use { output ->
+                to.write(temp, src.size).use { output ->
                     val buffer = ByteArray(BUFFER)
                     while (true) {
                         checkpoint()

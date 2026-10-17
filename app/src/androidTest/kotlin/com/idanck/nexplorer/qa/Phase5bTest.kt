@@ -1,8 +1,10 @@
 package com.idanck.nexplorer.qa
 
 import android.content.Context
+import android.content.Intent
 import android.util.Log
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
@@ -30,6 +32,7 @@ import com.idanck.nexplorer.data.net.RemoteFs
 import com.idanck.nexplorer.data.net.SftpFs
 import com.idanck.nexplorer.data.net.SshHostKeys
 import com.idanck.nexplorer.data.transfer.TransferKind
+import com.idanck.nexplorer.media.PlaybackService
 import com.idanck.nexplorer.qa.Qa.waitFor
 import com.idanck.nexplorer.qa.Qa.waitForDisk
 import com.idanck.nexplorer.qa.Qa.waitGone
@@ -92,6 +95,8 @@ class Phase5bTest {
     @After
     fun tearDown() {
         if (::scenario.isInitialized) scenario.close()
+        // נגן השמע ממשיך ברקע גם בלי מסך (t05).
+        ApplicationProvider.getApplicationContext<Context>().let { it.stopService(Intent(it, PlaybackService::class.java)) }
         // monkey ו-release-smoke.sh רצים אחרי זה — בלי חיבור שמור, ה-monkey לא מגיע לשרת.
         runBlocking { container.settings.update { it.copy(connections = emptyList()) } }
         if (::server.isInitialized) runCatching { SftpFs(server, password.toCharArray(), null).use { wipe(it, base) } }
@@ -204,6 +209,14 @@ class Phase5bTest {
             File(root, "big.bin").readBytes().toList().hashCode(),
             container.remote.fsFor(base).openRead("$base/big.bin").use { it.readBytes() }.toList().hashCode(),
         )
+        // דילוג בנגן: קריאה מאמצע הקובץ.
+        val clip = Qa.asset("clip.mp4")
+        container.remote.fsFor(base).let { fs ->
+            fs.openWrite("$base/clip.mp4").use { it.write(clip) }
+            Qa.assertReadsFromOffsets(fs, "$base/clip.mp4", clip)
+        }
+        // אפליקציה אחרת ("פתיחה באמצעות") — דרך RemoteFilesProvider.
+        Qa.assertProviderReads("$base/clip.mp4", clip)
 
         // מהשרת למכשיר בהעברה.
         container.transfers.enqueue(TransferKind.Move, listOf("$base/readme.txt"), File(root, "Empty").absolutePath)
@@ -280,5 +293,29 @@ class Phase5bTest {
         compose.onNodeWithText("סמוך על המפתח החדש").performClick()
         compose.waitFor(hasText("release-smoke-sftp.txt"), 30_000)
         assertEquals(server.hostKey, container.settings.state.value.connections.single().hostKey)
+    }
+
+    @Test
+    fun t05_audioPlaysStraightFromTheServer() = logged("t05") {
+        SftpFs(server, password.toCharArray(), null).use { fs ->
+            fs.mkdir("$base/Music")
+            fs.openWrite("$base/Music/b-tone.wav").use { it.write(QaData.wav(seconds = 30, frequency = 660.0)) }
+            fs.openWrite("$base/Music/a-tone.wav").use { it.write(QaData.wav(seconds = 30, frequency = 440.0)) }
+        }
+        save(withPassword())
+        launch(base)
+        compose.waitFor(hasText("Music"), 30_000)
+        compose.onNodeWithText("Music").performClick()
+        compose.waitFor(hasText("a-tone.wav"), 30_000)
+        compose.onNodeWithText("a-tone.wav").performClick()
+        // ישר לנגן (השירות ברקע, דרך MediaController): הרשימה מהתיקייה בשרת, והמיקום מתקדם.
+        compose.waitFor(hasContentDescription("השהה"), 30_000)
+        compose.waitFor(hasText(" / 2", substring = true), 10_000)
+        compose.waitFor(hasText("0:02"), 30_000)
+        Qa.screenshot(compose, "139-sftp-audio-streaming")
+        val copies = File(ApplicationProvider.getApplicationContext<Context>().cacheDir, RemoteFiles.CACHE_DIR).walk().filter { it.name.endsWith(".wav") }.toList()
+        assertTrue("השיר הורד למכשיר: $copies", copies.isEmpty())
+        compose.onNodeWithContentDescription("השהה").performClick()
+        compose.waitFor(hasContentDescription("נגן"), 10_000)
     }
 }

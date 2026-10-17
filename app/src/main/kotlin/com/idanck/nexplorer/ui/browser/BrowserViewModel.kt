@@ -10,8 +10,10 @@ import com.idanck.nexplorer.core.ArchiveFormats
 import com.idanck.nexplorer.core.ArchivePaths
 import com.idanck.nexplorer.core.BatchRename
 import com.idanck.nexplorer.core.Entry
+import com.idanck.nexplorer.core.FileKind
 import com.idanck.nexplorer.core.FileNames
 import com.idanck.nexplorer.core.FolderSizes
+import com.idanck.nexplorer.core.MediaFormats
 import com.idanck.nexplorer.core.NetPaths
 import com.idanck.nexplorer.core.RenamePattern
 import com.idanck.nexplorer.core.Section
@@ -332,11 +334,14 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
         }
         when {
             entry.isDirectory -> navigate(Location.Folder(entry.path))
-            // ברשת: עותק זמני במכשיר, ואז פתיחה רגילה. קובץ מוצפן, ארכיון ו-APK — מהעותק, כקובץ.
-            NetPaths.isRemote(entry.path) -> if (EncryptedFiles.hasEncryptedName(entry.name)) {
-                emit("קובץ מוצפן ברשת — העתק אותו למכשיר כדי לפתוח או לפענח")
-            } else {
-                emitEvent(BrowserEvent.Fetch(listOf(entry), FetchPurpose.Open))
+            // ברשת: הנגנים ואפליקציות אחרות (גם לארכיון — חילוץ ברשת אין) קוראים ישירות מהשרת. מציג התמונות
+            // וגיליון ה-APK צריכים קובץ, ואפליקציה אחרת — גודל ידוע (ל-Google Docs אין: הוא מיוצא בכל פתיחה);
+            // אלה — עותק זמני במכשיר, ואז פתיחה רגילה.
+            NetPaths.isRemote(entry.path) -> when {
+                EncryptedFiles.hasEncryptedName(entry.name) -> emit("קובץ מוצפן ברשת — העתק אותו למכשיר כדי לפתוח או לפענח")
+                entry.kind == FileKind.Image || entry.extension == "apk" || (entry.size <= 0 && !MediaFormats.playable(entry)) ->
+                    emitEvent(BrowserEvent.Fetch(listOf(entry), FetchPurpose.Open))
+                else -> emitEvent(BrowserEvent.OpenFile(entry))
             }
             EncryptedFiles.hasEncryptedName(entry.name) -> {
                 val vault = Vaults.rootOf(File(entry.path))
@@ -881,7 +886,7 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
         }
     }
 
-    /** "הסר" במגירה: החיבור, הסיסמה שלו, והמועדפים והתצוגות בתוכו. */
+    /** "הסר" במגירה: החיבור, הסיסמה שלו (ובענן — האסימון), והמועדפים והתצוגות בתוכו. */
     fun removeConnection(id: String) {
         val connection = _state.value.connections.firstOrNull { it.id == id } ?: return
         val root = NetPaths.root(connection.protocol, id)
@@ -896,6 +901,7 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
                 )
             }
             remote.forget(id)
+            container.cloud.tokens.remove(id)
             if (_state.value.folderPath?.let(::inside) == true) navigate(Location.Folder(StorageVolumes.primaryPath()))
             emit("\"${connection.label}\" הוסר מהמגירה")
         }

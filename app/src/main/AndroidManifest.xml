@@ -19,6 +19,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <!-- נגן השמע ממשיך ברקע, עם התראה ובקרים במסך הנעילה. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- שיר מהרשת כשהמסך כבוי: WakeLock ו-WifiLock בזמן ניגון (הרשאה רגילה, בלי שאלה). -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!--
@@ -49,6 +51,26 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!--
+          OneDrive (שלב 6): דף ההתחברות של Microsoft חוזר ל-<applicationId>://oauth. מיוצא — הדפדפן פותח אותו;
+          אפליקציה אחרת שתפתח אותו לא תשיג כלום בלי ה-PKCE verifier, שלא יוצא מהאפליקציה.
+        -->
+        <activity
+            android:name=".ui.net.OAuthRedirectActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.NoDisplay">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:host="oauth"
+                    android:scheme="${applicationId}" />
             </intent-filter>
         </activity>
 
@@ -83,6 +105,13 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- קבצים ברשת לאפליקציה אחרת, ישירות מהשרת (קריאה בלבד). כמו FileProvider: לא מיוצא, גישה ל-URI שנשלח. -->
+        <provider
+            android:name=".data.net.RemoteFilesProvider"
+            android:authorities="${applicationId}.remote"
+            android:exported="false"
+            android:grantUriPermissions="true" />
     </application>
 
 </manifest>

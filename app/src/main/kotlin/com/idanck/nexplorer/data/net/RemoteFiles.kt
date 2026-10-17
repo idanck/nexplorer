@@ -15,11 +15,12 @@ import java.util.UUID
 /**
  * כל המקומות ברשת: לפי המזהה שבנתיב ([NetPaths]) מוצא את החיבור השמור, ופותח לו [RemoteFs] אחד שנשמר
  * עד שהחיבור משתנה או נמחק. [connectionOf] — מההעדפות; [decrypt] — פותח את הצפנים שבחיבור (הסיסמה
- * והמפתח הפרטי) ב-Keystore. בבדיקות מול שרת — ישירות.
+ * והמפתח הפרטי) ב-Keystore; [cloudAuth] — האסימונים של חיבור ענן. בבדיקות מול שרת — ישירות.
  */
 class RemoteFiles(
     private val connectionOf: (String) -> NetConnection?,
     private val decrypt: (String) -> CharArray,
+    private val cloudAuth: (NetConnection) -> CloudAuth = { throw IOException("אין התחברות לענן") },
 ) {
     private val open = HashMap<String, Pair<NetConnection, RemoteFs>>()
 
@@ -33,7 +34,7 @@ class RemoteFiles(
             val fs = try {
                 val key = connection.keySecret?.let(decrypt)
                 try {
-                    create(connection, password, key)
+                    create(connection, password, key, if (connection.protocol.cloud) cloudAuth(connection) else null)
                 } finally {
                     key?.fill('\u0000')
                 }
@@ -185,10 +186,34 @@ class RemoteFiles(
         const val CACHE_DIR = "remote"
         private const val BUFFER = 256 * 1024
 
-        fun create(connection: NetConnection, password: CharArray?, privateKey: CharArray? = null): RemoteFs = when (connection.protocol) {
+        fun create(connection: NetConnection, password: CharArray?, privateKey: CharArray? = null, auth: CloudAuth? = null): RemoteFs = when (connection.protocol) {
             NetProtocol.Smb -> SmbFs(connection, password)
             NetProtocol.Sftp -> SftpFs(connection, password, privateKey)
             NetProtocol.WebDav -> WebDavFs(connection, password)
+            NetProtocol.GoogleDrive -> DriveFs(connection, auth ?: throw IOException("אין התחברות ל-Google Drive"))
+            NetProtocol.OneDrive -> OneDriveFs(connection, auth ?: throw IOException("אין התחברות ל-OneDrive"))
+        }
+
+        /**
+         * "התחבר" בענן: החשבון (השם במגירה, [NetConnection.user]) ורשימת השורש — באסימון של ההתחברות שעכשיו,
+         * לפני שהחיבור נשמר.
+         */
+        suspend fun testCloud(connection: NetConnection, auth: CloudAuth): ConnectCheck = withContext(Dispatchers.IO) {
+            try {
+                create(connection, null, null, auth).use { fs ->
+                    val account = when (fs) {
+                        is DriveFs -> fs.account()
+                        is OneDriveFs -> fs.account()
+                        else -> connection.user
+                    }
+                    fs.list(connection.root)
+                    ConnectCheck.Ok(connection.copy(user = account))
+                }
+            } catch (e: IOException) {
+                ConnectCheck.Failed(e.message ?: "ההתחברות נכשלה")
+            } catch (e: RuntimeException) {
+                ConnectCheck.Failed(e.message ?: "ההתחברות נכשלה")
+            }
         }
 
         /**

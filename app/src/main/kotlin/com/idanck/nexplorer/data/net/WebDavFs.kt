@@ -16,6 +16,8 @@ import okio.BufferedSink
 import okio.Pipe
 import okio.buffer
 import org.w3c.dom.Element
+import java.io.ByteArrayInputStream
+import java.io.EOFException
 import java.io.FilterInputStream
 import java.io.IOException
 import java.io.InputStream
@@ -102,10 +104,31 @@ class WebDavFs(private val connection: NetConnection, password: CharArray?) : Re
         return entryOf(path, own, NetPaths.name(path).ifEmpty { connection.label })
     }
 
-    override fun openRead(path: String): InputStream {
-        val response = execute(request(urlOf(path, directory = false)).get().build())
-        if (response.code != 200) response.use { throw failure(it) }
+    /**
+     * מ-[offset]: ‏`Range` (206). שרת שמתעלם ממנו מחזיר את כל הקובץ (200) — ואז מדלגים כאן; מעבר לסוף
+     * הקובץ השרת עונה 416.
+     */
+    override fun openRead(path: String, offset: Long): InputStream {
+        val request = request(urlOf(path, directory = false)).get()
+        if (offset > 0) request.header("Range", "bytes=$offset-")
+        val response = execute(request.build())
+        if (offset > 0 && response.code == 416) {
+            response.close()
+            return ByteArrayInputStream(ByteArray(0))
+        }
+        if (response.code != 200 && !(offset > 0 && response.code == 206)) response.use { throw failure(it) }
         val body = response.body ?: response.use { throw failure(it) }
+        if (offset > 0 && response.code == 200) {
+            try {
+                body.source().skip(offset)
+            } catch (e: EOFException) {
+                response.close()
+                return ByteArrayInputStream(ByteArray(0))
+            } catch (e: IOException) {
+                response.close()
+                throw map(e)
+            }
+        }
         return object : FilterInputStream(body.byteStream()) {
             override fun read(): Int = guard { super.read() }
             override fun read(b: ByteArray, off: Int, len: Int): Int = guard { super.read(b, off, len) }
@@ -118,7 +141,7 @@ class WebDavFs(private val connection: NetConnection, password: CharArray?) : Re
      * אחר) לבקשה שרצה ב-thread משלה. `If-None-Match: *` — השרת מסרב לדרוס קובץ קיים. הכשל של הבקשה
      * (שרת מלא, אין הרשאה) נראה ב-[OutputStream.close], או בכתיבה שאחריו.
      */
-    override fun openWrite(path: String): OutputStream {
+    override fun openWrite(path: String, size: Long): OutputStream {
         val pipe = Pipe(PIPE_BUFFER)
         val body = object : RequestBody() {
             override fun contentType() = OCTET_STREAM

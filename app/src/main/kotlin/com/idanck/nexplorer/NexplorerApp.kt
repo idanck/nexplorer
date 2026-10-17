@@ -7,6 +7,8 @@ import coil.ImageLoaderFactory
 import coil.decode.VideoFrameDecoder
 import com.idanck.nexplorer.data.crypto.EncryptedPreview
 import com.idanck.nexplorer.data.crypto.VaultKeys
+import com.idanck.nexplorer.data.net.CloudAuths
+import com.idanck.nexplorer.data.net.CloudTokens
 import com.idanck.nexplorer.data.net.ConnectionSecrets
 import com.idanck.nexplorer.data.net.RemoteFiles
 import com.idanck.nexplorer.data.settings.SettingsRepository
@@ -28,10 +30,13 @@ class AppContainer(app: Application) {
     val settings = SettingsRepository(app, scope)
     /** תיקיות מוצפנות שנפתחו — בזיכרון בלבד. */
     val vaults = VaultKeys()
-    /** מקומות ברשת (D3): החיבורים מההעדפות, והסיסמאות מה-Keystore — רק כשמתחברים. */
+    /** ענן (D4): ההרשאות של Google ב-Play services, וה-refresh tokens של OneDrive ב-Keystore. */
+    val cloud = CloudAuths(app, CloudTokens(app))
+    /** מקומות ברשת (D3) וענן: החיבורים מההעדפות, והסיסמאות מה-Keystore — רק כשמתחברים. */
     val remote = RemoteFiles(
         connectionOf = { id -> settings.state.value.connections.firstOrNull { it.id == id } },
         decrypt = ConnectionSecrets::decrypt,
+        cloudAuth = cloud::forConnection,
     )
     val transfers = TransferManager(app, scope, vaults, remote)
     val updates = UpdateManager(app, settings, transfers)
@@ -42,6 +47,9 @@ class NexplorerApp : Application(), ImageLoaderFactory {
 
     lateinit var container: AppContainer
         private set
+
+    /** ספק תוכן נקרא כבר לפני onCreate (‏RemoteFilesProvider) — אז עוד אין [container]. */
+    val isReady: Boolean get() = ::container.isInitialized
 
     override fun onCreate() {
         super.onCreate()

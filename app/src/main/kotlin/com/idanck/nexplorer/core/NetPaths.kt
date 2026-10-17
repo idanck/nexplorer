@@ -2,16 +2,22 @@ package com.idanck.nexplorer.core
 
 import java.io.File
 
-/** פרוטוקול של מקום ברשת (D3): SMB (5א), SFTP (5ב), WebDAV (5ג; הפורט — של https, ו-80 ל-http). */
-enum class NetProtocol(val scheme: String, val label: String, val defaultPort: Int) {
+/**
+ * פרוטוקול של מקום ברשת (D3): SMB (5א), SFTP (5ב), WebDAV (5ג; הפורט — של https, ו-80 ל-http). ענן (D4, שלב 6):
+ * Google Drive ו-OneDrive — [cloud]: בלי שרת לבחור, ההתחברות בחשבון של השירות.
+ */
+enum class NetProtocol(val scheme: String, val label: String, val defaultPort: Int, val cloud: Boolean = false) {
     Smb("smb", "SMB", 445),
     Sftp("sftp", "SFTP", 22),
     WebDav("dav", "WebDAV", 443),
+    GoogleDrive("gdrive", "Google Drive", 443, cloud = true),
+    OneDrive("onedrive", "OneDrive", 443, cloud = true),
 }
 
 /**
  * נתיב של מקום ברשת: `smb://<חיבור>/<שיתוף>/<תיקייה>/<קובץ>`, `sftp://<חיבור>/<נתיב מלא בשרת>`
- * (`sftp://<חיבור>` הוא `/` של השרת), או `dav://<חיבור>/<נתיב מתחת לכתובת של החיבור>`. המזהה של החיבור — ולא השרת — בנתיב, כדי
+ * (`sftp://<חיבור>` הוא `/` של השרת), `dav://<חיבור>/<נתיב מתחת לכתובת של החיבור>`, או `gdrive://<חיבור>/...` ו-`onedrive://<חיבור>/...`
+ * (השורש — "האחסון שלי"). המזהה של החיבור — ולא השרת — בנתיב, כדי
  * שמועדף או תצוגה "רק בתיקייה זו" ישרדו שינוי של כתובת השרת או של המשתמש. נתיב מקומי מתחיל ב-/,
  * ולכן אין התנגשות בין השניים. בלי תלות באנדרואיד — נבדק ב-JVM.
  */
@@ -56,6 +62,27 @@ object NetPaths {
     /** שם הפריט האחרון בנתיב מקומי או ברשת. */
     fun nameOf(path: String): String = if (isRemote(path)) name(path) else File(path).name
 
+    /**
+     * הנתיב כרכיבים — [פרוטוקול, חיבור, שיתוף/תיקייה, ..., שם] — לכתובת `content://` שאפליקציה אחרת קוראת
+     * ממנה (`RemoteFilesProvider`): כל רכיב מקודד לבד, והרכיב האחרון הוא שם הקובץ. null — לא נתיב ברשת.
+     */
+    fun parts(path: String): List<String>? {
+        val protocol = protocolOf(path) ?: return null
+        val id = connectionId(path) ?: return null
+        return listOf(protocol.scheme, id) + segments(path)
+    }
+
+    /** ההפך מ-[parts]. null — פרוטוקול לא מוכר, בלי חיבור, או רכיב שאינו שם (ריק, `.`, `..`, עם `/`). */
+    fun fromParts(parts: List<String>): String? {
+        val protocol = NetProtocol.entries.firstOrNull { it.scheme == parts.getOrNull(0) } ?: return null
+        val id = parts.getOrNull(1)?.takeIf(::isName) ?: return null
+        val rest = parts.drop(2)
+        if (!rest.all(::isName)) return null
+        return rest.fold(root(protocol, id), ::child)
+    }
+
+    private fun isName(part: String) = part.isNotEmpty() && part != "." && part != ".." && '/' !in part
+
     /** [path] בתוך [dir] או זהה לו — בנתיבים באותה צורה (שניהם ברשת או שניהם מקומיים). */
     fun isInside(path: String, dir: String): Boolean = FileNames.isInside(path, dir)
 
@@ -80,7 +107,7 @@ object NetPaths {
     }
 
     /**
-     * בדיקת שם לפריט ברשת, מעבר ל-[FileNames.validate]: SMB (Windows) לא מקבל `\ : * ? " < > |`,
+     * בדיקת שם לפריט ברשת, מעבר ל-[FileNames.validate]: SMB (Windows) ו-OneDrive לא מקבלים `\ : * ? " < > |`,
      * ושם שנגמר בנקודה או ברווח נשמר בלעדיהם.
      */
     fun validateName(protocol: NetProtocol, name: String): String? {
@@ -95,8 +122,18 @@ object NetPaths {
             NetProtocol.Sftp -> null
             // השם עובר מקודד בכתובת; רק מה שבלתי אפשרי בה ממילא.
             NetProtocol.WebDav -> if (name.any { it == '\\' }) "בשרת הזה השם לא יכול להכיל \\" else null
+            // Drive מקבל כל שם (גם / — הוא מוצג כ-∕, ראה DriveNames).
+            NetProtocol.GoogleDrive -> null
+            NetProtocol.OneDrive -> when {
+                name.any { it in SMB_FORBIDDEN } -> "ב-OneDrive השם לא יכול להכיל \\ : * ? \" < > |"
+                name.endsWith('.') || name.endsWith(' ') || name.startsWith(' ') -> "ב-OneDrive השם לא יכול להתחיל ברווח או להיגמר בנקודה או ברווח"
+                name.substringBefore('.').uppercase() in WINDOWS_RESERVED || name.equals("desktop.ini", ignoreCase = true) ->
+                    "OneDrive לא מקבל את השם הזה"
+                else -> null
+            }
         }
     }
 
     private const val SMB_FORBIDDEN = "\\:*?\"<>|"
+    private val WINDOWS_RESERVED = setOf("CON", "PRN", "AUX", "NUL") + (0..9).flatMap { listOf("COM$it", "LPT$it") }
 }

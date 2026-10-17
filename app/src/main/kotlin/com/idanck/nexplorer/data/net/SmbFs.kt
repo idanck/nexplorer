@@ -90,9 +90,11 @@ class SmbFs(private val connection: NetConnection, password: CharArray?) : Remot
         }
     }
 
-    override fun openRead(path: String): InputStream = withShare(path) { share, inner ->
+    override fun openRead(path: String, offset: Long): InputStream = withShare(path) { share, inner ->
         val file = share.openFile(inner, EnumSet.of(AccessMask.GENERIC_READ), null, SMB2ShareAccess.ALL, SMB2CreateDisposition.FILE_OPEN, null)
-        object : FilterInputStream(file.inputStream) {
+        // smbj מדלג בלי לקרוא: הבקשה הראשונה כבר מ-offset.
+        val input = file.inputStream.apply { if (offset > 0) skip(offset) }
+        object : FilterInputStream(input) {
             override fun read(): Int = guard { super.read() }
             override fun read(b: ByteArray, off: Int, len: Int): Int = guard { super.read(b, off, len) }
             override fun close() {
@@ -105,7 +107,7 @@ class SmbFs(private val connection: NetConnection, password: CharArray?) : Remot
         }
     }
 
-    override fun openWrite(path: String): OutputStream = withShare(path) { share, inner ->
+    override fun openWrite(path: String, size: Long): OutputStream = withShare(path) { share, inner ->
         val file = share.openFile(
             inner,
             EnumSet.of(AccessMask.GENERIC_WRITE, AccessMask.FILE_WRITE_ATTRIBUTES),
@@ -249,6 +251,9 @@ class SmbFs(private val connection: NetConnection, password: CharArray?) : Remot
     }
 
     private fun isStale(e: Throwable): Boolean {
+        // החוט נקטע (דילוג בנגן מבטל את הטעינה ב-interrupt), לא החיבור: איפוס היה מפיל גם העברה שרצה בו.
+        // smbj מחזיר את הדגל לפני שהוא זורק — לפעמים בלי InterruptedException בשרשרת (המתנה ל-credits).
+        if (Thread.currentThread().isInterrupted || generateSequence(e) { it.cause }.any { it is InterruptedException }) return false
         if (e is SMBApiException) {
             return e.status == NtStatus.STATUS_NETWORK_NAME_DELETED || e.status == NtStatus.STATUS_USER_SESSION_DELETED ||
                 e.status == NtStatus.STATUS_NETWORK_SESSION_EXPIRED

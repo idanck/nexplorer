@@ -1,6 +1,7 @@
 package com.idanck.nexplorer.ui.net
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Dns
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Terminal
@@ -13,4 +14,6 @@ val NetProtocol.icon: ImageVector
         NetProtocol.Smb -> Icons.Outlined.Dns
         NetProtocol.Sftp -> Icons.Outlined.Terminal
         NetProtocol.WebDav -> Icons.Outlined.Language
+        // ענן — האייקון של האריח "ענן", בלי סמלים של Google או Microsoft.
+        NetProtocol.GoogleDrive, NetProtocol.OneDrive -> Icons.Outlined.Cloud
     }
