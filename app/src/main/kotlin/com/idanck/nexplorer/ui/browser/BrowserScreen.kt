@@ -225,8 +225,8 @@ fun BrowserScreen(
                 is BrowserEvent.OpenFile -> if (MediaFormats.opensInApp(event.entry)) {
                     onOpenMedia(event.entry)
                 } else if (!FileIntents.open(context, event.entry.path, event.entry.name)) {
-                    // אין אפליקציה לטקסט/קוד — העורך המובנה פותח אותו.
-                    if (event.entry.canEditAsText()) onEditText(event.entry.path)
+                    // אין אפליקציה לטקסט/קוד — העורך המובנה פותח אותו (במכשיר בלבד).
+                    if (event.entry.canEditAsText() && !NetPaths.isRemote(event.entry.path)) onEditText(event.entry.path)
                     else launch { snackbar.showSnackbar("אין אפליקציה שפותחת קבצים מסוג זה") }
                 }
                 is BrowserEvent.OpenArchive -> dialog = BrowserDialog.Extract(event.entry)
@@ -493,7 +493,8 @@ fun BrowserScreen(
                                 files.isEmpty() -> message("אי אפשר לשתף תיקיות — בחר קבצים")
                                 // כל URI עובר שלוש פעמים ב-Intent; אלפים חורגים ממגבלת ה-Binder ומפילים את השליחה.
                                 files.size > FileIntents.MAX_SHARE -> message("אפשר לשתף עד ${FileIntents.MAX_SHARE} קבצים בבת אחת")
-                                // מהרשת: קודם עותק במכשיר — אפליקציה אחרת לא קוראת מהשרת.
+                                // מהרשת: קודם עותק במכשיר — מי שמקבל שיתוף קורא אותו מתי שהוא רוצה (שליחה ברקע,
+                                // אחרי שהאפליקציה נסגרה), ולא בזמן שהחיבור לשרת פתוח.
                                 state.isRemote -> dialog = BrowserDialog.Fetch(files, FetchPurpose.Share)
                                 FileIntents.share(context, files.map { it.path to it.name }) == 0 -> message("אין אפליקציה לשיתוף")
                             }
@@ -518,11 +519,9 @@ fun BrowserScreen(
                                     isFavorite = single != null && single.path in state.favorites,
                                     // קיצור דרך פותח נתיב במכשיר; לחיבור ברשת — מהמגירה.
                                     canPinShortcut = canPin && !state.isRemote,
+                                    // גם ברשת: האפליקציה שנבחרה קוראת ישירות מהשרת (RemoteFilesProvider).
                                     onOpenWith = {
-                                        single?.let {
-                                            if (state.isRemote) dialog = BrowserDialog.Fetch(listOf(it), FetchPurpose.OpenWith)
-                                            else if (!FileIntents.openWith(context, it.path, it.name)) message("אין אפליקציה מתאימה")
-                                        }
+                                        single?.let { if (!FileIntents.openWith(context, it.path, it.name)) message("אין אפליקציה מתאימה") }
                                     },
                                     onMove = { vm.copyToClipboard(selected.map { it.path }, cut = true) },
                                     onCopyPath = {
@@ -723,7 +722,6 @@ fun BrowserScreen(
                             !FileIntents.open(context, copy.path, copy.name) -> message("אין אפליקציה שפותחת קבצים מסוג זה")
                         }
                     }
-                    FetchPurpose.OpenWith -> local.singleOrNull()?.let { if (!FileIntents.openWith(context, it.path, it.name)) message("אין אפליקציה מתאימה") }
                     FetchPurpose.Share -> if (FileIntents.share(context, local.map { it.path to it.name }) == 0) message("אין אפליקציה לשיתוף")
                 }
             },

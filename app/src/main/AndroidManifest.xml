@@ -85,6 +85,13 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- קבצים ברשת לאפליקציה אחרת, ישירות מהשרת (קריאה בלבד). כמו FileProvider: לא מיוצא, גישה ל-URI שנשלח. -->
+        <provider
+            android:name=".data.net.RemoteFilesProvider"
+            android:authorities="${applicationId}.remote"
+            android:exported="false"
+            android:grantUriPermissions="true" />
     </application>
 
 </manifest>

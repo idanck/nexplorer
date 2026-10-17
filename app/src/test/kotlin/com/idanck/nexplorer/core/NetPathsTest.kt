@@ -38,6 +38,22 @@ class NetPathsTest {
     }
 
     @Test
+    fun `parts round-trip for a content uri, and odd parts are refused`() {
+        val file = "$root/volume2/Photos/דוח #1 50%.pdf"
+        assertEquals(listOf("smb", "a1b2c3", "volume2", "Photos", "דוח #1 50%.pdf"), NetPaths.parts(file))
+        assertEquals(file, NetPaths.fromParts(NetPaths.parts(file)!!))
+        val sftp = NetPaths.child(NetPaths.root(NetProtocol.Sftp, "s1"), "etc")
+        assertEquals(sftp, NetPaths.fromParts(NetPaths.parts(sftp)!!))
+        assertEquals("dav://d1", NetPaths.fromParts(listOf("dav", "d1")))
+        assertNull(NetPaths.parts("/storage/emulated/0/a.pdf"))
+        assertNull(NetPaths.fromParts(listOf("ftp", "x", "a")))
+        assertNull(NetPaths.fromParts(listOf("smb")))
+        assertNull(NetPaths.fromParts(listOf("smb", "a1b2c3", "..", "x")))
+        assertNull(NetPaths.fromParts(listOf("smb", "a1b2c3", "a/b")))
+        assertNull(NetPaths.fromParts(listOf("smb", "", "x")))
+    }
+
+    @Test
     fun `parentOf and nameOf work for local and remote paths`() {
         assertEquals("/storage/emulated/0", NetPaths.parentOf("/storage/emulated/0/Download"))
         assertEquals("Download", NetPaths.nameOf("/storage/emulated/0/Download"))

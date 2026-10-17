@@ -12,9 +12,14 @@ import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
 import com.idanck.nexplorer.MainActivity
 import com.idanck.nexplorer.R
+import com.idanck.nexplorer.core.NetPaths
+import com.idanck.nexplorer.data.net.RemoteFilesProvider
 import java.io.File
 
-/** פתיחה, שיתוף וקיצורי דרך — כל מה שעובר לאפליקציה אחרת דרך FileProvider. */
+/**
+ * פתיחה, שיתוף וקיצורי דרך — כל מה שעובר לאפליקציה אחרת דרך FileProvider. קובץ ברשת — דרך
+ * [RemoteFilesProvider], שקורא מהשרת בלי עותק (קריאה בלבד).
+ */
 object FileIntents {
 
     const val ACTION_OPEN_FOLDER = "com.idanck.nexplorer.action.OPEN_FOLDER"
@@ -34,12 +39,16 @@ object FileIntents {
     }
 
     private fun uriFor(context: Context, path: String): Uri =
-        FileProvider.getUriForFile(context, "${context.packageName}.files", File(path))
+        if (NetPaths.isRemote(path)) RemoteFilesProvider.uriFor(context, path)
+        else FileProvider.getUriForFile(context, "${context.packageName}.files", File(path))
 
     private fun viewIntent(context: Context, path: String, name: String): Intent =
         Intent(Intent.ACTION_VIEW)
             .setDataAndType(uriFor(context, path), mimeType(name))
-            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            .addFlags(
+                if (NetPaths.isRemote(path)) Intent.FLAG_GRANT_READ_URI_PERMISSION
+                else Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+            )
 
     /** false כשאין אפליקציה שמטפלת בסוג הזה — הממשק מציג הודעה במקום קריסה. */
     fun open(context: Context, path: String, name: String): Boolean = launch(context, viewIntent(context, path, name))
