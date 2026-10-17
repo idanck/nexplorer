@@ -4,6 +4,7 @@
 #   Drive: לפי ID, שמות כפולים מותרים, / בשם, Google Docs (ייצוא בלבד), קיצורי דרך, resumable upload (308 + Range).
 #   Graph: לפי נתיב (root:/a/b:/children), שמות ייחודיים בלי רישיות, conflictBehavior=fail, upload session בגושים
 #   של כפולות 320KB ובלי Authorization, /content מפנה (302) לכתובת הורדה, OneNote (package) בשורש.
+#   הורדה (alt=media, /download) עם `Range: bytes=N-` — 206 מהמקום, 416 מעבר לסוף.
 # אסימון: Bearer qa-token (אחר — 401). דפים קטנים (3) כדי שהדפדוף בין דפים ייבדק.
 #   python3 cloud-server.py [--port 8090]
 # בקרה לבדיקות: POST /qa/reset (חזרה לנתוני ההתחלה), POST /qa/throttle?count=N (N בקשות הבאות — 429).
@@ -173,6 +174,16 @@ class Handler(BaseHTTPRequestHandler):
         if body and self.command != "HEAD":
             self.wfile.write(body)
 
+    def send_file(self, data, content_type):
+        """תוכן קובץ, כמו בשירות האמיתי: `Range: bytes=N-` — 206 מהמקום; מעבר לסוף — 416."""
+        m = re.fullmatch(r"bytes=(\d+)-", self.headers.get("Range", ""))
+        if not m:
+            return self.send(200, data, content_type)
+        start = int(m.group(1))
+        if start >= len(data):
+            return self.send(416, b"", content_type, {"Content-Range": "bytes */%d" % len(data)})
+        return self.send(206, data[start:], content_type, {"Content-Range": "bytes %d-%d/%d" % (start, len(data) - 1, len(data))})
+
     def drive_error(self, code, reason, message=""):
         self.send(code, {"error": {"code": code, "message": message or reason, "errors": [{"reason": reason, "message": message or reason}]}})
 
@@ -228,7 +239,7 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith("/download/"):
             with lock:
                 n = state["graph"].get(path.rsplit("/", 1)[1])
-            return self.send(200, n["data"], "application/octet-stream") if n else self.graph_error(404, "itemNotFound")
+            return self.send_file(n["data"], "application/octet-stream") if n else self.graph_error(404, "itemNotFound")
         if path.startswith("/upload-session/"):
             return self.graph_session(path.rsplit("/", 1)[1], data)
         if path == "/consumers/oauth2/v2.0/token" and self.command == "POST":
@@ -285,7 +296,7 @@ class Handler(BaseHTTPRequestHandler):
                 if q.get("alt") == "media":
                     if n["folder"] or n["mime"].startswith("application/vnd.google-apps."):
                         return self.drive_error(403, "fileNotDownloadable")
-                    return self.send(200, n["data"], n["mime"])
+                    return self.send_file(n["data"], n["mime"])
                 return self.send(200, drive_json(n))
             if self.command == "DELETE":
                 del files[nid]

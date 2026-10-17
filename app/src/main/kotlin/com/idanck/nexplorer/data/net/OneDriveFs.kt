@@ -8,7 +8,6 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.File
-import java.io.FilterInputStream
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
@@ -57,17 +56,11 @@ class OneDriveFs(private val connection: NetConnection, auth: CloudAuth) : Remot
         return entryOf(path, o, NetPaths.name(path).ifEmpty { connection.label })
     }
 
-    /** `/content` מפנה (302) לכתובת הורדה זמנית; OkHttp עוקב, ולא שולח את האסימון לשרת אחר. */
-    override fun openRead(path: String): InputStream {
-        val response = http.execute { Request.Builder().url(item(path, "content")).get() }
-        if (response.code != 200) response.use { throw http.failure(it) }
-        val body = response.body ?: response.use { throw IOException("תשובה ריקה מ-$SERVICE") }
-        return object : FilterInputStream(body.byteStream()) {
-            override fun read(): Int = guard { super.read() }
-            override fun read(b: ByteArray, off: Int, len: Int): Int = guard { super.read(b, off, len) }
-            override fun close() = response.close()
-        }
-    }
+    /**
+     * `/content` מפנה (302) לכתובת הורדה זמנית; OkHttp עוקב (עם ה-Range), ולא שולח את האסימון לשרת אחר.
+     */
+    override fun openRead(path: String, offset: Long): InputStream =
+        http.download(offset) { Request.Builder().url(item(path, "content")).get() }
 
     /**
      * עד [SIMPLE_MAX] — PUT אחד. גדול — upload session בגושים של [CHUNK], עם [size] בכל גוש (Graph דורש את הגודל
@@ -157,12 +150,6 @@ class OneDriveFs(private val connection: NetConnection, auth: CloudAuth) : Remot
             isHidden = name.startsWith("."),
             kind = FileKinds.of(name, folder != null),
         )
-    }
-
-    private fun <T> guard(block: () -> T): T = try {
-        block()
-    } catch (e: IOException) {
-        throw http.network(e)
     }
 
     // ---------- העלאה ----------

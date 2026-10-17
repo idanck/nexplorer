@@ -11,7 +11,6 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.FilterInputStream
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
@@ -60,7 +59,7 @@ class DriveFs(private val connection: NetConnection, auth: CloudAuth) : RemoteFs
         return entryOf(path, item, NetPaths.name(path).ifEmpty { connection.label })
     }
 
-    override fun openRead(path: String): InputStream {
+    override fun openRead(path: String, offset: Long): InputStream {
         val item = resolve(path)?.item ?: throw CloudNotFound("הפריט לא נמצא ב-$SERVICE")
         if (item.isDirectory) throw IOException("\"${item.name}\" הוא תיקייה")
         val id = item.target ?: item.id
@@ -70,14 +69,7 @@ class DriveFs(private val connection: NetConnection, auth: CloudAuth) : RemoteFs
         } else {
             files(id).newBuilder().addQueryParameter("alt", "media").build()
         }
-        val response = http.execute { Request.Builder().url(url).get() }
-        if (response.code != 200) response.use { throw http.failure(it) }
-        val body = response.body ?: response.use { throw IOException("תשובה ריקה מ-$SERVICE") }
-        return object : FilterInputStream(body.byteStream()) {
-            override fun read(): Int = guard { super.read() }
-            override fun read(b: ByteArray, off: Int, len: Int): Int = guard { super.read(b, off, len) }
-            override fun close() = response.close()
-        }
+        return http.download(offset, ranged = export == null) { Request.Builder().url(url).get() }
     }
 
     /**
@@ -259,12 +251,6 @@ class DriveFs(private val connection: NetConnection, auth: CloudAuth) : RemoteFs
         kind = FileKinds.of(name, item.isDirectory),
         isLink = item.isShortcut,
     )
-
-    private fun <T> guard(block: () -> T): T = try {
-        block()
-    } catch (e: IOException) {
-        throw http.network(e)
-    }
 
     // ---------- העלאה ----------
 

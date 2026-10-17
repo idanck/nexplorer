@@ -6,7 +6,11 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import org.json.JSONObject
+import java.io.ByteArrayInputStream
+import java.io.EOFException
+import java.io.FilterInputStream
 import java.io.IOException
+import java.io.InputStream
 import java.net.ConnectException
 import java.net.NoRouteToHostException
 import java.net.SocketTimeoutException
@@ -94,6 +98,43 @@ internal class CloudHttp(
         } catch (e: org.json.JSONException) {
             throw IOException("תשובה לא מובנת מ-$service", e)
         }
+    }
+
+    /**
+     * הורדה מ-[offset] (דילוג בנגן, אפליקציה אחרת שקוראת מהשרת): `Range` — 206 מהמקום. [ranged] = false (ייצוא של
+     * Google Docs, שנוצר בכל בקשה) או שירות שמחזיר את הכול (200) — מדלגים בזרם; מעבר לסוף (416) — זרם ריק.
+     */
+    fun download(offset: Long, ranged: Boolean = true, build: () -> Request.Builder): InputStream {
+        val range = offset > 0 && ranged
+        val response = execute { build().apply { if (range) header("Range", "bytes=$offset-") } }
+        if (range && response.code == 416) {
+            response.close()
+            return ByteArrayInputStream(ByteArray(0))
+        }
+        if (response.code != 200 && !(range && response.code == 206)) response.use { throw failure(it) }
+        val body = response.body ?: response.use { throw IOException("תשובה ריקה מ-$service") }
+        if (offset > 0 && response.code == 200) {
+            try {
+                body.source().skip(offset)
+            } catch (e: EOFException) {
+                response.close()
+                return ByteArrayInputStream(ByteArray(0))
+            } catch (e: IOException) {
+                response.close()
+                throw network(e)
+            }
+        }
+        return object : FilterInputStream(body.byteStream()) {
+            override fun read(): Int = guard { super.read() }
+            override fun read(b: ByteArray, off: Int, len: Int): Int = guard { super.read(b, off, len) }
+            override fun close() = response.close()
+        }
+    }
+
+    private fun <T> guard(block: () -> T): T = try {
+        block()
+    } catch (e: IOException) {
+        throw network(e)
     }
 
     /** תשובה שאינה 2xx ← הודעה בעברית. 404 — [CloudNotFound]. */
