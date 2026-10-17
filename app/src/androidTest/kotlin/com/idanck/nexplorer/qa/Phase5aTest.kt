@@ -324,7 +324,7 @@ class Phase5aTest {
             Thread.sleep(250)
         }
         Log.i("Phase5aTest", "readme.txt opened in ${Qa.device.currentPackageName}")
-        Qa.screenshot(compose, "140-smb-open-without-copy", settle = false)
+        Qa.screenshot(compose, "151-smb-open-without-copy", settle = false)
         val copies = File(ApplicationProvider.getApplicationContext<Context>().cacheDir, RemoteFiles.CACHE_DIR).walk().filter { it.isFile }.map { it.name }.toList()
         assertFalse("הקובץ הורד למכשיר: $copies", "readme.txt" in copies)
         if (other) Qa.device.pressBack()

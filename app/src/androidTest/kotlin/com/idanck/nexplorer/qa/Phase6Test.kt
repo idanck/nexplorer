@@ -190,6 +190,9 @@ class Phase6Test {
         container.transfers.enqueue(TransferKind.Copy, listOf(big.absolutePath), base)
         compose.waitForDisk(120_000) { remoteStat("$base/cloud.bin")?.size == big.length() }
         assertArrayEquals(big.readBytes(), remoteBytes("$base/cloud.bin"))
+        // פתיחה ישירה מהשירות (5ד): מאמצע הקובץ (Range), וכמו אפליקציה אחרת (RemoteFilesProvider).
+        Qa.assertReadsFromOffsets(container.remote.fsFor(base), "$base/cloud.bin", big.readBytes())
+        Qa.assertProviderReads("$base/cloud.bin", big.readBytes())
 
         // אל המכשיר: העברה — המקור נמחק מהשירות רק אחרי שהעותק נשמר.
         container.transfers.enqueue(TransferKind.Move, listOf("$base/notes.txt"), File(root, "Empty").absolutePath)
