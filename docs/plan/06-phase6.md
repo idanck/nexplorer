@@ -55,7 +55,7 @@ Google Drive ו-OneDrive כמקומות במגירה, כמו ה-NAS וה-Pi. א�
 
 | שירות | איפה | מה |
 |---|---|---|
-| Google | console.cloud.google.com | פרויקט; Google Drive API; מסך הסכמה (External, ההרשאה `auth/drive`, ‏Publish — אחרת ההתחברות פגה אחרי 7 ימים); לקוח **Android**: ‏`com.idanck.nexplorer` + ה-SHA-1 של מפתח ה-release |
+| Google | console.cloud.google.com | פרויקט; Google Drive API; מסך הסכמה (External, ההרשאה `auth/drive`, ‏Publish — אחרת ההתחברות פגה אחרי 7 ימים); לקוח **Android**: ‏`com.idanck.nexplorer` + ה-SHA-1 של מפתח ה-release — ✓ 17/10/2026: פרויקט `nexplorer-idanck`, לקוח Android ‏"nexplorer release" (`72763883858-f6dkm37fmf2l9f8ldbhkiprh30keedcv`), ‏SHA-1 ‏`BE:B3:8F:20:24:C3:2D:CE:B8:E8:A1:A0:B2:04:1D:59:79:16:9A:03`, ‏In production (לא מאומת — בהתחברות מופיע מסך "לא אומתה"). דף הבית ומדיניות הפרטיות: `site/` |
 | Microsoft | entra.microsoft.com | רישום אפליקציה ל-"Personal Microsoft accounts only"; פלטפורמה Mobile and desktop עם `com.idanck.nexplorer://oauth`; הרשאות Graph ‏`Files.ReadWrite` ו-`offline_access`. ה-client ID נכנס ל-`gradle.properties` |
 
 ## בדיקות
