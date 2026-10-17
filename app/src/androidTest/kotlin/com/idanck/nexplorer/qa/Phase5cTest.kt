@@ -189,6 +189,8 @@ class Phase5cTest {
             fs.openWrite("$base/clip.mp4").use { it.write(clip) }
             Qa.assertReadsFromOffsets(fs, "$base/clip.mp4", clip)
         }
+        // אפליקציה אחרת ("פתיחה באמצעות") — דרך RemoteFilesProvider.
+        Qa.assertProviderReads("$base/clip.mp4", clip)
 
         container.transfers.enqueue(TransferKind.Move, listOf("$base/readme.txt"), File(root, "Empty").absolutePath)
         compose.waitForDisk(60_000) { File(root, "Empty/readme.txt").isFile && remoteStat("$base/readme.txt") == null }

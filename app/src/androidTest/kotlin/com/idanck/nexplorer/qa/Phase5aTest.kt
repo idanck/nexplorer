@@ -1,6 +1,7 @@
 package com.idanck.nexplorer.qa
 
 import android.content.Context
+import android.os.SystemClock
 import android.util.Log
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
@@ -30,6 +31,7 @@ import com.idanck.nexplorer.data.net.RemoteFiles
 import com.idanck.nexplorer.data.net.RemoteFs
 import com.idanck.nexplorer.data.net.SmbFs
 import com.idanck.nexplorer.data.transfer.TransferKind
+import com.idanck.nexplorer.qa.Qa.exists
 import com.idanck.nexplorer.qa.Qa.waitFor
 import com.idanck.nexplorer.qa.Qa.waitForDisk
 import com.idanck.nexplorer.qa.Qa.waitGone
@@ -301,5 +303,30 @@ class Phase5aTest {
         assertTrue("הסרטון הורד למכשיר: $copies", copies.isEmpty())
         Qa.device.pressBack()
         compose.waitFor(hasText("clip.mp4"), 10_000)
+    }
+
+    @Test
+    fun t06_otherAppsReadStraightFromTheServer() = logged("t06") {
+        val clip = Qa.asset("clip.mp4")
+        SmbFs(server, password.toCharArray()).use { fs -> fs.openWrite("$base/clip.mp4").use { it.write(clip) } }
+        saveConnection()
+        Qa.assertProviderReads("$base/clip.mp4", clip)
+
+        // הקשה על קובץ שאינו מדיה: אפליקציה אחרת (או "אין אפליקציה") — בלי חלון הורדה ובלי עותק.
+        launch(base)
+        compose.waitFor(hasText("readme.txt"), 30_000)
+        compose.onNodeWithText("readme.txt").performClick()
+        val deadline = SystemClock.uptimeMillis() + 15_000
+        var other = false
+        while (SystemClock.uptimeMillis() < deadline) {
+            other = Qa.device.currentPackageName != Qa.packageName
+            if (other || compose.exists(hasText("אין אפליקציה שפותחת קבצים מסוג זה"))) break
+            Thread.sleep(250)
+        }
+        Log.i("Phase5aTest", "readme.txt opened in ${Qa.device.currentPackageName}")
+        Qa.screenshot(compose, "140-smb-open-without-copy", settle = false)
+        val copies = File(ApplicationProvider.getApplicationContext<Context>().cacheDir, RemoteFiles.CACHE_DIR).walk().filter { it.isFile }.map { it.name }.toList()
+        assertFalse("הקובץ הורד למכשיר: $copies", "readme.txt" in copies)
+        if (other) Qa.device.pressBack()
     }
 }

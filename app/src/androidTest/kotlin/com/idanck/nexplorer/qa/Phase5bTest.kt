@@ -215,6 +215,8 @@ class Phase5bTest {
             fs.openWrite("$base/clip.mp4").use { it.write(clip) }
             Qa.assertReadsFromOffsets(fs, "$base/clip.mp4", clip)
         }
+        // אפליקציה אחרת ("פתיחה באמצעות") — דרך RemoteFilesProvider.
+        Qa.assertProviderReads("$base/clip.mp4", clip)
 
         // מהשרת למכשיר בהעברה.
         container.transfers.enqueue(TransferKind.Move, listOf("$base/readme.txt"), File(root, "Empty").absolutePath)
