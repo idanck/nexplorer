@@ -257,13 +257,13 @@ private fun ResultRow(
     ) {
         FileIconTile(entry)
         Spacer(Modifier.width(NexplorerDimens.RowGap))
+        // ברוחב הטבעי (לא fillMaxWidth): טקסט LTR נצמד לצד ההתחלה, ליד האריח.
         Column(Modifier.weight(1f)) {
             Text(
                 highlighted(entry.name, query.highlights(entry.name), highlight),
                 style = FileNameTextStyle,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth(),
             )
             Text(
                 hit.parentLabel.isolated() + if (entry.isDirectory) "" else " · ${SizeFormat.short(entry.size).isolated()}",
@@ -271,7 +271,6 @@ private fun ResultRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth(),
             )
         }
         IconButton(onClick = { onShowInFolder(entry) }) {

@@ -3,7 +3,6 @@ package com.idanck.nexplorer.ui.browser
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -44,7 +43,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
@@ -67,12 +65,14 @@ import com.idanck.nexplorer.ui.theme.NexplorerDimens
 import com.idanck.nexplorer.ui.theme.NexplorerShape
 import com.idanck.nexplorer.ui.theme.NexplorerTheme
 
-/** מה שהשורות צריכות כדי להגיב — אחיד לכל מצבי התצוגה. */
+/**
+ * מה שהשורות צריכות כדי להגיב — אחיד לכל מצבי התצוגה.
+ * מחווה אחת לכל פעולה: הקשה (בכל מקום בשורה, גם על האריח) פותחת, ובמצב בחירה מסמנת;
+ * לחיצה ארוכה מתחילה בחירה, ובמצב בחירה בוחרת טווח. אין "הקשה על האריח בוחרת" — זה בלבל בין סימון לפתיחה.
+ */
 class FileListActions(
     val onClick: (Entry) -> Unit,
     val onLongClick: (Entry) -> Unit,
-    /** הקשה על האריח בוחרת (F3), גם כשלא במצב בחירה. */
-    val onIconClick: (Entry) -> Unit,
     /** מיקום הגלילה האחרון בתיקייה (אינדקס, היסט) — כניסה לתיקייה מתחילה בראש, "למעלה" חוזר לשורה. */
     val scrollFor: (Location) -> Pair<Int, Int>,
     val onScrolled: (Location, Int, Int) -> Unit,
@@ -167,7 +167,7 @@ private fun FileRow(entry: Entry, state: BrowserState, actions: FileListActions,
     val selected = entry.path in state.selection
     val density = state.view.density
     val vertical = when (density) {
-        0 -> NexplorerDimens.Space3
+        0 -> NexplorerDimens.RowPaddingVertical + NexplorerDimens.Space1
         2 -> NexplorerDimens.Space1
         else -> NexplorerDimens.RowPaddingVertical
     }
@@ -188,13 +188,10 @@ private fun FileRow(entry: Entry, state: BrowserState, actions: FileListActions,
             .padding(horizontal = NexplorerDimens.Space4, vertical = vertical),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        FileIconTile(
-            entry,
-            modifier = Modifier
-                .clip(NexplorerShape.IconTile)
-                .clickable(onClickLabel = "בחר", role = Role.Checkbox) { actions.onIconClick(entry) },
-        )
+        FileIconTile(entry)
         Spacer(Modifier.width(NexplorerDimens.RowGap))
+        // השם ברוחב הטבעי שלו (לא fillMaxWidth): כך הוא נצמד לצד ההתחלה, ליד האריח ומעל השורה המשנית —
+        // ולא לקצה הרחוק של השורה כמו פסקת LTR שממלאת את הרוחב.
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NexplorerDimens.Space1 / 2)) {
             Text(
                 entry.name,
@@ -202,7 +199,6 @@ private fun FileRow(entry: Entry, state: BrowserState, actions: FileListActions,
                 color = if (drop.hovering) NexplorerTheme.colors.onAmberContainer else Color.Unspecified,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth(),
             )
             Text(
                 if (drop.hovering) AnnotatedString(DROP_HINT) else metaLine(entry, now, folderSize = state.folderSizeOf(entry)),
@@ -234,21 +230,11 @@ private fun CompactRow(entry: Entry, state: BrowserState, actions: FileListActio
             .padding(horizontal = NexplorerDimens.Space4, vertical = NexplorerDimens.Space1),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        FileIconTile(
-            entry,
-            size = NexplorerDimens.CompactIconTile,
-            modifier = Modifier
-                .clip(NexplorerShape.IconTile)
-                .clickable(onClickLabel = "בחר", role = Role.Checkbox) { actions.onIconClick(entry) },
-        )
+        FileIconTile(entry, size = NexplorerDimens.CompactIconTile)
         Spacer(Modifier.width(NexplorerDimens.Space3))
-        Text(
-            entry.name,
-            style = FileNameTextStyle,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
+        Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+            Text(entry.name, style = FileNameTextStyle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
         Spacer(Modifier.width(NexplorerDimens.Space2))
         if (drop.hovering) {
             Text(DROP_HINT, style = MaterialTheme.typography.labelMedium, color = NexplorerTheme.colors.onAmberContainer, maxLines = 1)
@@ -334,21 +320,9 @@ private fun GridTile(entry: Entry, state: BrowserState, actions: FileListActions
     ) {
         Box {
             if (entry.kind == FileKind.Image || entry.kind == FileKind.Video) {
-                FileThumbnail(
-                    entry,
-                    Modifier
-                        .size(NexplorerDimens.GridIconTile)
-                        .clip(NexplorerShape.IconTile)
-                        .clickable(onClickLabel = "בחר", role = Role.Checkbox) { actions.onIconClick(entry) },
-                )
+                FileThumbnail(entry, Modifier.size(NexplorerDimens.GridIconTile).clip(NexplorerShape.IconTile))
             } else {
-                FileIconTile(
-                    entry,
-                    size = NexplorerDimens.GridIconTile,
-                    modifier = Modifier
-                        .clip(NexplorerShape.IconTile)
-                        .clickable(onClickLabel = "בחר", role = Role.Checkbox) { actions.onIconClick(entry) },
-                )
+                FileIconTile(entry, size = NexplorerDimens.GridIconTile)
             }
             if (state.inSelection) {
                 SelectionBox(selected, Modifier.align(Alignment.TopEnd).padding(NexplorerDimens.Space1 / 2))
@@ -399,13 +373,7 @@ private fun GalleryTile(entry: Entry, state: BrowserState, actions: FileListActi
             )
         }
         if (state.inSelection) {
-            SelectionBox(
-                selected,
-                Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(NexplorerDimens.Space2)
-                    .clickable(onClickLabel = "בחר", role = Role.Checkbox) { actions.onIconClick(entry) },
-            )
+            SelectionBox(selected, Modifier.align(Alignment.TopEnd).padding(NexplorerDimens.Space2))
         }
     }
 }
