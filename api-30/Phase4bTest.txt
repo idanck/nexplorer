@@ -1,0 +1,8 @@
+
+com.idanck.nexplorer.qa.Phase4bTest:....
+
+Time: 63.937
+
+OK (4 tests)
+
+
