@@ -9,6 +9,7 @@ import com.hierynomus.mssmb2.SMB2CreateDisposition
 import com.hierynomus.mssmb2.SMB2ShareAccess
 import com.hierynomus.mssmb2.SMBApiException
 import com.hierynomus.protocol.commons.EnumWithValue
+import com.hierynomus.protocol.commons.socket.ProxySocketFactory
 import com.hierynomus.protocol.transport.TransportException
 import com.hierynomus.smbj.SMBClient
 import com.hierynomus.smbj.SmbConfig
@@ -42,8 +43,10 @@ class SmbFs(private val connection: NetConnection, password: CharArray?) : Remot
     private val password: CharArray = password?.copyOf() ?: CharArray(0)
     private val client = SMBClient(
         SmbConfig.builder()
-            // גם זמן ההתחברות: שרת שלא עונה לא תוקע את הרשימה דקה.
-            .withSoTimeout(SOCKET_TIMEOUT_S, TimeUnit.SECONDS)
+            // שרת שלא עונה: ההתחברות נכשלת אחרי CONNECT_TIMEOUT_MS, וכל בקשה — אחרי REQUEST_TIMEOUT_S.
+            // בלי withSoTimeout: ב-smbj הוא זמן ההמתנה של החוט שקורא מה-socket גם כשאין בקשה, וחיבור
+            // שעמד כמה שניות מת בשקט — הבקשה הבאה מחכה דקה לתשובה שאיש לא יקרא.
+            .withSocketFactory(ProxySocketFactory(CONNECT_TIMEOUT_MS))
             .withTimeout(REQUEST_TIMEOUT_S, TimeUnit.SECONDS)
             .build(),
     )
@@ -167,7 +170,7 @@ class SmbFs(private val connection: NetConnection, password: CharArray?) : Remot
     }
 
     override fun close() {
-        synchronized(lock) { reset() }
+        synchronized(lock) { reset(graceful = true) }
         password.fill('\u0000')
         runCatching { client.close() }
     }
@@ -216,12 +219,18 @@ class SmbFs(private val connection: NetConnection, password: CharArray?) : Remot
         share
     }
 
-    private fun reset() {
+    /**
+     * [graceful] — סוגרים את השיתופים ומתנתקים מהשרת, ורק אז את ה-socket. חיבור שמת — לא: כל בקשה בו
+     * מחכה REQUEST_TIMEOUT_S לתשובה שלא תגיע, ובזמן הזה [lock] תפוס.
+     */
+    private fun reset(graceful: Boolean = false) {
         generation++
-        shares.values.forEach { runCatching { it.close() } }
-        shares.clear()
-        runCatching { session?.close() }
+        if (graceful) {
+            shares.values.forEach { runCatching { it.close() } }
+            runCatching { session?.close() }
+        }
         runCatching { conn?.close(true) }
+        shares.clear()
         session = null
         conn = null
     }
@@ -293,7 +302,7 @@ class SmbFs(private val connection: NetConnection, password: CharArray?) : Remot
     class NotFound(message: String) : IOException(message)
 
     private companion object {
-        const val SOCKET_TIMEOUT_S = 15L
+        const val CONNECT_TIMEOUT_MS = 15_000
         const val REQUEST_TIMEOUT_S = 60L
         const val STYPE_MASK = 0x0FFFFFFFL
         const val STYPE_DISKTREE = 0L

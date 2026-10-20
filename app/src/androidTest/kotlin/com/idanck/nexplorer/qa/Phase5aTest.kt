@@ -329,4 +329,17 @@ class Phase5aTest {
         assertFalse("הקובץ הורד למכשיר: $copies", "readme.txt" in copies)
         if (other) Qa.device.pressBack()
     }
+
+    @Test
+    fun t07_idleConnectionStillListsAtOnce() = logged("t07") {
+        // 20 שניות בלי תעבורה (מעבר ל-soTimeout של 15 שהיה): חיבור שמת בשקט היה מחכה דקה לרשימה, ועוד דקה לאיפוס.
+        SmbFs(server, password.toCharArray()).use { fs ->
+            assertTrue(fs.list(base).any { it.name == "readme.txt" })
+            Thread.sleep(20_000)
+            val started = SystemClock.uptimeMillis()
+            assertTrue(fs.list(base).any { it.name == "readme.txt" })
+            val took = SystemClock.uptimeMillis() - started
+            assertTrue("רשימה אחרי 20 שניות בלי תעבורה: $took ms", took < 5_000)
+        }
+    }
 }
