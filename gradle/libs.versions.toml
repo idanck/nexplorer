@@ -24,7 +24,7 @@ dcerpc = "0.12.13"
 sshj = "0.41.2"
 bcpkix = "1.86"
 okhttp = "5.5.0"
-playServicesAuth = "21.5.0"
+playServicesAuth = "22.0.0"
 androidxBrowser = "1.8.0"
 
 [libraries]
