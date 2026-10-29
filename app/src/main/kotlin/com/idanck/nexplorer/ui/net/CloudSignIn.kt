@@ -18,9 +18,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Cloud
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
@@ -162,7 +159,7 @@ fun CloudServices(selected: NetProtocol, enabled: Boolean, onSelect: (NetProtoco
                     .selectable(selected = chosen, enabled = enabled || chosen, role = Role.RadioButton) { onSelect(protocol) }
                     .padding(horizontal = NexplorerDimens.ConnectFieldPadding),
             ) {
-                Icon(Icons.Outlined.Cloud, contentDescription = null, tint = if (chosen) scheme.onPrimaryContainer else scheme.onSurfaceVariant, modifier = Modifier.size(NexplorerDimens.ConnectHintIcon))
+                ConnectionIcon(protocol, size = NexplorerDimens.ConnectHintIcon, tint = if (chosen) scheme.onPrimaryContainer else scheme.onSurfaceVariant)
                 Column(Modifier.weight(1f)) {
                     Text(protocol.label, style = MaterialTheme.typography.bodyLarge, color = if (chosen) scheme.onPrimaryContainer else scheme.onSurface)
                     Text(account, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)

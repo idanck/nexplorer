@@ -71,6 +71,55 @@ private val DarkColors = darkColorScheme(
     onError = DarkOnError,
 )
 
+/** מיכל וסמל של אריח סוג קובץ. */
+@Immutable
+data class TypeTone(val container: Color, val content: Color)
+
+/** אריחי סוגי הקבצים (1.10). הסדר כמו ב-`FileType`; Ebook באותו גוון של Doc. */
+@Immutable
+data class FileTypePalette(
+    val folder: TypeTone,
+    val image: TypeTone,
+    val video: TypeTone,
+    val audio: TypeTone,
+    val pdf: TypeTone,
+    val doc: TypeTone,
+    val sheet: TypeTone,
+    val slides: TypeTone,
+    val archive: TypeTone,
+    val apk: TypeTone,
+    /** טקסט, קוד, מוצפן ואחר — מבחינים ביניהם לפי הסמל. */
+    val neutral: TypeTone,
+)
+
+private val LightFileTypes = FileTypePalette(
+    folder = TypeTone(LightPrimaryContainer, LightOnPrimaryContainer),
+    image = TypeTone(LightImageTile, LightOnImageTile),
+    video = TypeTone(LightVideoTile, LightOnVideoTile),
+    audio = TypeTone(LightAudioTile, LightOnAudioTile),
+    pdf = TypeTone(LightPdfTile, LightOnPdfTile),
+    doc = TypeTone(LightDocTile, LightOnDocTile),
+    sheet = TypeTone(LightSheetTile, LightOnSheetTile),
+    slides = TypeTone(LightSlidesTile, LightOnSlidesTile),
+    archive = TypeTone(LightArchiveTile, LightOnArchiveTile),
+    apk = TypeTone(LightApkTile, LightOnApkTile),
+    neutral = TypeTone(LightSurfaceVariant, LightOnSurfaceVariant),
+)
+
+private val DarkFileTypes = FileTypePalette(
+    folder = TypeTone(DarkPrimaryContainer, DarkOnPrimaryContainer),
+    image = TypeTone(DarkImageTile, DarkOnImageTile),
+    video = TypeTone(DarkVideoTile, DarkOnVideoTile),
+    audio = TypeTone(DarkAudioTile, DarkOnAudioTile),
+    pdf = TypeTone(DarkPdfTile, DarkOnPdfTile),
+    doc = TypeTone(DarkDocTile, DarkOnDocTile),
+    sheet = TypeTone(DarkSheetTile, DarkOnSheetTile),
+    slides = TypeTone(DarkSlidesTile, DarkOnSlidesTile),
+    archive = TypeTone(DarkArchiveTile, DarkOnArchiveTile),
+    apk = TypeTone(DarkApkTile, DarkOnApkTile),
+    neutral = TypeTone(DarkSurfaceVariant, DarkOnSurfaceVariant),
+)
+
 /**
  * צבעים שאין להם מקום ב-ColorScheme של Material 3.
  * השימוש: `NexplorerTheme.colors.amber`.
@@ -115,6 +164,8 @@ data class NexplorerColors(
     val chartDocuments: Color,
     val chartAudio: Color,
     val chartOther: Color,
+    /** אריחי סוגי הקבצים ברשימה, ברשת ובחיפוש. */
+    val fileTypes: FileTypePalette,
 )
 
 private val LightExtended = NexplorerColors(
@@ -148,6 +199,7 @@ private val LightExtended = NexplorerColors(
     chartDocuments = LightChartDocuments,
     chartAudio = LightChartAudio,
     chartOther = LightChartOther,
+    fileTypes = LightFileTypes,
 )
 
 private val DarkExtended = LightExtended.copy(
@@ -164,6 +216,7 @@ private val DarkExtended = LightExtended.copy(
     chartDocuments = DarkChartDocuments,
     chartAudio = DarkChartAudio,
     chartOther = DarkChartOther,
+    fileTypes = DarkFileTypes,
 )
 
 private val LocalNexplorerColors = staticCompositionLocalOf { LightExtended }

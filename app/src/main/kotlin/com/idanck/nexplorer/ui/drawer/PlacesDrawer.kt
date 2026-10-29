@@ -73,7 +73,8 @@ import com.idanck.nexplorer.ui.theme.FileNameTextStyle
 import com.idanck.nexplorer.ui.theme.MonoTextStyle
 import com.idanck.nexplorer.ui.theme.NexplorerDimens
 import com.idanck.nexplorer.ui.theme.NexplorerShape
-import com.idanck.nexplorer.ui.net.icon
+import com.idanck.nexplorer.ui.net.ConnectionIcon
+import com.idanck.nexplorer.ui.net.hasOwnIcon
 
 class DrawerModel(
     val volumes: List<StorageVolumeInfo>,
@@ -341,15 +342,23 @@ private fun ConnectionRow(connection: NetConnection, space: RemoteSpace?, active
                 Modifier
                     .size(NexplorerDimens.PlaceTile)
                     .clip(NexplorerShape.PlaceTile)
-                    .background(if (active) scheme.primary else scheme.surfaceVariant),
+                    // אייקון בצבעים משלו (Google Drive) — על משטח בהיר גם כשהחיבור פעיל.
+                    .background(
+                        when {
+                            connection.protocol.hasOwnIcon -> if (active) scheme.surface else scheme.surfaceVariant
+                            active -> scheme.primary
+                            else -> scheme.surfaceVariant
+                        },
+                    ),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(connection.protocol.icon, contentDescription = null, tint = if (active) scheme.onPrimary else scheme.onSurface)
+                ConnectionIcon(connection.protocol, tint = if (active) scheme.onPrimary else scheme.onSurface)
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NexplorerDimens.Space1)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        "${connection.label} · ${connection.protocol.label}",
+                        // ענן: "Google Drive", והחשבון בשורה שמתחת; בשאר: "NAS · SMB".
+                        if (connection.protocol.cloud) connection.title else "${connection.label} · ${connection.protocol.label}",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium),
                         color = accent,
                         maxLines = 1,

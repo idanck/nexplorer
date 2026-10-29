@@ -40,6 +40,15 @@ data class NetConnection(
 ) {
     val label: String get() = name.ifBlank { if (protocol.cloud) user.ifBlank { protocol.label } else host }
 
+    /**
+     * הכותרת בראש המסך, בפירור הראשון, במגירה ובמסילה (1.10): בענן — שם השירות ("Google Drive") או השם שנבחר,
+     * והחשבון בשורה קטנה מתחת ([account]); בשאר — [label].
+     */
+    val title: String get() = if (protocol.cloud) name.ifBlank { protocol.label } else label
+
+    /** החשבון של חיבור ענן ("alex@example.com"); null בשאר, או כשעוד לא ידוע. */
+    val account: String? get() = user.takeIf { protocol.cloud && it.isNotBlank() }
+
     /** WebDAV ב-http — 80; אחרת של הפרוטוקול. */
     val defaultPort: Int get() = if (protocol == NetProtocol.WebDav && plainHttp) 80 else protocol.defaultPort
 

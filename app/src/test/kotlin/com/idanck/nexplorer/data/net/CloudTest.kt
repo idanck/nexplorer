@@ -62,6 +62,11 @@ class CloudTest {
         assertEquals("gdrive://c10ud0000001", drive.root)
         assertEquals("gdrive://alex@example.com/Photos/a.jpg", drive.displayUrl("${drive.root}/Photos/a.jpg"))
         assertEquals("Work", drive.copy(name = "Work").label)
+        // 1.10: בכותרת ובמגירה — שם השירות (או השם שנבחר), והחשבון בנפרד.
+        assertEquals("Google Drive", drive.title)
+        assertEquals("alex@example.com", drive.account)
+        assertEquals("Work", drive.copy(name = "Work").title)
+        assertEquals(null, drive.copy(user = "").account)
         // לפני ההתחברות אין חשבון.
         assertEquals("OneDrive", drive.copy(protocol = NetProtocol.OneDrive, user = "").label)
         assertEquals(listOf(drive), NetConnection.decode(NetConnection.encode(listOf(drive))))

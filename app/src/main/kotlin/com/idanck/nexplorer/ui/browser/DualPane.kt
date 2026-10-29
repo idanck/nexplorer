@@ -57,6 +57,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.idanck.nexplorer.core.Entry
 import com.idanck.nexplorer.core.NetPaths
+import com.idanck.nexplorer.core.NetProtocol
 import com.idanck.nexplorer.data.files.StorageVolumeInfo
 import com.idanck.nexplorer.data.net.NetConnection
 import com.idanck.nexplorer.data.net.RemoteFiles
@@ -72,6 +73,8 @@ import com.idanck.nexplorer.ui.transfer.TransfersSheet
 import com.idanck.nexplorer.ui.update.UpdateActions
 import com.idanck.nexplorer.ui.update.UpdateBanner
 import com.idanck.nexplorer.update.UpdateState
+import com.idanck.nexplorer.ui.net.ConnectionIcon
+import com.idanck.nexplorer.ui.net.hasOwnIcon
 import com.idanck.nexplorer.ui.net.icon
 import kotlinx.coroutines.launch
 
@@ -269,7 +272,7 @@ private fun PaneRail(
             RailVolume(volume, selected = volume.path == activeVolumePath, onClick = { onVolume(volume) })
         }
         connections.forEach { connection ->
-            RailPlace(connection.protocol.icon, connection.label, selected = connection.id == activeConnectionId, onClick = { onConnection(connection) })
+            RailPlace(connection.protocol.icon, connection.title, selected = connection.id == activeConnectionId, onClick = { onConnection(connection) }, protocol = connection.protocol)
         }
         Spacer(Modifier.weight(1f))
         RailTransfers(count = transfers, onClick = onTransfers)
@@ -309,7 +312,7 @@ private fun RailVolume(volume: StorageVolumeInfo, selected: Boolean, onClick: ()
 }
 
 @Composable
-private fun RailPlace(icon: ImageVector, label: String, selected: Boolean, onClick: () -> Unit) {
+private fun RailPlace(icon: ImageVector, label: String, selected: Boolean, onClick: () -> Unit, protocol: NetProtocol? = null) {
     val scheme = MaterialTheme.colorScheme
     Surface(
         onClick = onClick,
@@ -324,7 +327,9 @@ private fun RailPlace(icon: ImageVector, label: String, selected: Boolean, onCli
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(NexplorerDimens.Space1 - NexplorerDimens.Space1 / 4, Alignment.CenterVertically),
         ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(NexplorerDimens.RailItemIcon))
+            // Google Drive — האייקון בצבעים משלו; בשאר — הסמל בצבע התוכן.
+            if (protocol?.hasOwnIcon == true) ConnectionIcon(protocol, size = NexplorerDimens.RailItemIcon)
+            else Icon(icon, contentDescription = null, modifier = Modifier.size(NexplorerDimens.RailItemIcon))
             Text(
                 label,
                 style = MaterialTheme.typography.labelSmall.let { if (selected) it.copy(fontWeight = FontWeight.SemiBold) else it },

@@ -121,7 +121,7 @@ data class BrowserState(
         get() = when (val loc = location) {
             is Location.Media -> loc.collection.label
             is Location.Folder -> when {
-                isRemote && isAtRoot -> connection?.label ?: NetPaths.name(loc.path)
+                isRemote && isAtRoot -> connection?.title ?: NetPaths.name(loc.path)
                 isRemote -> NetPaths.name(loc.path)
                 isAtRoot -> volume?.label ?: "/"
                 else -> File(loc.path).name
@@ -129,6 +129,9 @@ data class BrowserState(
         }
 
     val titleIsLtr: Boolean get() = location is Location.Folder && !isAtRoot
+
+    /** חיבור ענן שבתוכו נמצאים: הכותרת מקבלת את אייקון השירות ושורת החשבון. */
+    val cloudConnection: NetConnection? get() = connection?.takeIf { isRemote && it.protocol.cloud }
 
     val crumbs: List<Crumb>
         get() = when (val loc = location) {
@@ -155,7 +158,7 @@ data class BrowserState(
             NetPaths.protocolOf(path)?.let { NetPaths.root(it, id) }
         } ?: return emptyList()
         return buildList {
-            add(Crumb(c?.label ?: NetPaths.name(root), root, isLtr = false))
+            add(Crumb(c?.title ?: NetPaths.name(root), root, isLtr = false))
             var acc = root
             path.removePrefix(root).trim('/').split('/').filter { it.isNotEmpty() }.forEach { segment ->
                 acc = NetPaths.child(acc, segment)
