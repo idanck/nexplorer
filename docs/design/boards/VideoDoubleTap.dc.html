@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>nexplorer — נגן וידאו: הקשה כפולה</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#7FB0FF}a:hover{color:#D5E3FE}
+</style>
+</helmet>
+<div style="width: 844px; height: 390px; box-sizing: border-box; direction: rtl; font-family: 'Noto Sans Hebrew', system-ui, sans-serif; color: #FFFFFF; background: #000000; position: relative; overflow: hidden">
+  <svg aria-hidden="true" width="844" height="390" viewBox="0 0 844 390" style="position: absolute; inset: 0">
+    <rect width="844" height="390" fill="#7FA7C9"/>
+    <rect y="0" width="844" height="120" fill="#A9C8E2"/>
+    <circle cx="640" cy="92" r="46" fill="#F4E3B5"/>
+    <path d="M0 250 C 140 170, 260 210, 380 190 S 620 140, 844 210 V 390 H 0 Z" fill="#5E7F5A"/>
+    <path d="M0 300 C 180 250, 330 290, 470 270 S 700 240, 844 280 V 390 H 0 Z" fill="#3F5E3E"/>
+    <path d="M0 350 C 220 320, 420 345, 844 330 V 390 H 0 Z" fill="#2C4330"/>
+  </svg>
+  <!-- הקשה כפולה בכל מקום במסך = קדימה 10 שנ׳. הבקרים מוסתרים. -->
+  <div aria-hidden="true" style="position: absolute; left: 50%; top: 50%; width: 220px; height: 220px; margin: -110px 0 0 -110px; border-radius: 50%; background: rgba(255,255,255,0.12)"></div>
+  <div aria-hidden="true" style="position: absolute; left: 50%; top: 50%; width: 140px; height: 140px; margin: -70px 0 0 -70px; border-radius: 50%; background: rgba(255,255,255,0.16)"></div>
+  <div role="status" style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 6px; color: #FFFFFF; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.65)) drop-shadow(0 0 6px rgba(0,0,0,0.35));">
+    <div style="display: flex; gap: 0; margin-right: -6px; direction: ltr">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 5l9 7-9 7z" fill="currentColor"/></svg><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 5l9 7-9 7z" fill="currentColor"/></svg><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="0" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 5l9 7-9 7z" fill="currentColor"/></svg>
+    </div>
+    <span style="font-size: 18px; font-weight: 700; text-shadow: 0 1px 2px rgba(0,0,0,0.7), 0 0 8px rgba(0,0,0,0.35);"><span style="direction: ltr; unicode-bidi: isolate">+10</span> שנ׳</span>
+  </div>
+  <!-- כשהבקרים מוסתרים: פס התקדמות דק בקצה התחתון בלבד -->
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: rgba(255,255,255,0.3); direction: ltr"><div style="width: 27.6%; height: 2px; background: #7FB0FF"></div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":844,"height":390}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

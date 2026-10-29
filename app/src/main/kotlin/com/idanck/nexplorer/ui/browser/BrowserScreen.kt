@@ -102,6 +102,7 @@ import com.idanck.nexplorer.ui.update.UpdateActions
 import com.idanck.nexplorer.ui.update.UpdateBanner
 import com.idanck.nexplorer.update.UpdateState
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import com.idanck.nexplorer.ui.keys.KeyBus
 import com.idanck.nexplorer.ui.keys.KeyCommand
@@ -259,13 +260,14 @@ fun BrowserScreen(
             decoration = dragDecoration,
         )
     }
-    val listActions = remember(vm, drag) {
+    val listActions = remember(vm, drag, pane == null) {
         FileListActions(
             onClick = vm::open,
             onLongClick = { vm.longPress(it.path) },
             scrollFor = vm::scrollFor,
             onScrolled = vm::saveScroll,
             drag = drag,
+            grouped = pane == null,
         )
     }
 
@@ -414,9 +416,10 @@ fun BrowserScreen(
                     if (state.filter != null) {
                         FilterBar(state.filter.orEmpty(), onChange = vm::setFilter, onClose = { vm.setFilter(null) })
                     }
+                    // חלון יחיד (1.9): הרשימה מקובצת לכרטיסים על הרקע — בלי משטח לבן מתחתיה. בשני חלונות: משטח החלון.
                     Surface(
                         shape = if (pane == null) NexplorerShape.ContentSheet else RectangleShape,
-                        color = MaterialTheme.colorScheme.surface,
+                        color = if (pane == null) Color.Transparent else MaterialTheme.colorScheme.surface,
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth()

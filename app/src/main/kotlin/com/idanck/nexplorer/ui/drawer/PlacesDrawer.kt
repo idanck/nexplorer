@@ -2,7 +2,6 @@ package com.idanck.nexplorer.ui.drawer
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -67,6 +66,9 @@ import com.idanck.nexplorer.data.net.NetConnection
 import com.idanck.nexplorer.data.net.RemoteSpace
 import com.idanck.nexplorer.ui.browser.AmberBadge
 import com.idanck.nexplorer.ui.components.DrawerBanner
+import androidx.compose.foundation.layout.heightIn
+import com.idanck.nexplorer.ui.components.segment
+import com.idanck.nexplorer.ui.components.SegmentedGroup
 import com.idanck.nexplorer.ui.theme.FileNameTextStyle
 import com.idanck.nexplorer.ui.theme.MonoTextStyle
 import com.idanck.nexplorer.ui.theme.NexplorerDimens
@@ -118,16 +120,19 @@ fun PlacesDrawer(model: DrawerModel) {
             verticalArrangement = Arrangement.spacedBy(NexplorerDimens.Space1),
         ) {
             DrawerSection("מקומות")
-            model.volumes.forEach { volume -> PlaceRow(volume, active = volume.path == model.activeVolumePath) { model.onVolume(volume) } }
-            model.connections.forEach { connection ->
-                ConnectionRow(
-                    connection = connection,
-                    space = model.spaces[connection.id],
-                    active = connection.id == model.activeConnectionId,
-                    onClick = { model.onConnection(connection) },
-                    onEdit = { model.onEditConnection(connection) },
-                    onRemove = { model.onRemoveConnection(connection) },
-                )
+            // המקומות כרטיסים צמודים (1.9): הפעיל ב-primaryContainer, השאר במשטח.
+            SegmentedGroup {
+                model.volumes.forEach { volume -> PlaceRow(volume, active = volume.path == model.activeVolumePath) { model.onVolume(volume) } }
+                model.connections.forEach { connection ->
+                    ConnectionRow(
+                        connection = connection,
+                        space = model.spaces[connection.id],
+                        active = connection.id == model.activeConnectionId,
+                        onClick = { model.onConnection(connection) },
+                        onEdit = { model.onEditConnection(connection) },
+                        onRemove = { model.onRemoveConnection(connection) },
+                    )
+                }
             }
             AddPlaceRow(model.onAddPlace)
 
@@ -165,11 +170,13 @@ fun PlacesDrawer(model: DrawerModel) {
             }
 
             DrawerSection("כלים")
-            ToolRow("העברות", Icons.Outlined.SwapVert, model.onTransfers) {
-                if (model.activeTransfers > 0) AmberBadge("${model.activeTransfers} פעילות")
+            SegmentedGroup {
+                ToolRow("העברות", Icons.Outlined.SwapVert, model.onTransfers) {
+                    if (model.activeTransfers > 0) AmberBadge("${model.activeTransfers} פעילות")
+                }
+                ToolRow("מנתח אחסון", Icons.Outlined.DonutLarge, model.onAnalyzer)
+                ToolRow("הגדרות", Icons.Outlined.Settings, model.onSettings)
             }
-            ToolRow("מנתח אחסון", Icons.Outlined.DonutLarge, model.onAnalyzer)
-            ToolRow("הגדרות", Icons.Outlined.Settings, model.onSettings)
         }
     }
 }
@@ -240,9 +247,7 @@ private fun PlaceRow(volume: StorageVolumeInfo, active: Boolean, onClick: () -> 
     val accent = if (active) scheme.onPrimaryContainer else scheme.onSurface
     Row(
         modifier = Modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-            .background(if (active) scheme.primaryContainer else androidx.compose.ui.graphics.Color.Transparent)
+            .segment(if (active) scheme.primaryContainer else scheme.surface)
             .clickable(onClick = onClick)
             .padding(NexplorerDimens.Space2 + NexplorerDimens.Space1 / 2),
         verticalAlignment = Alignment.CenterVertically,
@@ -326,9 +331,7 @@ private fun ConnectionRow(connection: NetConnection, space: RemoteSpace?, active
     Box {
         Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .clip(MaterialTheme.shapes.medium)
-                .background(if (active) scheme.primaryContainer else androidx.compose.ui.graphics.Color.Transparent)
+                .segment(if (active) scheme.primaryContainer else scheme.surface)
                 .combinedClickable(onClick = onClick, onLongClick = { menu = true })
                 .padding(NexplorerDimens.Space2 + NexplorerDimens.Space1 / 2),
             verticalAlignment = Alignment.CenterVertically,
@@ -393,24 +396,21 @@ private fun ConnectionRow(connection: NetConnection, space: RemoteSpace?, active
 @Composable
 private fun AddPlaceRow(onClick: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
+    // כפתור טונאלי ברוחב המגירה, מתחת לקבוצת המקומות (1.9).
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
+            .padding(top = NexplorerDimens.Space1)
+            .heightIn(min = NexplorerDimens.TouchTarget)
+            .clip(NexplorerShape.Pill)
+            .background(scheme.surfaceVariant)
             .clickable(onClick = onClick)
-            .padding(horizontal = NexplorerDimens.Space2 + NexplorerDimens.Space1 / 2, vertical = NexplorerDimens.Space2),
+            .padding(horizontal = NexplorerDimens.Space4, vertical = NexplorerDimens.Space2),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(NexplorerDimens.Space3),
+        horizontalArrangement = Arrangement.spacedBy(NexplorerDimens.Space2, Alignment.CenterHorizontally),
     ) {
-        Box(
-            Modifier
-                .size(NexplorerDimens.PlaceTile)
-                .border(NexplorerDimens.Space1 / 2, scheme.primary, NexplorerShape.PlaceTile),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(Icons.Outlined.Add, contentDescription = null, tint = scheme.primary)
-        }
-        Text("הוסף מקום", style = MaterialTheme.typography.labelLarge, color = scheme.primary, modifier = Modifier.weight(1f))
+        Icon(Icons.Outlined.Add, contentDescription = null, tint = scheme.onPrimaryContainer, modifier = Modifier.size(NexplorerDimens.Space5 - NexplorerDimens.Space1))
+        Text("הוסף מקום", style = MaterialTheme.typography.labelLarge, color = scheme.onPrimaryContainer)
     }
 }
 
@@ -439,7 +439,6 @@ private fun Favorites(model: DrawerModel) {
                 modifier = Modifier
                     .clip(NexplorerShape.Pill)
                     .background(MaterialTheme.colorScheme.surface)
-                    .border(NexplorerDimens.Space1 / 4, MaterialTheme.colorScheme.outline, NexplorerShape.Pill)
                     .combinedClickable(onClick = { model.onFavorite(path) }, onLongClick = { model.onRemoveFavorite(path) })
                     .padding(horizontal = NexplorerDimens.Space3, vertical = NexplorerDimens.Space2),
             )
@@ -452,7 +451,7 @@ private fun CollectionTile(label: String, icon: ImageVector, active: Boolean, mo
     val scheme = MaterialTheme.colorScheme
     Column(
         modifier = modifier
-            .clip(NexplorerShape.IconTile)
+            .clip(NexplorerShape.FindingCard)
             .background(if (active) scheme.primaryContainer else scheme.surface)
             .clickable(onClick = onClick)
             .padding(vertical = NexplorerDimens.Space2 + NexplorerDimens.Space1 / 2, horizontal = NexplorerDimens.Space1),
@@ -468,10 +467,9 @@ private fun CollectionTile(label: String, icon: ImageVector, active: Boolean, mo
 private fun ToolRow(label: String, icon: ImageVector, onClick: () -> Unit, trailing: @Composable () -> Unit = {}) {
     Row(
         modifier = Modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
+            .segment(MaterialTheme.colorScheme.surface)
             .clickable(onClick = onClick)
-            .padding(horizontal = NexplorerDimens.Space2 + NexplorerDimens.Space1 / 2, vertical = NexplorerDimens.Space3),
+            .padding(horizontal = NexplorerDimens.Space3, vertical = NexplorerDimens.Space3),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)

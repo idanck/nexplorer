@@ -14,118 +14,83 @@ body{margin:0}
 a{color:#2B6FEE}a:hover{color:#1E4DA8}
 </style>
 </helmet>
-<div style="width: 390px; height: 844px; box-sizing: border-box; direction: rtl; font-family: 'Noto Sans Hebrew', system-ui, sans-serif; color: #16202A; background: #F3F5F7; display: flex; flex-direction: column; overflow: hidden; position: relative">
-
-  <!-- סרגל עליון -->
-  <div style="display: flex; align-items: center; gap: 8px; padding: 14px 12px 8px 12px">
-    <button aria-label="פתח מגירת מקומות" style="width: 44px; height: 44px; border: 0; background: transparent; border-radius: 22px; display: flex; align-items: center; justify-content: center; color: #2B6FEE">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
-    </button>
-    <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
-      <div style="font-size: 20px; font-weight: 600; line-height: 24px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">זיכרון פנימי</div>
-      <div style="font-size: 13px; color: #52606D; line-height: 16px">17 תיקיות · 6 קבצים · 89.4 GB פנויים</div>
-    </div>
-    <button aria-label="חיפוש" style="width: 44px; height: 44px; border: 0; background: transparent; border-radius: 22px; display: flex; align-items: center; justify-content: center; color: #16202A">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-    </button>
-    <button aria-label="עוד פעולות" style="width: 44px; height: 44px; border: 0; background: transparent; border-radius: 22px; display: flex; align-items: center; justify-content: center; color: #16202A">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>
-    </button>
+<div style="width: 390px; height: 844px; box-sizing: border-box; direction: rtl; font-family: 'Noto Sans Hebrew', system-ui, sans-serif; color: #141B24; background: #F4F6FB; position: relative; overflow: hidden">
+  <div style="display: flex; align-items: center; gap: 2px; height: 56px; margin: 12px 16px 0 16px; padding: 0 6px; border-radius: 28px; background: #E4E9F2">
+    <button aria-label="פתח מגירת מקומות" style="width: 44px; height: 44px; border: 0; background: transparent; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #141B24; flex-shrink: 0"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div style="flex: 1; min-width: 0; font-size: 16px; color: #4F5B69; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">חיפוש בזיכרון פנימי</div>
+    <button aria-label="עוד פעולות" style="width: 44px; height: 44px; border: 0; background: transparent; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #141B24; flex-shrink: 0"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button>
   </div>
-
-  <!-- פירורי לחם כצ'יפים -->
-  <div style="display: flex; align-items: center; gap: 6px; padding: 4px 16px 12px 16px; overflow: hidden">
-    <span style="font-size: 13px; font-weight: 500; color: #52606D; padding: 6px 10px; border-radius: 999px; background: #E6EAEE; white-space: nowrap">הקבצים שלי</span>
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9AA7B2" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
-    <span style="font-size: 13px; font-weight: 600; color: #1E4DA8; padding: 6px 10px; border-radius: 999px; background: #D5E3FE; white-space: nowrap">זיכרון פנימי</span>
-  </div>
-
-  <!-- רשימה -->
-  <div style="flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; background: #FFFFFF; border-radius: 24px 24px 0 0; padding: 8px 0 0 0">
-
-    <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 20px 4px 20px">
-      <span style="font-size: 12px; font-weight: 600; color: #52606D; letter-spacing: 0.04em">השבוע</span>
-      <span style="font-size: 12px; color: #52606D">מיון: תאריך ↓</span>
-    </div>
-
-    <div style="display: flex; align-items: center; gap: 14px; padding: 10px 16px; min-height: 64px">
-      <div style="width: 44px; height: 44px; border-radius: 14px; background: #D5E3FE; color: #1E4DA8; display: flex; align-items: center; justify-content: center; flex-shrink: 0">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
-      </div>
-      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
-        <div style="font-size: 16px; font-weight: 500; line-height: 20px; direction: ltr; unicode-bidi: isolate; text-align: start; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Download</div>
-        <div style="font-size: 13px; color: #52606D; line-height: 16px">670 פריטים · 12 באוק׳, 10:12</div>
-      </div>
-    </div>
-
-    <div style="display: flex; align-items: center; gap: 14px; padding: 10px 16px; min-height: 64px">
-      <div style="width: 44px; height: 44px; border-radius: 14px; background: #D5E3FE; color: #1E4DA8; display: flex; align-items: center; justify-content: center; flex-shrink: 0">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
-      </div>
-      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
-        <div style="font-size: 16px; font-weight: 500; line-height: 20px; direction: ltr; unicode-bidi: isolate; text-align: start">Recordings</div>
-        <div style="font-size: 13px; color: #52606D; line-height: 16px">4 פריטים · 8 באוק׳, 16:01</div>
-      </div>
-    </div>
-
-    <div style="display: flex; align-items: center; gap: 14px; padding: 10px 16px; min-height: 64px">
-      <div style="width: 44px; height: 44px; border-radius: 14px; background: #FBE7C9; color: #5C3203; display: flex; align-items: center; justify-content: center; flex-shrink: 0">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><circle cx="9" cy="9" r="1.5"/><path d="M20 16l-5-5-7 7"/></svg>
-      </div>
-      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
-        <div style="font-size: 16px; font-weight: 500; line-height: 20px; direction: ltr; unicode-bidi: isolate; text-align: start">IMG_20261012_103455.jpg</div>
-        <div style="font-size: 13px; color: #52606D; line-height: 16px"><span style="font-family: 'JetBrains Mono', monospace; direction: ltr; unicode-bidi: isolate">3.2 MB</span> · 12 באוק׳, 10:34</div>
-      </div>
-    </div>
-
-    <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 20px 4px 20px">
-      <span style="font-size: 12px; font-weight: 600; color: #52606D; letter-spacing: 0.04em">ספטמבר 2026</span>
-    </div>
-
-    <div style="display: flex; align-items: center; gap: 14px; padding: 10px 16px; min-height: 64px">
-      <div style="width: 44px; height: 44px; border-radius: 14px; background: #D5E3FE; color: #1E4DA8; display: flex; align-items: center; justify-content: center; flex-shrink: 0">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
-      </div>
-      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
-        <div style="font-size: 16px; font-weight: 500; line-height: 20px; direction: ltr; unicode-bidi: isolate; text-align: start">Pictures</div>
-        <div style="font-size: 13px; color: #52606D; line-height: 16px">79 פריטים · 28 בספט׳, 13:49</div>
-      </div>
-    </div>
-
-    <div style="display: flex; align-items: center; gap: 14px; padding: 10px 16px; min-height: 64px">
-      <div style="width: 44px; height: 44px; border-radius: 14px; background: #D5E3FE; color: #1E4DA8; display: flex; align-items: center; justify-content: center; flex-shrink: 0">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
-      </div>
-      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
-        <div style="font-size: 16px; font-weight: 500; line-height: 20px; direction: ltr; unicode-bidi: isolate; text-align: start">Movies</div>
-        <div style="font-size: 13px; color: #52606D; line-height: 16px">5 פריטים · 17 בספט׳, 13:07</div>
-      </div>
-    </div>
-
-    <div style="display: flex; align-items: center; gap: 14px; padding: 10px 16px; min-height: 64px">
-      <div style="width: 44px; height: 44px; border-radius: 14px; background: #E6EAEE; color: #16202A; display: flex; align-items: center; justify-content: center; flex-shrink: 0">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 13h6M9 17h6"/></svg>
-      </div>
-      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
-        <div style="font-size: 16px; font-weight: 500; line-height: 20px; direction: ltr; unicode-bidi: isolate; text-align: start">router-backup-2.1.cfg</div>
-        <div style="font-size: 13px; color: #52606D; line-height: 16px"><span style="font-family: 'JetBrains Mono', monospace; direction: ltr; unicode-bidi: isolate">48 KB</span> · 17 בספט׳, 13:03</div>
-      </div>
-    </div>
-
-    <div style="display: flex; align-items: center; gap: 14px; padding: 10px 16px; min-height: 64px">
-      <div style="width: 44px; height: 44px; border-radius: 14px; background: #E6EAEE; color: #16202A; display: flex; align-items: center; justify-content: center; flex-shrink: 0">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V6l10-2v12"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="16" r="2"/></svg>
-      </div>
-      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
-        <div style="font-size: 16px; font-weight: 500; line-height: 20px; direction: ltr; unicode-bidi: isolate; text-align: start">Music</div>
-        <div style="font-size: 13px; color: #52606D; line-height: 16px">3 פריטים · 19 באוג׳, 16:27</div>
-      </div>
+  <div style="padding: 20px 28px 4px 28px">
+    <div style="font-size: 30px; font-weight: 700; line-height: 36px; letter-spacing: -0.01em; ">זיכרון פנימי</div>
+    <div style="display: flex; align-items: center; gap: 12px; margin-top: 10px">
+      <div style="flex: 1; height: 6px; border-radius: 3px; background: #E4E9F2; overflow: hidden"><div style="width: 60%; height: 6px; border-radius: 3px; background: #2B6FEE"></div></div>
+      <span style="font-size: 13px; color: #4F5B69; white-space: nowrap"><span style="font-family: 'JetBrains Mono', monospace; direction: ltr; unicode-bidi: isolate">89.4 GB</span> פנויים</span>
     </div>
   </div>
-
-  <!-- כפתור צף עגול: חדש (בצד ההתחלה ב-RTL = שמאל) -->
-  <button aria-label="חדש" style="position: absolute; left: 20px; bottom: 28px; width: 56px; height: 56px; border: 0; border-radius: 50%; background: #2B6FEE; color: #FFFFFF; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 22px rgba(43,111,238,0.40)">
-    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+  <div style="display: flex; align-items: center; gap: 6px; padding: 10px 16px 0 16px; overflow: hidden">
+    <span style="font-size: 13px; font-weight: 500; color: #4F5B69; padding: 7px 12px; border-radius: 999px; background: #ECF0F7; white-space: nowrap;">הקבצים שלי</span><span style="color: #4F5B69; display: flex"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></span><span style="font-size: 13px; font-weight: 600; color: #1E4DA8; padding: 7px 12px; border-radius: 999px; background: #D5E3FE; white-space: nowrap;">זיכרון פנימי</span>
+  </div>
+    <div style="display: flex; align-items: center; justify-content: space-between; padding: 18px 28px 8px 28px">
+      <span style="font-size: 14px; font-weight: 600; color: #4F5B69">השבוע</span><span style="font-size: 13px; color: #4F5B69">תאריך ↓</span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 3px; margin: 0 12px">
+      <div style="display: flex; align-items: center; gap: 14px; padding: 10px 14px; min-height: 68px; box-sizing: border-box; border-radius: 24px 24px 6px 6px; background: #FFFFFF">
+        <div style="width: 44px; height: 44px; border-radius: 16px; background: #D5E3FE; color: #1E4DA8; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+          <div style="font-size: 16px; font-weight: 500; line-height: 22px; direction: ltr; unicode-bidi: isolate; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Download</div>
+          <div style="font-size: 13px; color: #4F5B69; line-height: 18px">670 פריטים · 12 באוק׳</div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 14px; padding: 10px 14px; min-height: 68px; box-sizing: border-box; border-radius: 6px; background: #FFFFFF">
+        <div style="width: 44px; height: 44px; border-radius: 16px; background: #D5E3FE; color: #1E4DA8; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+          <div style="font-size: 16px; font-weight: 500; line-height: 22px; direction: ltr; unicode-bidi: isolate; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Recordings</div>
+          <div style="font-size: 13px; color: #4F5B69; line-height: 18px">4 פריטים · 8 באוק׳</div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 14px; padding: 10px 14px; min-height: 68px; box-sizing: border-box; border-radius: 6px 6px 24px 24px; background: #FFFFFF">
+        <div style="width: 44px; height: 44px; border-radius: 16px; background: #FBE7C9; color: #5C3203; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1.5"/><path d="M20 16l-5-5-7 7"/></svg></div>
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+          <div style="font-size: 16px; font-weight: 500; line-height: 22px; direction: ltr; unicode-bidi: isolate; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">IMG_20261012_103455.jpg</div>
+          <div style="font-size: 13px; color: #4F5B69; line-height: 18px"><span style="font-family: 'JetBrains Mono', monospace; direction: ltr; unicode-bidi: isolate">3.2 MB</span> · 12 באוק׳</div>
+        </div>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; justify-content: space-between; padding: 18px 28px 8px 28px">
+      <span style="font-size: 14px; font-weight: 600; color: #4F5B69">ספטמבר 2026</span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 3px; margin: 0 12px">
+      <div style="display: flex; align-items: center; gap: 14px; padding: 10px 14px; min-height: 68px; box-sizing: border-box; border-radius: 24px 24px 6px 6px; background: #FFFFFF">
+        <div style="width: 44px; height: 44px; border-radius: 16px; background: #D5E3FE; color: #1E4DA8; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+          <div style="font-size: 16px; font-weight: 500; line-height: 22px; direction: ltr; unicode-bidi: isolate; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Pictures</div>
+          <div style="font-size: 13px; color: #4F5B69; line-height: 18px">79 פריטים · 28 בספט׳</div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 14px; padding: 10px 14px; min-height: 68px; box-sizing: border-box; border-radius: 6px; background: #FFFFFF">
+        <div style="width: 44px; height: 44px; border-radius: 16px; background: #D5E3FE; color: #1E4DA8; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+          <div style="font-size: 16px; font-weight: 500; line-height: 22px; direction: ltr; unicode-bidi: isolate; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Movies</div>
+          <div style="font-size: 13px; color: #4F5B69; line-height: 18px">5 פריטים · 17 בספט׳</div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 14px; padding: 10px 14px; min-height: 68px; box-sizing: border-box; border-radius: 6px; background: #FFFFFF">
+        <div style="width: 44px; height: 44px; border-radius: 16px; background: #ECF0F7; color: #141B24; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 13h6M9 17h6"/></svg></div>
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+          <div style="font-size: 16px; font-weight: 500; line-height: 22px; direction: ltr; unicode-bidi: isolate; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">router-backup-2.1.cfg</div>
+          <div style="font-size: 13px; color: #4F5B69; line-height: 18px"><span style="font-family: 'JetBrains Mono', monospace; direction: ltr; unicode-bidi: isolate">48 KB</span> · 17 בספט׳</div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 14px; padding: 10px 14px; min-height: 68px; box-sizing: border-box; border-radius: 6px 6px 24px 24px; background: #FFFFFF">
+        <div style="width: 44px; height: 44px; border-radius: 16px; background: #ECF0F7; color: #141B24; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V6l10-2v12"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="16" r="2"/></svg></div>
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+          <div style="font-size: 16px; font-weight: 500; line-height: 22px; direction: ltr; unicode-bidi: isolate; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Music</div>
+          <div style="font-size: 13px; color: #4F5B69; line-height: 18px">3 פריטים · 19 באוג׳</div>
+        </div>
+      </div>
+    </div>
+  <button aria-label="חדש" style="position: absolute; left: 20px; bottom: 28px; width: 56px; height: 56px; border: 0; border-radius: 50%; background: #2B6FEE; color: #FFFFFF; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(43,111,238,0.28)">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
   </button>
 </div>
 </x-dc>

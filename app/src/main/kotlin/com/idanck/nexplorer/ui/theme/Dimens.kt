@@ -20,6 +20,15 @@ object NexplorerDimens {
     /** אריח האייקון בשורת קובץ. */
     val IconTile = 44.dp
 
+    /**
+     * רשימה מקובצת (1.9): רווח בין כרטיסים בקבוצה, ושוליים מצדי המסך.
+     * סרגל החיפוש (גלולה) בראש המסך הראשי, ושורה בהגדרות.
+     */
+    val GroupGap = 3.dp
+    val GroupMargin = 12.dp
+    val SearchBarHeight = 56.dp
+    val SettingsRowHeight = 64.dp
+
     /** קוטר הכפתור הצף "חדש" במצב רגיל. */
     val Fab = 56.dp
 
@@ -133,6 +142,25 @@ object NexplorerDimens {
     val PlayerPlayButton = 72.dp
     val PlayerPlayIcon = 36.dp
     val PlayerControl = 56.dp
+    /** כפתור נגן/השהה בנגן השמע: 88×72, פינות 28. */
+    val PlayerPlayButtonWidth = 88.dp
+
+    /**
+     * פס ההתקדמות בנגנים: דק (3), עם ידית 12 (בנגן השמע 14). כשבקרי הווידאו מוסתרים — קו של 2 בקצה התחתון.
+     * גובה האזור הלחיץ סביב הפס: 32 (יעד מגע בלי להעבות את הקו).
+     */
+    val SeekTrack = 3.dp
+    val SeekThumb = 12.dp
+    val SeekThumbAudio = 14.dp
+    val SeekTouchHeight = 32.dp
+    val SeekTrackHidden = 2.dp
+
+    /** נגן הווידאו: כפתורי הדילוג במרכז (72, אייקון 48) והרווח ביניהם, וגלי ההקשה הכפולה. */
+    val VideoSkipButton = 72.dp
+    val VideoSkipIcon = 48.dp
+    val VideoSkipGap = 120.dp
+    val VideoRippleOuter = 220.dp
+    val VideoRippleInner = 140.dp
 
     /**
      * "הוסף מקום" (לוח "חיבור חדש"): אריח סוג (אייקון 22, מסגרת 1 — ובנבחר 2), שדה (גובה 44, ריפוד 14),

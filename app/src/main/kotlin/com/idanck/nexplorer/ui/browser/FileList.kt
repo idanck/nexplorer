@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.FolderOpen
@@ -43,12 +44,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import com.idanck.nexplorer.core.Entry
 import com.idanck.nexplorer.core.FileKind
 import com.idanck.nexplorer.core.Section
@@ -61,6 +64,7 @@ import com.idanck.nexplorer.ui.components.SelectionBox
 import com.idanck.nexplorer.ui.components.metaLine
 import com.idanck.nexplorer.ui.theme.FileNameTextStyle
 import com.idanck.nexplorer.ui.theme.MonoTextStyle
+import com.idanck.nexplorer.ui.theme.NexplorerColors
 import com.idanck.nexplorer.ui.theme.NexplorerDimens
 import com.idanck.nexplorer.ui.theme.NexplorerShape
 import com.idanck.nexplorer.ui.theme.NexplorerTheme
@@ -78,6 +82,11 @@ class FileListActions(
     val onScrolled: (Location, Int, Int) -> Unit,
     /** שני חלונות: גרירת הבחירה ותיקיות כיעדי שחרור. בחלון יחיד — null. */
     val drag: FileDrag? = null,
+    /**
+     * רשימה מקובצת (1.9, חלון יחיד): כל שורה כרטיס על הרקע, צמוד לשכניו במדור. בשני חלונות — שורות
+     * רגילות על משטח החלון.
+     */
+    val grouped: Boolean = false,
 )
 
 @Composable
@@ -129,11 +138,13 @@ private fun FileColumn(state: BrowserState, actions: FileListActions, contentPad
     LazyColumn(modifier = modifier.fillMaxSize(), state = listState, contentPadding = contentPadding) {
         groups(state).forEachIndexed { index, section ->
             header(section, index, sortLabel(state))
-            items(section.entries, key = { it.path }) { entry ->
+            val last = section.entries.lastIndex
+            itemsIndexed(section.entries, key = { _, entry -> entry.path }) { i, entry ->
+                val card = if (actions.grouped) RowCard(NexplorerShape.groupItem(first = i == 0, last = i == last), last = i == last) else null
                 if (compact) {
-                    CompactRow(entry, state, actions)
+                    CompactRow(entry, state, actions, card)
                 } else {
-                    FileRow(entry, state, actions, now)
+                    FileRow(entry, state, actions, now, card)
                 }
             }
         }
@@ -162,8 +173,28 @@ private fun folderDropZone(entry: Entry, actions: FileListActions): DropZone =
 
 private const val DROP_HINT = "שחרר כאן להעתקה"
 
+/** שורה ברשימה מקובצת: צורת הכרטיס לפי מקומו במדור, והאם הוא האחרון (בלי רווח אחריו). */
+private class RowCard(val shape: Shape, val last: Boolean)
+
+/**
+ * הרקע של שורה. ברשימה מקובצת — כרטיס במשטח (נבחר: selectedRow) עם שוליים מהצדדים ורווח לשורה הבאה;
+ * אחרת — רק סימון הבחירה.
+ */
+private fun Modifier.rowBackground(card: RowCard?, selected: Boolean, colors: NexplorerColors, surface: Color): Modifier =
+    if (card == null) {
+        background(if (selected) colors.selectedRow else Color.Transparent)
+    } else {
+        padding(
+            start = NexplorerDimens.GroupMargin,
+            end = NexplorerDimens.GroupMargin,
+            bottom = if (card.last) 0.dp else NexplorerDimens.GroupGap,
+        )
+            .clip(card.shape)
+            .background(if (selected) colors.selectedRow else surface)
+    }
+
 @Composable
-private fun FileRow(entry: Entry, state: BrowserState, actions: FileListActions, now: Long) {
+private fun FileRow(entry: Entry, state: BrowserState, actions: FileListActions, now: Long, card: RowCard?) {
     val selected = entry.path in state.selection
     val density = state.view.density
     val vertical = when (density) {
@@ -180,12 +211,12 @@ private fun FileRow(entry: Entry, state: BrowserState, actions: FileListActions,
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = minHeight)
             .then(drop.modifier)
+            .rowBackground(card, selected, NexplorerTheme.colors, MaterialTheme.colorScheme.surface)
+            .heightIn(min = minHeight)
             .dropHighlight(drop.hovering, NexplorerTheme.colors)
-            .background(if (selected) NexplorerTheme.colors.selectedRow else Color.Transparent)
             .entryClicks(entry, selected, actions)
-            .padding(horizontal = NexplorerDimens.Space4, vertical = vertical),
+            .padding(horizontal = if (card != null) NexplorerDimens.Space3 else NexplorerDimens.Space4, vertical = vertical),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         FileIconTile(entry)
@@ -216,18 +247,18 @@ private fun FileRow(entry: Entry, state: BrowserState, actions: FileListActions,
 }
 
 @Composable
-private fun CompactRow(entry: Entry, state: BrowserState, actions: FileListActions) {
+private fun CompactRow(entry: Entry, state: BrowserState, actions: FileListActions, card: RowCard?) {
     val selected = entry.path in state.selection
     val drop = folderDropZone(entry, actions)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = NexplorerDimens.CompactRowHeight)
             .then(drop.modifier)
+            .rowBackground(card, selected, NexplorerTheme.colors, MaterialTheme.colorScheme.surface)
+            .heightIn(min = NexplorerDimens.CompactRowHeight)
             .dropHighlight(drop.hovering, NexplorerTheme.colors)
-            .background(if (selected) NexplorerTheme.colors.selectedRow else Color.Transparent)
             .entryClicks(entry, selected, actions)
-            .padding(horizontal = NexplorerDimens.Space4, vertical = NexplorerDimens.Space1),
+            .padding(horizontal = if (card != null) NexplorerDimens.Space3 else NexplorerDimens.Space4, vertical = NexplorerDimens.Space1),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         FileIconTile(entry, size = NexplorerDimens.CompactIconTile)

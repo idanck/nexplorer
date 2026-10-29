@@ -5,24 +5,19 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.os.SystemClock
-import android.util.Log
-import android.view.View
-import android.view.ViewGroup
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import androidx.test.uiautomator.By
-import androidx.test.uiautomator.Until
-import androidx.media3.ui.PlayerView
 import com.idanck.nexplorer.MainActivity
 import com.idanck.nexplorer.media.PlaybackService
 import com.idanck.nexplorer.qa.Qa.exists
@@ -38,7 +33,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.MethodSorters
 import java.io.File
-import java.util.regex.Pattern
 
 /** שלב 3ב: נגן השמע (רשימה מהתיקייה, ניגון ברקע, חזרה מההתראה) ונגן הווידאו (סיבוב בלי לאבד מקום). */
 @RunWith(AndroidJUnit4::class)
@@ -143,36 +137,23 @@ class Phase3bTest {
     }
 
     /**
-     * עצירה בכפתור של Media3 עצמו (ה-View שלו — לא Player.pause מהקוד). UiAutomator לא מוצא את
-     * ה-Views שבתוך ה-AndroidView (בדיקה ב-API 29 ו-35: "Node not found"), ולכן הלחיצה דרך ה-View.
-     * לפני כן: הבקרים מוצגים, ועץ הנגישות נשמר — מה ש-TalkBack רואה מהנגן.
+     * עצירה בכפתור "השהה" של הנגן (הבקרים ב-Compose מ-1.9, לא של Media3). כשהבקרים כבר הוסתרו —
+     * הקשה על המסך מציגה אותם; ואם נעלמו בדיוק בין הבדיקה ללחיצה — מנסים שוב.
+     * לפני הלחיצה: עץ הנגישות נשמר — מה ש-TalkBack רואה מהנגן.
      */
     private fun pauseWithPlayerButton() {
-        withPlayerView { it.showController() }
-        val seen = Qa.device.wait(Until.hasObject(By.res(Pattern.compile(".*:id/exo_play_pause"))), 3_000)
-        Log.i(TAG, "exo_play_pause in the accessibility tree: $seen")
-        Qa.device.dumpWindowHierarchy(File(Qa.shotsDir, "84-video-a11y.xml"))
-        var clicked = false
-        withPlayerView { view -> clicked = view.findViewByEntryName("exo_play_pause")?.performClick() == true }
-        assertTrue("אין כפתור נגן/השהה בבקרי הנגן", clicked)
-        compose.waitFor(playback("מושהה"), 5_000)
-    }
-
-    private fun withPlayerView(action: (PlayerView) -> Unit) {
-        scenario.onActivity { activity -> activity.window.decorView.findPlayerView()?.let(action) }
-    }
-
-    private fun View.findPlayerView(): PlayerView? {
-        if (this is PlayerView) return this
-        if (this is ViewGroup) for (i in 0 until childCount) getChildAt(i).findPlayerView()?.let { return it }
-        return null
-    }
-
-    /** לפי שם המזהה ולא לפי R של Media3: המספרים נקבעים ב-APK של האפליקציה. */
-    private fun View.findViewByEntryName(name: String): View? {
-        if (id != View.NO_ID && runCatching { resources.getResourceEntryName(id) }.getOrNull() == name) return this
-        if (this is ViewGroup) for (i in 0 until childCount) getChildAt(i).findViewByEntryName(name)?.let { return it }
-        return null
+        repeat(3) {
+            if (!compose.exists(hasContentDescription("השהה"))) {
+                compose.onNodeWithTag("videoSurface").performClick()
+                compose.waitFor(hasContentDescription("השהה"), 5_000)
+            }
+            if (it == 0) Qa.device.dumpWindowHierarchy(File(Qa.shotsDir, "84-video-a11y.xml"))
+            if (runCatching { compose.onNodeWithContentDescription("השהה").performClick() }.isSuccess) {
+                compose.waitFor(playback("מושהה"), 5_000)
+                return
+            }
+        }
+        throw AssertionError("אין כפתור השהה בבקרי הנגן")
     }
 
     /**
