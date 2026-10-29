@@ -14,94 +14,94 @@ body{margin:0}
 a{color:#2B6FEE}a:hover{color:#1E4DA8}
 </style>
 </helmet>
-<div style="width: 390px; height: 844px; box-sizing: border-box; direction: rtl; font-family: 'Noto Sans Hebrew', system-ui, sans-serif; color: #16202A; background: #F3F5F7; display: flex; flex-direction: column; overflow: hidden">
+<div style="width: 390px; height: 844px; box-sizing: border-box; direction: rtl; font-family: 'Noto Sans Hebrew', system-ui, sans-serif; color: #141B24; background: #F4F6FB; display: flex; flex-direction: column; overflow: hidden">
 
   <!-- שורת חיפוש -->
   <div style="display: flex; align-items: center; gap: 8px; padding: 14px 12px 10px 12px">
-    <button aria-label="חזרה" style="width: 44px; height: 44px; border: 0; background: transparent; border-radius: 22px; display: flex; align-items: center; justify-content: center; color: #16202A; flex-shrink: 0">
+    <button aria-label="חזרה" style="width: 44px; height: 44px; border: 0; background: transparent; border-radius: 22px; display: flex; align-items: center; justify-content: center; color: #141B24; flex-shrink: 0">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
     </button>
     <label for="q" style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">חיפוש</label>
     <div style="flex: 1; display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 14px; border-radius: 999px; background: #FFFFFF; border: 2px solid #2B6FEE">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2B6FEE" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-      <input id="q" type="text" value="router* !old" style="flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-family: 'JetBrains Mono', monospace; font-size: 15px; color: #16202A; direction: ltr; text-align: left">
-      <button aria-label="נקה" style="width: 28px; height: 28px; border: 0; border-radius: 14px; background: #E6EAEE; color: #16202A; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      <input id="q" type="text" value="router* !old" style="flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-family: 'JetBrains Mono', monospace; font-size: 15px; color: #141B24; direction: ltr; text-align: left">
+      <button aria-label="נקה" style="width: 28px; height: 28px; border: 0; border-radius: 16px; background: #ECF0F7; color: #141B24; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>
   </div>
 
   <!-- צ'יפי סינון -->
   <div style="display: flex; align-items: center; gap: 6px; padding: 0 16px 10px 16px; overflow: hidden">
     <span style="display: flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; color: #1E4DA8; padding: 7px 12px; border-radius: 999px; background: #D5E3FE; white-space: nowrap">בכל המקומות <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span>
-    <span style="display: flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 500; color: #16202A; padding: 7px 12px; border-radius: 999px; background: #FFFFFF; border: 1px solid #C7CED5; white-space: nowrap">סוג</span>
+    <span style="display: flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 500; color: #141B24; padding: 7px 12px; border-radius: 999px; background: #FFFFFF; border: 1px solid #C3CBD6; white-space: nowrap">סוג</span>
     <span style="display: flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; color: #1E4DA8; padding: 7px 12px; border-radius: 999px; background: #D5E3FE; white-space: nowrap">&gt; 1 MB</span>
-    <span style="display: flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 500; color: #16202A; padding: 7px 12px; border-radius: 999px; background: #FFFFFF; border: 1px solid #C7CED5; white-space: nowrap">תאריך</span>
+    <span style="display: flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 500; color: #141B24; padding: 7px 12px; border-radius: 999px; background: #FFFFFF; border: 1px solid #C3CBD6; white-space: nowrap">תאריך</span>
   </div>
 
   <!-- תוצאות -->
-  <div style="flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; background: #FFFFFF; border-radius: 24px 24px 0 0; padding: 8px 0 0 0">
+  <div style="flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; background: #FFFFFF; border-radius: 28px 28px 0 0; padding: 8px 0 0 0">
 
     <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 20px 4px 20px">
-      <span style="font-size: 12px; font-weight: 600; color: #52606D; letter-spacing: 0.04em">זיכרון פנימי · 3</span>
-      <span style="font-size: 12px; color: #52606D">מהאינדקס · 0.2 שנ׳</span>
+      <span style="font-size: 12px; font-weight: 600; color: #4F5B69; letter-spacing: 0.04em">זיכרון פנימי · 3</span>
+      <span style="font-size: 12px; color: #4F5B69">מהאינדקס · 0.2 שנ׳</span>
     </div>
 
     <div style="display: flex; align-items: center; gap: 14px; padding: 8px 16px; min-height: 60px">
-      <div style="width: 44px; height: 44px; border-radius: 14px; background: #E6EAEE; color: #16202A; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 13h6M9 17h6"/></svg></div>
+      <div style="width: 44px; height: 44px; border-radius: 16px; background: #ECF0F7; color: #141B24; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 13h6M9 17h6"/></svg></div>
       <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
         <div style="font-size: 16px; font-weight: 500; direction: ltr; unicode-bidi: isolate; text-align: start; white-space: nowrap; overflow: hidden; text-overflow: ellipsis"><span style="background: #FBE7C9; border-radius: 4px; padding: 0 2px">router</span>-backup-2.1.cfg</div>
-        <div style="font-size: 12px; color: #52606D; font-family: 'JetBrains Mono', monospace; direction: ltr; unicode-bidi: isolate; text-align: start; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Download/system_config · 48 KB</div>
+        <div style="font-size: 12px; color: #4F5B69; font-family: 'JetBrains Mono', monospace; direction: ltr; unicode-bidi: isolate; text-align: start; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Download/system_config · 48 KB</div>
       </div>
     </div>
     <div style="display: flex; align-items: center; gap: 14px; padding: 8px 16px; min-height: 60px">
-      <div style="width: 44px; height: 44px; border-radius: 14px; background: #D5E3FE; color: #1E4DA8; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>
+      <div style="width: 44px; height: 44px; border-radius: 16px; background: #D5E3FE; color: #1E4DA8; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>
       <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
         <div style="font-size: 16px; font-weight: 500; direction: ltr; unicode-bidi: isolate; text-align: start">Firmware_2.1</div>
-        <div style="font-size: 12px; color: #52606D; font-family: 'JetBrains Mono', monospace; direction: ltr; unicode-bidi: isolate; text-align: start">Download · 3 items</div>
+        <div style="font-size: 12px; color: #4F5B69; font-family: 'JetBrains Mono', monospace; direction: ltr; unicode-bidi: isolate; text-align: start">Download · 3 items</div>
       </div>
     </div>
     <div style="display: flex; align-items: center; gap: 14px; padding: 8px 16px; min-height: 60px">
-      <div style="width: 44px; height: 44px; border-radius: 14px; background: #E6EAEE; color: #16202A; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l3 7H5zM5 10v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9"/></svg></div>
+      <div style="width: 44px; height: 44px; border-radius: 16px; background: #ECF0F7; color: #141B24; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l3 7H5zM5 10v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9"/></svg></div>
       <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
         <div style="font-size: 16px; font-weight: 500; direction: ltr; unicode-bidi: isolate; text-align: start"><span style="background: #FBE7C9; border-radius: 4px; padding: 0 2px">router</span>-firmware-2.1.zip</div>
-        <div style="font-size: 12px; color: #52606D; font-family: 'JetBrains Mono', monospace; direction: ltr; unicode-bidi: isolate; text-align: start">Download · 62.4 MB</div>
+        <div style="font-size: 12px; color: #4F5B69; font-family: 'JetBrains Mono', monospace; direction: ltr; unicode-bidi: isolate; text-align: start">Download · 62.4 MB</div>
       </div>
     </div>
 
     <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 20px 4px 20px">
-      <span style="font-size: 12px; font-weight: 600; color: #52606D; letter-spacing: 0.04em">NAS · 2</span>
-      <span style="font-size: 12px; color: #52606D">מהאינדקס · לפני 4 שע׳</span>
+      <span style="font-size: 12px; font-weight: 600; color: #4F5B69; letter-spacing: 0.04em">NAS · 2</span>
+      <span style="font-size: 12px; color: #4F5B69">מהאינדקס · לפני 4 שע׳</span>
     </div>
     <div style="display: flex; align-items: center; gap: 14px; padding: 8px 16px; min-height: 60px">
-      <div style="width: 44px; height: 44px; border-radius: 14px; background: #E6EAEE; color: #16202A; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg></div>
+      <div style="width: 44px; height: 44px; border-radius: 16px; background: #ECF0F7; color: #141B24; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg></div>
       <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
         <div style="font-size: 16px; font-weight: 500; direction: ltr; unicode-bidi: isolate; text-align: start"><span style="background: #FBE7C9; border-radius: 4px; padding: 0 2px">router</span>-notes.md</div>
-        <div style="font-size: 12px; color: #52606D; font-family: 'JetBrains Mono', monospace; direction: ltr; unicode-bidi: isolate; text-align: start">volume2/Documents/network · 6 KB</div>
+        <div style="font-size: 12px; color: #4F5B69; font-family: 'JetBrains Mono', monospace; direction: ltr; unicode-bidi: isolate; text-align: start">volume2/Documents/network · 6 KB</div>
       </div>
     </div>
     <div style="display: flex; align-items: center; gap: 14px; padding: 8px 16px; min-height: 60px">
-      <div style="width: 44px; height: 44px; border-radius: 14px; background: #E6EAEE; color: #16202A; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l3 7H5zM5 10v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9"/></svg></div>
+      <div style="width: 44px; height: 44px; border-radius: 16px; background: #ECF0F7; color: #141B24; display: flex; align-items: center; justify-content: center; flex-shrink: 0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l3 7H5zM5 10v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-9"/></svg></div>
       <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
         <div style="font-size: 16px; font-weight: 500; direction: ltr; unicode-bidi: isolate; text-align: start"><span style="background: #FBE7C9; border-radius: 4px; padding: 0 2px">router</span>-backup-2.0.tar.gz</div>
-        <div style="font-size: 12px; color: #52606D; font-family: 'JetBrains Mono', monospace; direction: ltr; unicode-bidi: isolate; text-align: start">volume2/Backups/router · 1.2 MB</div>
+        <div style="font-size: 12px; color: #4F5B69; font-family: 'JetBrains Mono', monospace; direction: ltr; unicode-bidi: isolate; text-align: start">volume2/Backups/router · 1.2 MB</div>
       </div>
     </div>
 
     <!-- חיפוש עמוק -->
-    <div style="margin: 12px 16px 0 16px; padding: 12px 14px; border-radius: 16px; background: #F3F5F7; display: flex; align-items: center; gap: 12px">
+    <div style="margin: 12px 16px 0 16px; padding: 12px 14px; border-radius: 16px; background: #F4F6FB; display: flex; align-items: center; gap: 12px">
       <div style="flex: 1; display: flex; flex-direction: column; gap: 2px">
         <span style="font-size: 14px; font-weight: 600">לא מצאת?</span>
-        <span style="font-size: 12px; color: #52606D">חיפוש עמוק עובר תיקייה-תיקייה. ב-NAS זה עלול לקחת כמה דקות.</span>
+        <span style="font-size: 12px; color: #4F5B69">חיפוש עמוק עובר תיקייה-תיקייה. ב-NAS זה עלול לקחת כמה דקות.</span>
       </div>
       <button style="height: 36px; padding: 0 14px; border: 0; border-radius: 999px; background: #2B6FEE; color: #FFFFFF; font-family: inherit; font-size: 13px; font-weight: 600; white-space: nowrap">חיפוש עמוק</button>
     </div>
 
     <!-- תחביר -->
-    <div style="margin: 10px 16px 0 16px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; color: #52606D">
+    <div style="margin: 10px 16px 0 16px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; color: #4F5B69">
       <span style="font-weight: 600">תחביר:</span>
-      <span style="font-family: 'JetBrains Mono', monospace; background: #E6EAEE; padding: 2px 7px; border-radius: 6px; direction: ltr">*</span><span>כל רצף</span>
-      <span style="font-family: 'JetBrains Mono', monospace; background: #E6EAEE; padding: 2px 7px; border-radius: 6px; direction: ltr">?</span><span>תו</span>
-      <span style="font-family: 'JetBrains Mono', monospace; background: #E6EAEE; padding: 2px 7px; border-radius: 6px; direction: ltr">a | b</span><span>או</span>
-      <span style="font-family: 'JetBrains Mono', monospace; background: #E6EAEE; padding: 2px 7px; border-radius: 6px; direction: ltr">!x</span><span>בלי</span>
+      <span style="font-family: 'JetBrains Mono', monospace; background: #ECF0F7; padding: 2px 7px; border-radius: 6px; direction: ltr">*</span><span>כל רצף</span>
+      <span style="font-family: 'JetBrains Mono', monospace; background: #ECF0F7; padding: 2px 7px; border-radius: 6px; direction: ltr">?</span><span>תו</span>
+      <span style="font-family: 'JetBrains Mono', monospace; background: #ECF0F7; padding: 2px 7px; border-radius: 6px; direction: ltr">a | b</span><span>או</span>
+      <span style="font-family: 'JetBrains Mono', monospace; background: #ECF0F7; padding: 2px 7px; border-radius: 6px; direction: ltr">!x</span><span>בלי</span>
     </div>
   </div>
 </div>

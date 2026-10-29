@@ -44,7 +44,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -210,22 +209,19 @@ private fun NowPlaying(state: AudioState, viewModel: AudioPlayerViewModel, artSi
         // ציר זמן ובקרי ניגון: תמיד משמאל לימין, גם בממשק עברי (כמו בכל נגן).
         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
             Column(Modifier.fillMaxWidth()) {
-                var dragging by remember { mutableStateOf<Float?>(null) }
                 val duration = state.durationMs
-                val fraction = if (duration > 0) (state.positionMs.toFloat() / duration).coerceIn(0f, 1f) else 0f
-                Slider(
-                    value = dragging ?: fraction,
-                    onValueChange = { dragging = it },
-                    onValueChangeFinished = {
-                        dragging?.let { viewModel.seekTo((it * duration).toLong()) }
-                        dragging = null
-                    },
-                    enabled = duration > 0,
-                    modifier = Modifier.semantics { contentDescription = "מיקום" },
+                // פס התקדמות דק (1.9), כמו בנגן הווידאו.
+                ThinSeekBar(
+                    positionMs = state.positionMs,
+                    durationMs = duration,
+                    onSeek = viewModel::seekTo,
+                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    progressColor = MaterialTheme.colorScheme.primary,
+                    thumbColor = MaterialTheme.colorScheme.primary,
+                    thumbSize = NexplorerDimens.SeekThumbAudio,
                 )
                 Row(Modifier.fillMaxWidth()) {
-                    val shown = dragging?.let { (it * duration).toLong() } ?: state.positionMs
-                    Text(MediaTime.format(shown), style = MonoTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(MediaTime.format(state.positionMs), style = MonoTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.weight(1f))
                     Text(MediaTime.format(duration), style = MonoTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -244,7 +240,12 @@ private fun NowPlaying(state: AudioState, viewModel: AudioPlayerViewModel, artSi
                     IconButton(onClick = viewModel::previous, modifier = Modifier.size(NexplorerDimens.PlayerControl)) {
                         Icon(Icons.Filled.SkipPrevious, contentDescription = "הקודם")
                     }
-                    FilledIconButton(onClick = viewModel::toggle, modifier = Modifier.size(NexplorerDimens.PlayerPlayButton)) {
+                    // נגן/השהה: מלבן עם פינות 28, לא עיגול (1.9).
+                    FilledIconButton(
+                        onClick = viewModel::toggle,
+                        shape = NexplorerShape.PlayButton,
+                        modifier = Modifier.size(width = NexplorerDimens.PlayerPlayButtonWidth, height = NexplorerDimens.PlayerPlayButton),
+                    ) {
                         Icon(
                             if (state.playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                             contentDescription = if (state.playing) "השהה" else "נגן",

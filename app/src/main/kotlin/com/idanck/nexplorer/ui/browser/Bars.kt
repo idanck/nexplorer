@@ -43,17 +43,27 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import com.idanck.nexplorer.core.Counts
+import com.idanck.nexplorer.ui.theme.NexplorerTheme
+import com.idanck.nexplorer.core.isolated
 import com.idanck.nexplorer.ui.theme.MonoTextStyle
 import com.idanck.nexplorer.ui.theme.NexplorerDimens
 import com.idanck.nexplorer.ui.theme.NexplorerShape
 
-/** סרגל עליון (לוח "מסך ראשי"): ☰ בכחול, כותרת + סיכום, חיפוש, ⋮. */
+/**
+ * הראש של המסך הראשי (לוח "מסך ראשי", 1.9): סרגל חיפוש בצורת גלולה — ☰, "חיפוש ב-…" (הקשה פותחת את
+ * החיפוש), צ'יפ "N בלוח" כשיש מה להדביק, ⋮ — ומתחתיו שם המקום בכותרת גדולה והסיכום.
+ */
 @Composable
 fun BrowserTopBar(
     title: String,
@@ -66,65 +76,92 @@ fun BrowserTopBar(
     onClipboard: () -> Unit,
     moreMenu: @Composable () -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(
-                start = NexplorerDimens.Space3,
-                end = NexplorerDimens.Space3,
-                top = NexplorerDimens.Space2,
-                bottom = NexplorerDimens.Space1,
-            ),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(NexplorerDimens.Space2),
-    ) {
-        IconButton(onClick = onMenu) {
-            Icon(Icons.Filled.Menu, contentDescription = "פתח מגירת מקומות", tint = MaterialTheme.colorScheme.primary)
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = NexplorerDimens.Space4, end = NexplorerDimens.Space4, top = NexplorerDimens.Space2)
+                .height(NexplorerDimens.SearchBarHeight)
+                .clip(NexplorerShape.Pill)
+                .background(NexplorerTheme.colors.searchBar)
+                .padding(horizontal = NexplorerDimens.Space1),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = onMenu) {
+                Icon(Icons.Filled.Menu, contentDescription = "פתח מגירת מקומות", tint = MaterialTheme.colorScheme.onSurface)
+            }
+            // כל הגלולה (חוץ מהכפתורים) פותחת את החיפוש — "חיפוש" לקורא המסך ולבדיקות.
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .heightIn(min = NexplorerDimens.TouchTarget)
+                    .clip(NexplorerShape.Pill)
+                    .clickable(onClick = onSearch)
+                    .semantics(mergeDescendants = true) { contentDescription = "חיפוש" }
+                    .padding(horizontal = NexplorerDimens.Space2),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    Icons.Filled.Search,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(NexplorerDimens.Space5 - NexplorerDimens.Space1),
+                )
+                Spacer(Modifier.width(NexplorerDimens.Space2))
+                Text(
+                    "חיפוש ב-${title.isolated()}",
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Normal),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (clipboardCount > 0) {
+                // לוח "הדבקה": צ'יפ "3 בלוח" בצד הסוף של הסרגל.
+                Row(
+                    modifier = Modifier
+                        .background(MaterialTheme.colorScheme.primaryContainer, NexplorerShape.Pill)
+                        .clickable(onClick = onClipboard)
+                        .padding(horizontal = NexplorerDimens.Space3, vertical = NexplorerDimens.Space2),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "$clipboardCount בלוח",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                    Spacer(Modifier.width(NexplorerDimens.Space1 + NexplorerDimens.Space1 / 2))
+                    Icon(
+                        Icons.Outlined.ContentCopy,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(NexplorerDimens.Space4),
+                    )
+                }
+            }
+            Box {
+                IconButton(onClick = onMore) { Icon(Icons.Filled.MoreVert, contentDescription = "עוד פעולות") }
+                moreMenu()
+            }
         }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(NexplorerDimens.Space1 / 2)) {
-            // ברוחב הטבעי (לא fillMaxWidth): כותרת LTR ("Pictures") נצמדת לצד ההתחלה, מעל הסיכום — לא לקצה הרחוק.
+        // כותרת גדולה: ברוחב הטבעי — כותרת LTR ("Pictures") נצמדת לצד ההתחלה, מעל הסיכום.
+        Column(
+            Modifier.padding(start = NexplorerDimens.Space5, end = NexplorerDimens.Space5, top = NexplorerDimens.Space4, bottom = NexplorerDimens.Space1),
+            verticalArrangement = Arrangement.spacedBy(NexplorerDimens.Space1 / 2),
+        ) {
             Text(
                 title,
-                style = MaterialTheme.typography.titleLarge.let { if (titleIsLtr) it.copy(textDirection = TextDirection.Ltr) else it },
+                style = MaterialTheme.typography.headlineMedium.let { if (titleIsLtr) it.copy(textDirection = TextDirection.Ltr) else it },
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 summary,
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-        }
-        if (clipboardCount > 0) {
-            // לוח "הדבקה": צ'יפ "3 בלוח" בצד הסוף של הסרגל.
-            Row(
-                modifier = Modifier
-                    .background(MaterialTheme.colorScheme.primaryContainer, NexplorerShape.Pill)
-                    .clickable(onClick = onClipboard)
-                    .padding(horizontal = NexplorerDimens.Space3, vertical = NexplorerDimens.Space2),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    "$clipboardCount בלוח",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-                Spacer(Modifier.width(NexplorerDimens.Space1 + NexplorerDimens.Space1 / 2))
-                Icon(
-                    Icons.Outlined.ContentCopy,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(NexplorerDimens.Space4),
-                )
-            }
-        } else {
-            IconButton(onClick = onSearch) { Icon(Icons.Filled.Search, contentDescription = "חיפוש") }
-        }
-        Box {
-            IconButton(onClick = onMore) { Icon(Icons.Filled.MoreVert, contentDescription = "עוד פעולות") }
-            moreMenu()
         }
     }
 }

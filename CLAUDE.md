@@ -15,6 +15,8 @@
 - הקוד של העיצוב: `app/src/main/kotlin/com/idanck/nexplorer/ui/theme/`. **אל תכתוב hex או גדלים בתוך מסכים** — רק דרך `MaterialTheme`, `NexplorerTheme.colors`, `NexplorerDimens`, `NexplorerShape`.
 - שינוי ערך עיצוב = עדכון `tokens.json` + הקוד + `design-language.md` באותו PR.
 - שמות קבצים ונתיבים: `FileNameTextStyle` / `MonoTextStyle` (LTR מבודד). הכפתור הצף: עיגול, `FabPosition.End`.
+- רשימות מקובצות (שפת העיצוב 1.9): בקבוצה רגילה `SegmentedGroup` + `Modifier.segment()`, וב-LazyColumn `NexplorerShape.groupItem(first, last)` — לא Surface אחד עם קווים מפרידים.
+- נגן הווידאו: הבקרים ב-Compose (`ui/player/VideoPlayerScreen.kt`, `SeekBar.kt`), לא של Media3 (`useController = false`). בבדיקות — שכבת המגע לפי `testTag("videoSurface")` והכפתורים לפי התיאור ("השהה", "קדימה 10 שניות").
 - מפת יכולות Solid Explorer: `docs/research/02-features.md`
 - מחקר שפת העיצוב של Solid (השראה בלבד): `docs/research/05-design-language.md`, `docs/research/solid-tokens.json`
 - החלטות פתוחות (אין לבחור במקום עידן): `docs/research/08-open-decisions.md`

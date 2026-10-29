@@ -19,9 +19,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -31,6 +31,7 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -47,6 +48,8 @@ import com.idanck.nexplorer.core.SizeFormat
 import com.idanck.nexplorer.core.isolated
 import com.idanck.nexplorer.data.settings.AppSettings
 import com.idanck.nexplorer.data.settings.ThemeMode
+import com.idanck.nexplorer.ui.components.SegmentedGroup
+import com.idanck.nexplorer.ui.components.segment
 import com.idanck.nexplorer.ui.theme.FileNameTextStyle
 import com.idanck.nexplorer.ui.theme.MonoTextStyle
 import com.idanck.nexplorer.ui.theme.NexplorerDimens
@@ -111,19 +114,14 @@ fun SettingsScreen(model: SettingsModel) {
                             }
                         }
                     }
-                    Divider()
                     SwitchItem("צבע דינמי מהטפט", "כבוי — נשאר הכחול של האפליקציה", checked = false, enabled = false) {}
-                    Divider()
                     Item("שפה", "עברית") {}
                 }
 
                 Group("התנהגות") {
                     SwitchItem("אישור לפני מחיקה", "מחיקה היא בלתי הפיכה", s.confirmDelete, onChange = model.onConfirmDelete)
-                    Divider()
                     SwitchItem("הצג קבצים מוסתרים", "קבצים ותיקיות שמתחילים בנקודה", s.defaultView.showHidden, onChange = model.onShowHidden)
-                    Divider()
                     SwitchItem("פתח בתיקייה האחרונה", s.lastFolder?.substringAfterLast('/'), s.reopenLastFolder, onChange = model.onReopenLast)
-                    Divider()
                     var showHiddenFolders by remember { mutableStateOf(false) }
                     Item(
                         "תיקיות מוסתרות",
@@ -141,9 +139,7 @@ fun SettingsScreen(model: SettingsModel) {
                     Item("גישה לכל הקבצים", onClick = model.onStorageAccess) {
                         StatusChip(if (model.storageGranted) "ניתנה" else "לא ניתנה", ok = model.storageGranted)
                     }
-                    Divider()
                     Item("Shizuku", "פותח Android/data ו-Android/obb") { StatusChip("בקרוב", ok = null) }
-                    Divider()
                     Item("Root") { StatusChip("לא זמין", ok = null) }
                 }
 
@@ -151,9 +147,7 @@ fun SettingsScreen(model: SettingsModel) {
 
                 Group("אודות") {
                     Item("nexplorer", "מנהל קבצים · שפת העיצוב \"סלע ואות\"") {}
-                    Divider()
                     Item("גרסה") { Text(BuildConfig.VERSION_NAME, style = MonoTextStyle) }
-                    Divider()
                     Item("חבילה") { Text(BuildConfig.APPLICATION_ID, style = MonoTextStyle) }
                 }
                 Spacer(Modifier.size(NexplorerDimens.Space4))
@@ -186,11 +180,13 @@ private fun UpdatesSection(model: SettingsModel) {
         LinearProgressIndicator(
             progress = { u.fraction },
             color = NexplorerTheme.colors.amber,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = NexplorerDimens.Space4),
+            modifier = Modifier
+                .segment(MaterialTheme.colorScheme.surface)
+                .padding(horizontal = NexplorerDimens.Space4, vertical = NexplorerDimens.Space3),
         )
     }
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = NexplorerDimens.Space2),
+        Modifier.segment(MaterialTheme.colorScheme.surface).padding(horizontal = NexplorerDimens.Space2),
         horizontalArrangement = Arrangement.End,
     ) {
         when (u) {
@@ -217,14 +213,11 @@ private fun UpdatesSection(model: SettingsModel) {
         }
     }
     if (!model.canInstall) {
-        Divider()
         Item("התקנת עדכונים", "צריך לאשר פעם אחת ל-nexplorer להתקין אפליקציות", onClick = model.updateActions.onOpenInstallPermission) {
             StatusChip("לא אושר", ok = false)
         }
     }
-    Divider()
     SwitchItem("בדיקה אוטומטית", "פעם ביום, ברקע", s.updateAutoCheck, onChange = model.onAutoCheck)
-    Divider()
     SwitchItem("רק ב-Wi-Fi", "לא להוריד עדכון על חבילת גלישה", s.updateWifiOnly, onChange = model.onWifiOnly)
 }
 
@@ -251,30 +244,24 @@ private fun HiddenFoldersDialog(hidden: Set<String>, onUnhide: (String) -> Unit,
     )
 }
 
+/** מדור בהגדרות (1.9): כותרת, ומתחתיה כרטיסים צמודים — פריט לכל שורה, בלי קווים מפרידים. */
 @Composable
 private fun Group(title: String, content: @Composable ColumnScope.() -> Unit) {
     Text(
         title,
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(start = NexplorerDimens.Space2, top = NexplorerDimens.Space3, bottom = NexplorerDimens.Space1),
+        modifier = Modifier.padding(start = NexplorerDimens.Space3, top = NexplorerDimens.Space3, bottom = NexplorerDimens.Space1),
     )
-    Surface(shape = NexplorerShape.Card, color = MaterialTheme.colorScheme.surface, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(vertical = NexplorerDimens.Space1), content = content)
-    }
-}
-
-@Composable
-private fun Divider() {
-    HorizontalDivider(color = MaterialTheme.colorScheme.outline, modifier = Modifier.padding(horizontal = NexplorerDimens.Space4))
+    SegmentedGroup(content = content)
 }
 
 @Composable
 private fun Item(title: String, subtitle: String? = null, onClick: (() -> Unit)? = null, trailing: @Composable () -> Unit) {
     Row(
         modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = NexplorerDimens.RowHeight - NexplorerDimens.Space2)
+            .segment(MaterialTheme.colorScheme.surface)
+            .heightIn(min = NexplorerDimens.SettingsRowHeight)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = NexplorerDimens.Space4, vertical = NexplorerDimens.Space2),
         verticalAlignment = Alignment.CenterVertically,
@@ -293,7 +280,17 @@ private fun Item(title: String, subtitle: String? = null, onClick: (() -> Unit)?
 @Composable
 private fun SwitchItem(title: String, subtitle: String?, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
     Item(title, subtitle, onClick = if (enabled) ({ onChange(!checked) }) else null) {
-        Switch(checked = checked, onCheckedChange = if (enabled) onChange else null, enabled = enabled)
+        // מתג M3 עם ✓ על הידית כשהוא דולק (לוח "הגדרות", 1.9).
+        Switch(
+            checked = checked,
+            onCheckedChange = if (enabled) onChange else null,
+            enabled = enabled,
+            thumbContent = if (checked) {
+                { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(SwitchDefaults.IconSize)) }
+            } else {
+                null
+            },
+        )
     }
 }
 
