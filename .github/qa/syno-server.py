@@ -3,7 +3,8 @@
 # שהאפליקציה משתמשת בו, ובאותם כללים כמו DSM 7.4 (נבדקו מול NAS אמיתי):
 #   SYNO.API.Auth (login/logout, ‏format=sid), ‏List (list_share/list/getinfo, דפים), ‏Download (`Range` — 206, 416
 #   מעבר לסוף), ‏Upload (multipart, גם chunked; בלי overwrite — 414 לקובץ קיים; mtime באלפיות שנייה), ‏CreateFolder
-#   (1100 ← 414), ‏Rename (1200 ← 414), ‏Delete, ‏CopyMove (משימה + status), ‏Thumb. קובץ שלא נמצא בהורדה — 502 ב-HTML,
+#   (1100 ← 414), ‏Rename (1200 ← 414), ‏Delete, ‏CopyMove ו-DirSize (משימה + status), ‏Search (start/list, התוצאות בהדרגה),
+#   ‏Thumb. ה-taskid חייב להיות מחרוזת JSON (במירכאות) — כמו ש-DSM צריך. קובץ שלא נמצא בהורדה — 502 ב-HTML,
 #   ובתמונה ממוזערת — 404 ב-HTML (כמו DSM).
 #   קודי sid: 119 ל-sid לא מוכר — האפליקציה מתחברת מחדש.
 # המשתמש: alex / qa-pass. השיתופים — תיקיות תחת --root (ברירת מחדל /tmp/nexplorer-syno).
@@ -80,6 +81,16 @@ def info(path, full):
         "additional": {"size": 0 if isdir else st.st_size, "time": {"mtime": int(st.st_mtime), "atime": int(st.st_atime),
                                                                       "ctime": int(st.st_ctime), "crtime": int(st.st_ctime)}},
     }
+
+
+def task_id(p):
+    """taskid כמחרוזת JSON ("\"abc\""), כמו ש-DSM צריך (בלי מירכאות הוא מפרש מזהה כמו 1793E9474 כמספר)."""
+    raw = p.get("taskid", "")
+    try:
+        value = json.loads(raw)
+    except ValueError:
+        return None
+    return value if isinstance(value, str) else None
 
 
 def jarray(value):
@@ -228,6 +239,14 @@ class Handler(BaseHTTPRequestHandler):
                 ("SYNO.FileStation.Delete", "delete"): self.delete,
                 ("SYNO.FileStation.CopyMove", "start"): self.copy_move,
                 ("SYNO.FileStation.CopyMove", "status"): self.copy_move_status,
+                ("SYNO.FileStation.CopyMove", "stop"): lambda p: self.ok(),
+                ("SYNO.FileStation.DirSize", "start"): self.dir_size,
+                ("SYNO.FileStation.DirSize", "status"): self.task_status,
+                ("SYNO.FileStation.DirSize", "stop"): lambda p: self.ok(),
+                ("SYNO.FileStation.Search", "start"): self.search_start,
+                ("SYNO.FileStation.Search", "list"): self.search_list,
+                ("SYNO.FileStation.Search", "stop"): lambda p: self.ok(),
+                ("SYNO.FileStation.Search", "clean"): lambda p: self.ok(),
                 ("SYNO.FileStation.Thumb", "get"): self.thumb,
             }.get((api, method))
             if handler is None:
@@ -404,7 +423,7 @@ class Handler(BaseHTTPRequestHandler):
         self.ok({"taskid": task})
 
     def copy_move_status(self, p):
-        task = tasks.get(p.get("taskid"))
+        task = tasks.get(task_id(p))
         if task is None:
             raise Fail(599)
         task["polls"] += 1
@@ -414,6 +433,71 @@ class Handler(BaseHTTPRequestHandler):
         if finished and task["error"]:
             data["error"] = task["error"]
         self.ok(data)
+
+    def dir_size(self, p):
+        size = files = dirs = 0
+        for path in jarray(p.get("path", "[]")):
+            full = real(path)
+            if full is None or not os.path.exists(full):
+                raise Fail(408)
+            if os.path.isfile(full):
+                files += 1
+                size += os.path.getsize(full)
+                continue
+            for base, subdirs, names in os.walk(full):
+                dirs += len(subdirs)
+                files += len(names)
+                size += sum(os.path.getsize(os.path.join(base, n)) for n in names)
+        task = uuid.uuid4().hex[:8]
+        tasks[task] = {"polls": 0, "result": {"total_size": size, "num_file": files, "num_dir": dirs}}
+        self.ok({"taskid": task})
+
+    def task_status(self, p):
+        task = tasks.get(task_id(p))
+        if task is None:
+            raise Fail(599)
+        task["polls"] += 1
+        finished = task["polls"] >= 2
+        self.ok({"finished": finished, **(task["result"] if finished else {})})
+
+    def search_start(self, p):
+        import fnmatch
+        folder = p.get("folder_path", "")
+        full = real(folder)
+        if full is None or not os.path.isdir(full):
+            raise Fail(408)
+        pattern = p.get("pattern", "*") or "*"
+        if "*" not in pattern and "?" not in pattern:
+            pattern = "*" + pattern + "*"
+        size_from = int(p.get("size_from", 0) or 0)
+        mtime_from = int(p.get("mtime_from", 0) or 0)
+        found = []
+        for base, subdirs, names in os.walk(full):
+            for n in sorted(subdirs) + sorted(names):
+                f = os.path.join(base, n)
+                if not fnmatch.fnmatch(n.lower(), pattern.lower()):
+                    continue
+                if size_from and (os.path.isdir(f) or os.path.getsize(f) < size_from):
+                    continue
+                if mtime_from and os.stat(f).st_mtime < mtime_from:
+                    continue
+                path = "/" + os.path.relpath(f, ROOT)
+                found.append(info(path, f))
+        task = uuid.uuid4().hex[:8]
+        tasks[task] = {"polls": 0, "files": found}
+        self.ok({"taskid": task})
+
+    def search_list(self, p):
+        task = tasks.get(task_id(p))
+        if task is None:
+            # כמו DSM: מזהה שלא נמצא — "נגמר", בלי תוצאות.
+            return self.ok({"finished": True})
+        task["polls"] += 1
+        # התוצאות מגיעות בהדרגה: חצי בשאלה הראשונה, והשאר — כשהחיפוש "נגמר".
+        files = task["files"]
+        ready = files if task["polls"] >= 2 else files[: len(files) // 2]
+        offset, limit = int(p.get("offset", 0)), min(int(p.get("limit", 1000)), PAGE_LIMIT_MAX * 5)
+        self.ok({"finished": task["polls"] >= 2, "total": len(ready), "offset": offset, "files": ready[offset:offset + limit]})
 
     def thumb(self, p):
         full = real(p.get("path", ""))

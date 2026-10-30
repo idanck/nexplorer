@@ -6,6 +6,7 @@ import com.idanck.nexplorer.core.NetProtocol
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
@@ -61,6 +62,16 @@ class RemoteFiles(
 
     suspend fun space(path: String): RemoteSpace? = withContext(Dispatchers.IO) { runCatching { fsFor(path).space(path) }.getOrNull() }
 
+    /** החיבור של [path] כשהוא NAS של Synology — לחיפוש, להעתקה ולחישוב גדלים בצד השרת. */
+    fun synology(path: String): SynologyFs? =
+        if (NetPaths.protocolOf(path) == NetProtocol.Synology) fsFor(path) as? SynologyFs else null
+
+    /** גודל תיקייה ב-NAS (Synology — DirSize); null — לא Synology, או כשל. ל"גודל תיקיות" ברשימה. */
+    suspend fun folderSize(path: String): Long? = withContext(Dispatchers.IO) {
+        val context = currentCoroutineContext()
+        runCatching { synology(path)?.treeStats(listOf(path)) { !context.isActive }?.bytes }.getOrNull()
+    }
+
     /** תמונה ממוזערת מהשרת (Synology); null — אין, או כשל. */
     suspend fun thumbnail(path: String, large: Boolean): ByteArray? = withContext(Dispatchers.IO) {
         runCatching { fsFor(path).thumbnail(path, large) }.getOrNull()
@@ -97,6 +108,12 @@ class RemoteFiles(
 
     /** גודל ומספר פריטים של עץ ברשת — לחלון המאפיינים. כל תיקייה היא בקשה; הביטול נבדק בין בקשות. */
     suspend fun treeStats(paths: List<String>): TreeStats = withContext(Dispatchers.IO) {
+        // Synology: ה-NAS סופר בעצמו (DirSize) — בקשה אחת במקום תיקייה אחר תיקייה. רשימת השיתופים — כמו בכל מקום.
+        val context = currentCoroutineContext()
+        val syno = paths.firstOrNull()?.let { synology(it) }
+        if (syno != null && paths.none { NetPaths.isShareList(it) } && paths.all { NetPaths.connectionId(it) == NetPaths.connectionId(paths.first()) }) {
+            return@withContext syno.treeStats(paths) { !context.isActive }
+        }
         var bytes = 0L
         var files = 0
         var folders = 0

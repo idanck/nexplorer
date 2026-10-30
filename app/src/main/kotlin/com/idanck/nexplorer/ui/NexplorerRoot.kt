@@ -48,6 +48,7 @@ import com.idanck.nexplorer.ui.update.UpdateActions
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
+import com.idanck.nexplorer.core.NetPaths
 import com.idanck.nexplorer.core.Entry
 import com.idanck.nexplorer.core.FileKind
 import com.idanck.nexplorer.core.MediaFormats
@@ -293,8 +294,9 @@ fun NexplorerRoot(
                         screen = Screen.Browser
                     } else if (MediaFormats.opensInApp(entry)) {
                         openMedia(entry)
-                    } else if (EncryptedFiles.hasEncryptedName(entry.name)) {
-                        // חלון הסיסמה של מסך הקבצים, בתיקייה של הקובץ.
+                    } else if (EncryptedFiles.hasEncryptedName(entry.name) || NetPaths.isRemote(entry.path)) {
+                        // מוצפן — חלון הסיסמה של מסך הקבצים, בתיקייה של הקובץ; מהרשת (חיפוש ב-NAS, 7ב) — "פתח" של מסך
+                        // הקבצים, שמוריד עותק כשצריך.
                         browser.openPath(entry.path)
                         browser.open(entry)
                         screen = Screen.Browser

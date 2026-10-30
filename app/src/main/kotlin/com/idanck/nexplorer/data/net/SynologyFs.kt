@@ -22,6 +22,7 @@ import java.io.EOFException
 import java.io.FilterInputStream
 import java.io.IOException
 import java.io.InputStream
+import java.io.InterruptedIOException
 import java.io.OutputStream
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
@@ -353,23 +354,134 @@ class SynologyFs(private val connection: NetConnection, password: CharArray?) : 
 
     /** העברה בצד השרת: משימה (`CopyMove`), וממתינים לסיום. */
     private fun move(path: String, destFolder: String) {
+        copyMove(path, destFolder, remove = true, isCancelled = { false }, onProgress = {})
+    }
+
+    /**
+     * `CopyMove` — משימה ברקע ב-NAS: התחלה, ושאלה על המצב עד שהיא נגמרת. [onProgress] — החלק שהושלם (0–1).
+     * בוטל ([isCancelled]) — המשימה נעצרת ב-NAS, ו-[InterruptedIOException] נזרק.
+     */
+    private fun copyMove(path: String, destFolder: String, remove: Boolean, isCancelled: () -> Boolean, onProgress: (Double) -> Unit) {
         val task = call(
             "SYNO.FileStation.CopyMove", 3, "start",
             "path" to JSONArray(listOf(stationPath(path))).toString(),
             "dest_folder_path" to stationPath(destFolder),
-            "remove_src" to "true",
-        ).optString("taskid").ifEmpty { throw IOException("ה-NAS לא התחיל את ההעברה") }
+            "remove_src" to remove.toString(),
+        ).optString("taskid").ifEmpty { throw IOException(if (remove) "ה-NAS לא התחיל את ההעברה" else "ה-NAS לא התחיל את ההעתקה") }
+        val status = waitTask("SYNO.FileStation.CopyMove", 3, task, isCancelled) { onProgress(it.optDouble("progress", 0.0)) }
+        status.optJSONObject("error")?.let { throw SynoErrors.file(errorCodeOf(JSONObject().put("error", it))) }
+        onProgress(1.0)
+    }
+
+    /**
+     * ממתין למשימה ברקע ב-NAS (`CopyMove`, ‏`DirSize`): שאלה על המצב, בהמתנה שגדלה עד [POLL_MAX_MS]. ה-taskid
+     * נשלח כמחרוזת JSON (במירכאות): בלי מירכאות DSM מפרש מזהה כמו "1793374970510E9474" כמספר, והמשימה
+     * "לא נמצאת" — נמצא מול NAS אמיתי.
+     */
+    private fun waitTask(api: String, version: Int, task: String, isCancelled: () -> Boolean, onStatus: (JSONObject) -> Unit = {}): JSONObject {
         var wait = POLL_FIRST_MS
         while (true) {
-            val status = call("SYNO.FileStation.CopyMove", 3, "status", "taskid" to task)
-            if (status.optBoolean("finished")) {
-                status.optJSONObject("error")?.let { throw SynoErrors.file(errorCodeOf(JSONObject().put("error", it))) }
-                return
+            if (isCancelled()) {
+                runCatching { call(api, version, "stop", "taskid" to quoted(task)) }
+                throw InterruptedIOException("בוטל")
             }
+            val status = call(api, version, "status", "taskid" to quoted(task))
+            onStatus(status)
+            if (status.optBoolean("finished")) return status
             Thread.sleep(wait)
             wait = (wait * 2).coerceAtMost(POLL_MAX_MS)
         }
     }
+
+    /**
+     * העתקה בצד השרת, בלי שהבתים עוברים בטלפון: [path] אל `[destDir]/[name]`. אותו שם — `CopyMove` ישירות; שם
+     * אחר (כבר קיים פריט בשם המקורי ביעד) — דרך תיקייה זמנית ביעד: העתקה אליה, שינוי שם, העברה ליעד, מחיקתה.
+     * [onProgress] — החלק שהושלם (0–1).
+     */
+    fun copyOnServer(path: String, destDir: String, name: String, isCancelled: () -> Boolean, onProgress: (Double) -> Unit) {
+        if (name == NetPaths.name(path)) {
+            copyMove(path, destDir, remove = false, isCancelled, onProgress)
+            return
+        }
+        val temp = NetPaths.child(destDir, ".nexplorer-copy-${System.nanoTime().toString(36)}")
+        mkdir(temp)
+        try {
+            copyMove(path, temp, remove = false, isCancelled, onProgress)
+            val copied = NetPaths.child(temp, NetPaths.name(path))
+            renameInPlace(copied, name)
+            move(NetPaths.child(temp, name), destDir)
+        } finally {
+            runCatching { call("SYNO.FileStation.Delete", 2, "delete", "path" to JSONArray(listOf(stationPath(temp))).toString(), "recursive" to "true") }
+        }
+    }
+
+    /** גודל ומספר פריטים של עץ — `DirSize`, ב-NAS עצמו (בלי לעבור על כל תיקייה). התיקיות שנבחרו לא נספרות. */
+    fun treeStats(paths: List<String>, isCancelled: () -> Boolean): RemoteFiles.TreeStats {
+        val task = call("SYNO.FileStation.DirSize", 2, "start", "path" to JSONArray(paths.map(::stationPath)).toString())
+            .optString("taskid").ifEmpty { throw IOException("ה-NAS לא התחיל את החישוב") }
+        val status = waitTask("SYNO.FileStation.DirSize", 2, task, isCancelled)
+        return RemoteFiles.TreeStats(status.optLong("total_size"), status.optInt("num_file"), status.optInt("num_dir"))
+    }
+
+    /**
+     * חיפוש עמוק — ה-NAS מחפש (`Search`), בכל אחת מ-[folders] וכל מה שמתחתיה. [pattern] — כמו בתחביר שלנו: בלי
+     * תו כללי — הכלה ("img" ⊂ "IMG_101.jpg"), עם — glob; בלי רישיות. [minSize] (בתים) ו-[modifiedAfter] (אלפיות שנייה)
+     * — 0 בלי. התוצאות עוברות ל-[onFiles] בדפים, כשהן מגיעות; false ממנו — עצירה.
+     */
+    fun search(
+        folders: List<String>,
+        pattern: String,
+        minSize: Long,
+        modifiedAfter: Long,
+        isCancelled: () -> Boolean,
+        onFiles: (List<Entry>) -> Boolean,
+    ) {
+        val root = NetPaths.root(connection.protocol, connection.id)
+        for (folder in folders) {
+            val task = call(
+                "SYNO.FileStation.Search", 2, "start",
+                "folder_path" to stationPath(folder),
+                "recursive" to "true",
+                "pattern" to pattern.ifBlank { "*" },
+                *(if (minSize > 0) arrayOf("size_from" to minSize.toString()) else emptyArray()),
+                *(if (modifiedAfter > 0) arrayOf("mtime_from" to (modifiedAfter / 1000).toString()) else emptyArray()),
+            ).optString("taskid").ifEmpty { throw IOException("ה-NAS לא התחיל את החיפוש") }
+            try {
+                var offset = 0
+                var wait = POLL_FIRST_MS
+                while (true) {
+                    if (isCancelled()) return
+                    val page = call(
+                        "SYNO.FileStation.Search", 2, "list",
+                        "taskid" to quoted(task),
+                        "offset" to offset.toString(),
+                        "limit" to PAGE.toString(),
+                        "additional" to ADDITIONAL,
+                    )
+                    val files = page.optJSONArray("files") ?: JSONArray()
+                    if (files.length() > 0) {
+                        val entries = (0 until files.length()).map { i ->
+                            val file = files.getJSONObject(i)
+                            val path = root + file.optString("path")
+                            entryOf(NetPaths.parent(path) ?: root, file)
+                        }
+                        offset += files.length()
+                        if (!onFiles(entries)) return
+                        wait = POLL_FIRST_MS
+                        continue
+                    }
+                    if (page.optBoolean("finished") && offset >= page.optInt("total", offset)) break
+                    Thread.sleep(wait)
+                    wait = (wait * 2).coerceAtMost(POLL_MAX_MS)
+                }
+            } finally {
+                runCatching { call("SYNO.FileStation.Search", 2, "stop", "taskid" to quoted(task)) }
+                runCatching { call("SYNO.FileStation.Search", 2, "clean", "taskid" to quoted(task)) }
+            }
+        }
+    }
+
+    private fun quoted(task: String): String = JSONObject.quote(task)
 
     /**
      * בקשה ל-`entry.cgi`. כשל עם קוד של sid (פג, נותק) — התחברות מחדש וניסיון אחד נוסף. [NotFound] — 408.

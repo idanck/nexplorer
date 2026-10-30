@@ -7,6 +7,8 @@ import com.idanck.nexplorer.NexplorerApp
 import com.idanck.nexplorer.core.Entry
 import com.idanck.nexplorer.core.FileKind
 import com.idanck.nexplorer.core.FileKinds
+import com.idanck.nexplorer.core.NetPaths
+import com.idanck.nexplorer.core.NetProtocol
 import com.idanck.nexplorer.core.SearchQuery
 import com.idanck.nexplorer.data.files.LocalFiles
 import com.idanck.nexplorer.data.files.StorageVolumeInfo
@@ -23,6 +25,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.IOException
 
 enum class SizeFilter(val label: String, val minBytes: Long) {
     Any("כל גודל", 0),
@@ -56,7 +59,12 @@ data class SearchState(
     val scannedFolders: Int = 0,
     val elapsedMs: Long = 0,
     val truncated: Boolean = false,
+    /** החיפוש ב-NAS נכשל (אין חיבור, ההתחברות נכשלה). */
+    val error: String? = null,
 ) {
+    /** חיפוש ב-NAS של Synology (7ב): ה-NAS מחפש, ואין "תיקיות שנסרקו". */
+    val remote: Boolean get() = NetPaths.protocolOf(root) == NetProtocol.Synology
+
     /** "!" או "|" לבד הם עוד לא שאילתה — בלי זה הם היו מציגים את 1000 הקבצים הראשונים. */
     val hasCriteria: Boolean get() = !SearchQuery.parse(text).isEmpty || kind != null || size != SizeFilter.Any || date != DateFilter.Any
     val total: Int get() = groups.sumOf { it.hits.size }
@@ -69,6 +77,7 @@ data class SearchState(
 class SearchViewModel(app: Application) : AndroidViewModel(app) {
 
     private val settings = (app as NexplorerApp).container.settings
+    private val remote = (app as NexplorerApp).container.remote
     private val _state = MutableStateFlow(SearchState())
     val state: StateFlow<SearchState> = _state
     private var job: Job? = null
@@ -112,7 +121,21 @@ class SearchViewModel(app: Application) : AndroidViewModel(app) {
         val gen = ++generation
         val s = _state.value
         if (!s.hasCriteria) {
-            _state.update { it.copy(groups = emptyList(), scanning = false, scannedFolders = 0, truncated = false) }
+            _state.update { it.copy(groups = emptyList(), scanning = false, scannedFolders = 0, truncated = false, error = null) }
+            return
+        }
+        if (s.remote) {
+            job = viewModelScope.launch {
+                delay(DEBOUNCE_MS)
+                _state.update { it.copy(groups = emptyList(), scanning = true, scannedFolders = 0, truncated = false, error = null) }
+                val started = System.currentTimeMillis()
+                try {
+                    withContext(Dispatchers.IO) { searchNas(gen, s, started) }
+                } catch (e: IOException) {
+                    if (gen == generation) _state.update { it.copy(error = e.message ?: "החיפוש ב-NAS נכשל") }
+                }
+                if (gen == generation) _state.update { it.copy(scanning = false, elapsedMs = System.currentTimeMillis() - started) }
+            }
             return
         }
         job = viewModelScope.launch {
@@ -193,6 +216,61 @@ class SearchViewModel(app: Application) : AndroidViewModel(app) {
                 }
                 publish(force = false)
             }
+        }
+        publish(force = true)
+    }
+
+    /**
+     * Synology (7ב): ה-NAS מחפש ([SynologyFs.search]) — בתיקייה, או בכל השיתופים ("בכל ה-NAS", או מהשורש). מה שה-NAS
+     * יודע לסנן — שם (מילה אחת), גודל ותאריך — נשלח אליו; השאר (כמה מילים, "בלי", "או", סוג) — כאן, על התוצאות.
+     */
+    private suspend fun searchNas(gen: Int, s: SearchState, started: Long) {
+        val fs = remote.synology(s.root) ?: throw IOException("החיבור ל-NAS לא נמצא")
+        val context = currentCoroutineContext()
+        val query = SearchQuery.parse(s.text)
+        val showHidden = settings.state.value.defaultView.showHidden
+        val now = System.currentTimeMillis()
+        val root = NetPaths.root(NetProtocol.Synology, NetPaths.connectionId(s.root) ?: return)
+        val folders = if (s.allPlaces || NetPaths.isShareList(s.root)) fs.list(root).map { it.path } else listOf(s.root)
+        val groups = linkedMapOf<String, MutableList<SearchHit>>()
+        var found = 0
+        var lastPublish = 0L
+
+        fun publish(force: Boolean, truncated: Boolean = false) {
+            val t = System.currentTimeMillis()
+            if (!force && t - lastPublish < PUBLISH_MS) return
+            lastPublish = t
+            val snapshot = groups.map { (label, hits) -> SearchGroup(label, hits.toList()) }
+            _state.update {
+                if (gen != generation || !context.isActive) it
+                else it.copy(groups = snapshot, elapsedMs = t - started, truncated = truncated || it.truncated)
+            }
+        }
+
+        fs.search(
+            folders = folders,
+            pattern = query.serverPattern,
+            minSize = s.size.minBytes,
+            modifiedAfter = if (s.date != DateFilter.Any) now - s.date.maxAgeMs else 0,
+            isCancelled = { gen != generation || !context.isActive },
+        ) { entries ->
+            for (entry in entries) {
+                if (entry.isHidden && !showHidden) continue
+                if (!query.isEmpty && !query.matches(entry.name)) continue
+                if (s.kind != null && entry.kind != s.kind) continue
+                if (s.size != SizeFilter.Any && (entry.isDirectory || entry.size < s.size.minBytes)) continue
+                if (s.date != DateFilter.Any && now - entry.lastModified > s.date.maxAgeMs) continue
+                val segments = NetPaths.segments(entry.path)
+                val share = segments.firstOrNull() ?: continue
+                groups.getOrPut(share) { mutableListOf() } += SearchHit(entry, "/" + segments.dropLast(1).joinToString("/"))
+                found++
+                if (found >= LIMIT) {
+                    publish(force = true, truncated = true)
+                    return@search false
+                }
+            }
+            publish(force = false)
+            true
         }
         publish(force = true)
     }

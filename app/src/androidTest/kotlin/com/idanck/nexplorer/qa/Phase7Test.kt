@@ -215,6 +215,35 @@ class Phase7Test {
         Qa.screenshot(compose, "175-synology-wrong-password")
     }
 
+    /** 7ב: ה-NAS מחפש (מסך החיפוש הרגיל), מעתיק בתוך עצמו, וסופר גדלים (DirSize). */
+    @Test
+    fun t04_theNasSearchesCopiesAndCounts() = logged("t04") {
+        val nas = nas
+        save(nas)
+        val base = NetPaths.child(nas.root, "nexplorer-qa")
+        scenario = Qa.launch(base)
+        compose.waitFor(hasText("notes.txt"), 30_000)
+        compose.onNodeWithContentDescription("חיפוש").performClick()
+        compose.waitFor(hasSetTextAction())
+        compose.onNode(hasSetTextAction()).performTextInput("inside")
+        compose.waitFor(hasText("inside.png"), 30_000)
+        compose.waitFor(hasText("חיפוש ב-NAS", substring = true), 30_000)
+        Qa.screenshot(compose, "176-synology-search")
+
+        val backup = NetPaths.child(nas.root, "backup")
+        container.transfers.enqueue(TransferKind.Copy, listOf("$base/Photos"), backup)
+        compose.waitForDisk(60_000) { remoteStat("$backup/Photos/inside.png") != null }
+        assertNotNull(remoteStat("$base/Photos/inside.png"))
+        // שם תפוס ביעד — עותק בשם פנוי, עדיין בצד השרת.
+        container.transfers.enqueue(TransferKind.Copy, listOf("$base/notes.txt"), base)
+        compose.waitForDisk(60_000) { remoteStat("$base/notes (1).txt") != null }
+        assertEquals("hello from dsm\n", String(remoteBytes("$base/notes (1).txt")))
+
+        val stats = runBlocking { container.remote.treeStats(listOf("$base/Photos")) }
+        assertEquals(1, stats.files)
+        assertEquals(0, stats.folders)
+    }
+
     private companion object {
         const val SERVER = "10.0.2.2"
         const val PORT = 8091

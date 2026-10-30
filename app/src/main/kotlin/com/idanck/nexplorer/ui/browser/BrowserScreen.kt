@@ -80,6 +80,7 @@ import com.idanck.nexplorer.core.Entry
 import com.idanck.nexplorer.core.FileKind
 import com.idanck.nexplorer.core.MediaFormats
 import com.idanck.nexplorer.core.NetPaths
+import com.idanck.nexplorer.core.NetProtocol
 import com.idanck.nexplorer.core.SizeFormat
 import com.idanck.nexplorer.core.isolated
 import com.idanck.nexplorer.data.apk.ApkInspector
@@ -296,7 +297,10 @@ fun BrowserScreen(
     val selected = state.entries.filter { it.path in state.selection }
     val activeTransfers = transferList.filter { it.isActive }
     // ברשת אין חיפוש עמוק (כל תיקייה היא בקשה לשרת) — הסינון ברשימה במקומו.
-    val search: () -> Unit = { if (state.isRemote) vm.setFilter("") else onOpenSearch(state.folderPath) }
+    // ברשת — סינון ברשימה; ב-Synology (7ב) — מסך החיפוש, וה-NAS מחפש.
+    val search: () -> Unit = {
+        if (state.isRemote && state.folderPath?.let(NetPaths::protocolOf) != NetProtocol.Synology) vm.setFilter("") else onOpenSearch(state.folderPath)
+    }
 
     // מקלדת פיזית: רק המסך שמוצג — ובשני חלונות רק החלון הפעיל — מקבל פקודות.
     val onKey by rememberUpdatedState<(KeyCommand) -> Boolean> { command ->
@@ -901,7 +905,7 @@ private fun overflowModel(
         isFavorite = state.isFavorite,
         canPinShortcut = canPin && !state.isRemote,
         // ברשת: גודל תיקיות סורק את השרת, והמנתח — את המכשיר.
-        canFolderSizes = !state.isRemote,
+        canFolderSizes = !state.isRemote || state.folderPath?.let(NetPaths::protocolOf) == NetProtocol.Synology,
         canAnalyze = !state.isRemote,
         transfersLabel = if (activeTransfers.isEmpty()) null
         else (running?.let { "${(it.fraction * 100).toInt()}% · " }.orEmpty()) + activeTransfers.size,

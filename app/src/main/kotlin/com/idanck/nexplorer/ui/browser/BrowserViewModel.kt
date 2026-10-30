@@ -15,6 +15,7 @@ import com.idanck.nexplorer.core.FileNames
 import com.idanck.nexplorer.core.FolderSizes
 import com.idanck.nexplorer.core.MediaFormats
 import com.idanck.nexplorer.core.NetPaths
+import com.idanck.nexplorer.core.NetProtocol
 import com.idanck.nexplorer.core.RenamePattern
 import com.idanck.nexplorer.core.Section
 import com.idanck.nexplorer.core.ViewOptions
@@ -491,8 +492,10 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
         sizesJob?.cancel()
         val s = _state.value
         val location = s.location
-        // ברשת: חישוב גודל של כל תיקייה הוא סריקה של השרת — לא ברקע, בלי שביקשו.
-        if (!s.view.showFolderSizes || location !is Location.Folder || NetPaths.isRemote(location.path)) {
+        // ברשת: חישוב גודל של כל תיקייה הוא סריקה של השרת — לא ברקע, בלי שביקשו. חוץ מ-Synology (7ב): ה-NAS
+        // מחשב בעצמו (DirSize), בבקשה אחת לתיקייה.
+        val nas = (location as? Location.Folder)?.path?.let { NetPaths.protocolOf(it) == NetProtocol.Synology && !NetPaths.isShareList(it) } == true
+        if (!s.view.showFolderSizes || location !is Location.Folder || (NetPaths.isRemote(location.path) && !nas)) {
             if (s.folderSizes.isNotEmpty()) {
                 _state.update { it.copy(folderSizes = emptyMap()) }
                 arrange()
@@ -505,7 +508,7 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
             val found = s.folderSizes.filterKeys { it in folders }.toMutableMap()
             var published = System.currentTimeMillis()
             for (path in folders) {
-                val size = withContext(Dispatchers.IO) { FolderSizes.of(File(path)) { isActive } } ?: continue
+                val size = (if (nas) remote.folderSize(path) else withContext(Dispatchers.IO) { FolderSizes.of(File(path)) { isActive } }) ?: continue
                 found[path] = size
                 if (System.currentTimeMillis() - published >= SIZES_PUBLISH_MS) {
                     publishSizes(location, found.toMap())
