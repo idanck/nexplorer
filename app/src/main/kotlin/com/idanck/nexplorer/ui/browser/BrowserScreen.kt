@@ -407,6 +407,10 @@ fun BrowserScreen(
                             onMore = { overflowOpen = true },
                             onClipboard = { dialog = BrowserDialog.Clipboard },
                             moreMenu = moreMenu,
+                            cloud = state.cloudConnection?.protocol,
+                            cloudTitle = state.cloudConnection?.title,
+                            account = state.cloudConnection?.account,
+                            atCloudRoot = state.isAtRoot,
                         )
                     }
                     if (pane == null) {

@@ -142,6 +142,13 @@
       "w": 390,
       "h": 844,
       "title": "נגן שמע"
+    },
+    "FileIcons.dc.html": {
+      "x": 2318,
+      "y": 4160,
+      "w": 1720,
+      "h": 1586,
+      "title": "אריחי סוגי קבצים ו-Google Drive"
     }
   },
   "order": [
@@ -163,7 +170,8 @@
     "Tablet.dc.html",
     "VideoPlayer.dc.html",
     "VideoDoubleTap.dc.html",
-    "AudioPlayer.dc.html"
+    "AudioPlayer.dc.html",
+    "FileIcons.dc.html"
   ],
   "notes": {
     "t1": {

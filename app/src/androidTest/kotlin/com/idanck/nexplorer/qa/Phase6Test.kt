@@ -178,8 +178,12 @@ class Phase6Test {
         Qa.device.pressBack()
         compose.waitFor(hasText("notes.txt"))
 
+        // 1.10: בכותרת — שם השירות, והחשבון בשורה קטנה מתחתיה (מבודד, לכן substring).
+        compose.waitFor(hasText(connection.account!!, substring = true))
+
         compose.onNodeWithContentDescription("פתח מגירת מקומות").performClick()
-        compose.waitFor(hasText("${connection.label} · ${connection.protocol.label}"))
+        // במגירה: "Google Drive" / "OneDrive", והחשבון בשורה שמתחת.
+        compose.waitFor(hasText(connection.title))
         Qa.screenshot(compose, "$shot-drawer")
         Qa.device.pressBack()
 

@@ -54,6 +54,8 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import com.idanck.nexplorer.core.Counts
+import com.idanck.nexplorer.core.NetProtocol
+import com.idanck.nexplorer.ui.net.ConnectionIcon
 import com.idanck.nexplorer.ui.theme.NexplorerTheme
 import com.idanck.nexplorer.core.isolated
 import com.idanck.nexplorer.ui.theme.MonoTextStyle
@@ -63,6 +65,9 @@ import com.idanck.nexplorer.ui.theme.NexplorerShape
 /**
  * הראש של המסך הראשי (לוח "מסך ראשי", 1.9): סרגל חיפוש בצורת גלולה — ☰, "חיפוש ב-…" (הקשה פותחת את
  * החיפוש), צ'יפ "N בלוח" כשיש מה להדביק, ⋮ — ומתחתיו שם המקום בכותרת גדולה והסיכום.
+ *
+ * בתוך חיבור ענן ([cloud], 1.10): בשורש — אייקון השירות ליד הכותרת ("Google Drive"), והחשבון ([account]) בשורה
+ * קטנה מתחתיה, מעל הסיכום; בתיקייה בתוכו — הכותרת היא שם התיקייה, ובשורה הקטנה אייקון השירות, השם והחשבון.
  */
 @Composable
 fun BrowserTopBar(
@@ -75,6 +80,10 @@ fun BrowserTopBar(
     onMore: () -> Unit,
     onClipboard: () -> Unit,
     moreMenu: @Composable () -> Unit,
+    cloud: NetProtocol? = null,
+    cloudTitle: String? = null,
+    account: String? = null,
+    atCloudRoot: Boolean = false,
 ) {
     Column(Modifier.fillMaxWidth()) {
         Row(
@@ -149,12 +158,21 @@ fun BrowserTopBar(
             Modifier.padding(start = NexplorerDimens.Space5, end = NexplorerDimens.Space5, top = NexplorerDimens.Space4, bottom = NexplorerDimens.Space1),
             verticalArrangement = Arrangement.spacedBy(NexplorerDimens.Space1 / 2),
         ) {
-            Text(
-                title,
-                style = MaterialTheme.typography.headlineMedium.let { if (titleIsLtr) it.copy(textDirection = TextDirection.Ltr) else it },
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (cloud != null && atCloudRoot) {
+                    ConnectionIcon(cloud, size = NexplorerDimens.CloudTitleIcon, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(NexplorerDimens.Space2 + NexplorerDimens.Space1 / 2))
+                }
+                Text(
+                    title,
+                    style = MaterialTheme.typography.headlineMedium.let { if (titleIsLtr) it.copy(textDirection = TextDirection.Ltr) else it },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (cloud != null && (account != null || !atCloudRoot)) {
+                CloudAccountLine(cloud, if (atCloudRoot) null else cloudTitle, account)
+            }
             Text(
                 summary,
                 style = MaterialTheme.typography.bodyMedium,
@@ -163,6 +181,29 @@ fun BrowserTopBar(
                 overflow = TextOverflow.Ellipsis,
             )
         }
+    }
+}
+
+/**
+ * השורה הקטנה מתחת לכותרת בתוך חיבור ענן: בשורש — רק החשבון; בתיקייה — אייקון השירות, השם ("Google Drive")
+ * והחשבון. החשבון LTR ומבודד, כדי שכתובת מייל לא תתהפך בשורה עברית.
+ */
+@Composable
+private fun CloudAccountLine(cloud: NetProtocol, service: String?, account: String?) {
+    val text = listOfNotNull(service?.isolated(), account?.isolated()).joinToString(" · ")
+    if (text.isEmpty()) return
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        if (service != null) {
+            ConnectionIcon(cloud, size = NexplorerDimens.CloudAccountIcon, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.width(NexplorerDimens.Space1 + NexplorerDimens.Space1 / 2))
+        }
+        Text(
+            text,
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Normal),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
