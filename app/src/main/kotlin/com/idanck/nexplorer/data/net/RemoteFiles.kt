@@ -62,6 +62,18 @@ class RemoteFiles(
 
     suspend fun space(path: String): RemoteSpace? = withContext(Dispatchers.IO) { runCatching { fsFor(path).space(path) }.getOrNull() }
 
+    /** הרשת השתנתה: חיבורי QuickConnect פתוחים בודקים שוב לאן להתחבר (מקומי או ממסר). */
+    fun networkChanged() {
+        val all = synchronized(open) { open.values.map { it.second } }
+        all.filterIsInstance<SynologyFs>().forEach { it.recheck() }
+    }
+
+    /** QuickConnect: איך החיבור של [path] עובר עכשיו — רק כשכבר פתוח (לא מתחבר בשביל זה). */
+    fun route(path: String): QuickConnect.Route? {
+        val id = NetPaths.connectionId(path) ?: return null
+        return (synchronized(open) { open[id]?.second } as? SynologyFs)?.route
+    }
+
     /** החיבור של [path] כשהוא NAS של Synology — לחיפוש, להעתקה ולחישוב גדלים בצד השרת. */
     fun synology(path: String): SynologyFs? =
         if (NetPaths.protocolOf(path) == NetProtocol.Synology) fsFor(path) as? SynologyFs else null

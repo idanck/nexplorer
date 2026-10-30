@@ -33,6 +33,10 @@ import kotlin.concurrent.thread
  * ‏119) — התחברות מחדש פעם אחת וניסיון חוזר. https: [PinnedTls] — כמו ב-WebDAV (ברשת הביתית ניגשים בכתובת IP,
  * ו-DSM מגיש תעודה לשם אחר או חתומה עצמית).
  *
+ * QuickConnect (שלב 7ג, [NetConnection.quickConnect]): הכתובת נקבעת בבקשה הראשונה ([QuickConnect]) — מקומית בבית,
+ * ממסר בחוץ ([route]); לשתיהן תעודה תקפה, ולכן בלי [PinnedTls]. כשל רשת — הכתובת נקבעת מחדש וניסיון אחד נוסף, וכך
+ * גם אחרי שהרשת משתנה ([recheck]).
+ *
  * מה שאין ב-SMB: תמונות ממוזערות מה-NAS ([thumbnail]), ותאריך השינוי נקבע בהעלאה ([openWrite]) — אחריה אי אפשר.
  */
 class SynologyFs(private val connection: NetConnection, password: CharArray?) : RemoteFs {
@@ -40,19 +44,49 @@ class SynologyFs(private val connection: NetConnection, password: CharArray?) : 
     // OkHttp מקבל רק String — הסיסמה נשארת בזיכרון כל עוד החיבור פתוח (כמו ב-WebDAV).
     private val passwd = String(password ?: CharArray(0))
     private val tls = PinnedTls(connection.hostKey)
-    private val base: HttpUrl = HttpUrl.Builder()
-        .scheme(if (connection.plainHttp) "http" else "https")
-        .host(connection.host)
-        .port(connection.effectivePort)
-        .addPathSegment("webapi")
-        .build()
+    private val quick = connection.isQuickConnect
 
-    private val client: OkHttpClient = OkHttpClient.Builder()
+    private val plain: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(CONNECT_TIMEOUT_S, TimeUnit.SECONDS)
         .readTimeout(READ_TIMEOUT_S, TimeUnit.SECONDS)
         .writeTimeout(READ_TIMEOUT_S, TimeUnit.SECONDS)
-        .apply { if (!connection.plainHttp) tls.apply(this) }
+        .apply { if (!connection.plainHttp && !quick) tls.apply(this) }
         .build()
+
+    /** לאן הבקשות הולכות: הכתובת של ה-API (`…/webapi`), ה-client שלה, ואיך עוברים (ב-QuickConnect). */
+    private class Target(val base: HttpUrl, val client: OkHttpClient, val route: QuickConnect.Route?)
+
+    @Volatile
+    private var target: Target? = if (quick) null else Target(
+        HttpUrl.Builder()
+            .scheme(if (connection.plainHttp) "http" else "https")
+            .host(connection.host)
+            .port(connection.effectivePort)
+            .addPathSegment("webapi")
+            .build(),
+        plain,
+        null,
+    )
+    private val targetLock = Any()
+
+    private val base: HttpUrl get() = target().base
+
+    /** QuickConnect: מקומי או ממסר — אחרי הבקשה הראשונה; null — לא QuickConnect, או שעוד לא נקבע. */
+    val route: QuickConnect.Route? get() = target?.route
+
+    /** הרשת השתנתה (בית ↔ סלולר): ב-QuickConnect — הבקשה הבאה בודקת שוב לאן להתחבר. */
+    fun recheck() {
+        if (quick) synchronized(targetLock) { target = null }
+    }
+
+    private fun target(): Target = target ?: synchronized(targetLock) { target ?: locate().also { target = it } }
+
+    private fun locate(): Target {
+        val server = QuickConnect.lookup(connection.quickConnect, plain)
+        val client = plain.newBuilder().dns(QuickConnect.resolver(server)).build()
+        val address = QuickConnect.connect(server, client)
+        return Target(address.url.newBuilder().addPathSegment("webapi").build(), client, address.route)
+    }
 
     @Volatile
     private var sid: String? = null
@@ -184,8 +218,9 @@ class SynologyFs(private val connection: NetConnection, password: CharArray?) : 
             .apply { if (lastModified > 0) addFormDataPart("mtime", lastModified.toString()) }
             .addFormDataPart("file", NetPaths.name(path), file)
             .build()
-        val url = base.newBuilder().addPathSegment("entry.cgi").addQueryParameter("_sid", session).build()
-        val call = client.newCall(Request.Builder().url(url).post(body).build())
+        val at = target()
+        val url = at.base.newBuilder().addPathSegment("entry.cgi").addQueryParameter("_sid", session).build()
+        val call = at.client.newCall(Request.Builder().url(url).post(body).build())
         var outcome: Result<IOException?>? = null
         val worker = thread(name = "syno-upload", isDaemon = true) {
             outcome = runCatching {
@@ -319,9 +354,9 @@ class SynologyFs(private val connection: NetConnection, password: CharArray?) : 
                 post("auth.cgi", mapOf("api" to "SYNO.API.Auth", "version" to "6", "method" to "logout", "session" to SESSION, "_sid" to session)).close()
             }
         }
-        client.dispatcher.cancelAll()
-        client.dispatcher.executorService.shutdown()
-        client.connectionPool.evictAll()
+        plain.dispatcher.cancelAll()
+        plain.dispatcher.executorService.shutdown()
+        plain.connectionPool.evictAll()
     }
 
     // ---------- API ----------
@@ -531,14 +566,33 @@ class SynologyFs(private val connection: NetConnection, password: CharArray?) : 
         return execute(Request.Builder().url(base.newBuilder().addPathSegment(cgi).build()).post(form).build())
     }
 
-    private fun execute(request: Request): Response = try {
-        client.newCall(request).execute()
-    } catch (e: IOException) {
-        throw map(e)
+    /**
+     * QuickConnect: כשל ברשת (הכתובת לא עונה — יצאנו מהבית, או חזרנו) — הכתובת נקבעת מחדש, והבקשה נשלחת שוב
+     * לכתובת החדשה, פעם אחת. רק כשל בחיבור עצמו — הבקשה לא הגיעה ל-NAS.
+     */
+    private fun execute(request: Request): Response {
+        val at = target()
+        try {
+            return at.client.newCall(request).execute()
+        } catch (e: IOException) {
+            if (!quick || !unreachable(e)) throw map(e)
+            synchronized(targetLock) { if (target === at) target = null }
+        }
+        val again = target()
+        val url = request.url.newBuilder().scheme(again.base.scheme).host(again.base.host).port(again.base.port).build()
+        return try {
+            again.client.newCall(request.newBuilder().url(url).build()).execute()
+        } catch (e: IOException) {
+            throw map(e)
+        }
+    }
+
+    private fun unreachable(e: Throwable): Boolean = generateSequence(e) { it.cause }.any {
+        it is java.net.ConnectException || it is java.net.UnknownHostException || it is java.net.NoRouteToHostException
     }
 
     private fun jsonOf(response: Response): JSONObject {
-        if (response.code == 404) throw IOException("זה לא NAS של Synology — בדוק את הכתובת והפורט (${connection.effectivePort})")
+        if (response.code == 404) throw IOException(if (quick) "QuickConnect הגיע לכתובת שאינה DSM" else "זה לא NAS של Synology — בדוק את הכתובת והפורט (${connection.effectivePort})")
         val text = response.body?.string().orEmpty()
         return try {
             JSONObject(text)
@@ -564,7 +618,15 @@ class SynologyFs(private val connection: NetConnection, password: CharArray?) : 
         if (chain.any { it is javax.net.ssl.SSLHandshakeException || it is javax.net.ssl.SSLPeerUnverifiedException }) {
             return IOException("החיבור המאובטח ל-NAS נכשל", e)
         }
-        NetErrors.network(e, connection)?.let { return it }
+        if (quick) {
+            if (chain.any { it is java.net.SocketTimeoutException } || unreachable(e)) {
+                // בבקשה הבאה — שוב "לאן להתחבר".
+                synchronized(targetLock) { target = null }
+                return IOException("ה-NAS לא זמין דרך QuickConnect — בדוק את החיבור לאינטרנט", e)
+            }
+        } else {
+            NetErrors.network(e, connection)?.let { return it }
+        }
         if (chain.any { it is javax.net.ssl.SSLException || it is java.net.SocketException }) return IOException("החיבור ל-NAS נותק", e)
         return e as? IOException ?: IOException(e.message ?: "שגיאה מה-NAS", e)
     }

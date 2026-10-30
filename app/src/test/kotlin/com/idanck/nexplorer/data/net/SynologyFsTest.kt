@@ -2,6 +2,7 @@ package com.idanck.nexplorer.data.net
 
 import com.idanck.nexplorer.core.NetPaths
 import com.idanck.nexplorer.core.NetProtocol
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.junit.AfterClass
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -165,6 +166,32 @@ class SynologyFsTest {
         fs.copyOnServer("$qa/notes.txt", qa, "notes (1).txt", { false }) {}
         assertEquals("hello from dsm\n", String(fs.openRead("$qa/notes (1).txt").use { it.readBytes() }))
         assertTrue(fs.list(qa).none { it.name.startsWith(".nexplorer-copy") })
+    }
+
+    @Test
+    fun `quickconnect goes direct at home, through the relay outside, and checks again when the network changes`() {
+        QuickConnect.directory = "http://127.0.0.1:$port/Serv.php".toHttpUrl()
+        val id = "syn0000000002"
+        val quickQa = NetPaths.child(NetPaths.root(NetProtocol.Synology, id), "nexplorer-qa")
+        fun quick(alias: String = "my-nas") =
+            SynologyFs(NetConnection(id, NetProtocol.Synology, "", "", null, "", "alex", quickConnect = alias), "qa-pass".toCharArray())
+        quick().use { fs ->
+            assertNull(fs.route)
+            assertEquals(4, fs.list(quickQa).size)
+            assertEquals(QuickConnect.Route.Local, fs.route)
+        }
+        // מחוץ לבית: המקומית לא עונה, והממסר נפתח רק אחרי request_tunnel.
+        control("/qa/qc?lan=down")
+        quick().use { fs ->
+            assertEquals("hello from dsm\n", String(fs.openRead("$quickQa/notes.txt").use { it.readBytes() }))
+            assertEquals(QuickConnect.Route.Relay, fs.route)
+            // חזרה הביתה — הרשת השתנתה, והבקשה הבאה עוברת ישירות.
+            control("/qa/qc?lan=up")
+            fs.recheck()
+            assertEquals(4, fs.list(quickQa).size)
+            assertEquals(QuickConnect.Route.Local, fs.route)
+        }
+        assertEquals("המזהה לא נמצא ב-QuickConnect", runCatching { quick("other-nas").use { it.list(quickQa) } }.exceptionOrNull()?.message)
     }
 
     @Test

@@ -2,6 +2,7 @@ package com.idanck.nexplorer.data.net
 
 import com.idanck.nexplorer.core.NetProtocol
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -101,5 +102,20 @@ class NetConnectionTest {
         val odd = cloud.copy(host = "fe80::1", port = 8443, share = "dav/a b", plainHttp = false)
         assertEquals("https://[fe80::1]:8443/dav/a%20b/x%23%25%3F", odd.displayUrl("${odd.root}/x#%?"))
         assertEquals(com.idanck.nexplorer.core.DavAddress("fe80::1", 8443, "dav/a b", false), com.idanck.nexplorer.core.DavAddress.parse(odd.displayUrl(odd.root)))
+    }
+
+    @Test
+    fun `quickconnect keeps the id instead of a server`() {
+        val qc = NetConnection("0f0f0f0f0f0f", NetProtocol.Synology, "", "", null, "", "alex", secret = "aXY=:cGs=", quickConnect = "my-nas")
+        val home = qc.copy(id = "1a1a1a1a1a1a", host = "192.168.1.20", quickConnect = "")
+        assertEquals(listOf(qc, home), NetConnection.decode(NetConnection.encode(listOf(qc, home))))
+        assertTrue(qc.isQuickConnect)
+        assertFalse(home.isQuickConnect)
+        assertEquals("my-nas", qc.label)
+        assertEquals("alex@my-nas · QuickConnect", qc.subtitle)
+        assertEquals("syno://my-nas.quickconnect.to/photo/2026", qc.displayUrl("${qc.root}/photo/2026"))
+        // רשומה מלפני 7ג — רשת ביתית.
+        val old = """[{"id":"1a1a1a1a1a1a","protocol":"Synology","name":"","host":"192.168.1.20","port":null,"share":"","user":"alex","domain":"","secret":"aXY=:cGs="}]"""
+        assertEquals(listOf(home), NetConnection.decode(old))
     }
 }

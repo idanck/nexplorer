@@ -1,6 +1,9 @@
 package com.idanck.nexplorer
 
 import android.app.Application
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
 import android.util.Log
 import coil.ImageLoader
 import coil.ImageLoaderFactory
@@ -62,6 +65,22 @@ class NexplorerApp : Application(), ImageLoaderFactory {
             EncryptedPreview.clearStale(cacheDir)
             container.remote.clearStale(cacheDir)
         }
+        watchNetwork()
+    }
+
+    /**
+     * QuickConnect (שלב 7ג): כשהרשת משתנה (חזרה הביתה, יציאה לסלולר) — החיבור בודק שוב לאן להתחבר: בבית ישירות,
+     * בחוץ — דרך הממסר. הקריאה הראשונה (הרשת שכבר פעילה) לא משנה כלום — עוד אין חיבור פתוח.
+     */
+    private fun watchNetwork() {
+        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return
+        runCatching {
+            cm.registerDefaultNetworkCallback(
+                object : ConnectivityManager.NetworkCallback() {
+                    override fun onAvailable(network: Network) = container.remote.networkChanged()
+                },
+            )
+        }.onFailure { Log.w("nexplorer", "network callback failed", it) }
     }
 
     /**
