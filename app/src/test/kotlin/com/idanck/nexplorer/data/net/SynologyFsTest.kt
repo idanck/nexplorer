@@ -130,6 +130,44 @@ class SynologyFsTest {
     }
 
     @Test
+    fun `the nas searches, in pages, with size and name filters`() = fs().use { fs ->
+        val found = mutableListOf<String>()
+        fs.search(listOf(qa), "png", minSize = 0, modifiedAfter = 0, isCancelled = { false }) { entries ->
+            found += entries.map { it.path }
+            true
+        }
+        assertEquals(listOf("$qa/Photos/inside.png", "$qa/photo.png"), found.sorted())
+        // בלי תו כללי — הכלה, בלי רישיות; עם — glob.
+        val all = mutableListOf<String>()
+        fs.search(listOf(root + "/nexplorer-qa", root + "/backup"), "*.TXT", 0, 0, { false }) { all += it.map { e -> e.name }; true }
+        assertEquals(listOf("# 100% עברית.txt", "notes.txt"), all.sorted())
+        val big = mutableListOf<String>()
+        fs.search(listOf(qa), "*", minSize = 50, modifiedAfter = 0, isCancelled = { false }) { big += it.map { e -> e.name }; true }
+        assertEquals(listOf("inside.png", "photo.png"), big.sorted())
+        // false מהקריאה — עוצרים.
+        var pages = 0
+        fs.search(listOf(qa), "*", 0, 0, { false }) { pages++; false }
+        assertEquals(1, pages)
+    }
+
+    @Test
+    fun `folder sizes and server-side copies`() = fs().use { fs ->
+        val stats = fs.treeStats(listOf(qa)) { false }
+        assertEquals(1, stats.folders)
+        assertEquals(4, stats.files)
+        assertTrue(stats.bytes > 0)
+        // אותו שם — CopyMove ישירות; שם אחר (קיים ביעד) — דרך תיקייה זמנית.
+        var last = 0.0
+        fs.copyOnServer("$qa/Photos", NetPaths.child(root, "backup"), "Photos", { false }) { last = it }
+        assertEquals(1.0, last, 0.0)
+        assertNotNull(fs.stat(NetPaths.child(root, "backup/Photos/inside.png")))
+        assertNotNull(fs.stat("$qa/Photos/inside.png"))
+        fs.copyOnServer("$qa/notes.txt", qa, "notes (1).txt", { false }) {}
+        assertEquals("hello from dsm\n", String(fs.openRead("$qa/notes (1).txt").use { it.readBytes() }))
+        assertTrue(fs.list(qa).none { it.name.startsWith(".nexplorer-copy") })
+    }
+
+    @Test
     fun `error codes map to hebrew`() {
         assertEquals("כבר קיים פריט בשם הזה", SynoErrors.file(414).message)
         assertEquals("אין מקום פנוי ב-NAS", SynoErrors.file(416).message)

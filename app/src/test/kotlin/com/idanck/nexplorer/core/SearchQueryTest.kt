@@ -41,4 +41,13 @@ class SearchQueryTest {
         assertEquals(emptyList<IntRange>(), SearchQuery.parse("zzz").highlights("my-router"))
         assertTrue(SearchQuery.parse("").isEmpty)
     }
+
+    @Test
+    fun `server pattern narrows by the first positive word`() {
+        assertEquals("router", SearchQuery.parse("router !old").serverPattern)
+        assertEquals("*.jpg", SearchQuery.parse("!thumb *.jpg").serverPattern)
+        // כמה חלופות, או רק "בלי" — הכל מהשרת, והסינון בטלפון.
+        assertEquals("*", SearchQuery.parse("a | b").serverPattern)
+        assertEquals("*", SearchQuery.parse("!old").serverPattern)
+    }
 }

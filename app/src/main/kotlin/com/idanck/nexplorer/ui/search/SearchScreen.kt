@@ -123,7 +123,12 @@ fun SearchScreen(
 
 private fun statusLine(state: SearchState): String {
     val seconds = String.format(Locale.US, "%.1f", state.elapsedMs / 1000.0)
-    return if (state.scanning) "סורק… ${state.scannedFolders} תיקיות" else "סריקה · $seconds שנ׳"
+    return when {
+        // Synology (7ב): ה-NAS מחפש — אין תיקיות שנסרקו בטלפון.
+        state.remote -> if (state.scanning) "ה-NAS מחפש…" else "חיפוש ב-NAS · $seconds שנ׳"
+        state.scanning -> "סורק… ${state.scannedFolders} תיקיות"
+        else -> "סריקה · $seconds שנ׳"
+    }
 }
 
 @Composable
@@ -181,9 +186,9 @@ private fun FilterChips(state: SearchState, viewModel: SearchViewModel) {
     ) {
         item {
             MenuChip(
-                label = if (state.allPlaces) "בכל המקומות" else "בתיקייה הנוכחית",
+                label = if (state.allPlaces) (if (state.remote) "בכל ה-NAS" else "בכל המקומות") else "בתיקייה הנוכחית",
                 selected = true,
-                options = listOf("בתיקייה הנוכחית" to false, "בכל המקומות" to true),
+                options = listOf("בתיקייה הנוכחית" to false, (if (state.remote) "בכל ה-NAS" else "בכל המקומות") to true),
                 onPick = viewModel::setAllPlaces,
             )
         }
@@ -290,6 +295,8 @@ private fun Footer(state: SearchState) {
     ) {
         when {
             !state.hasCriteria -> Text("הקלד שם, או בחר סוג / גודל / תאריך.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            state.error != null -> Text(state.error, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+            state.scanning && state.total == 0 && state.remote -> Text("ה-NAS מחפש…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             !state.scanning && state.total == 0 -> Text("לא נמצא כלום.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             state.truncated -> Text("מוצגות ${state.total} התוצאות הראשונות — צמצם את החיפוש.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }

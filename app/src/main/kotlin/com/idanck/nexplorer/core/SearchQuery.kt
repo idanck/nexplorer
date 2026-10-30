@@ -26,6 +26,13 @@ class SearchQuery private constructor(private val alternatives: List<Alternative
 
     val isEmpty: Boolean get() = alternatives.isEmpty()
 
+    /**
+     * מה שנשלח לשרת שמחפש בעצמו (Synology, 7ב) — צמצום בלבד; [matches] על התוצאות משלים. חלופה אחת: המילה
+     * החיובית הראשונה (אותו תחביר — הכלה בלי תו כללי, glob איתו, בלי רישיות). כמה חלופות (`|`), או רק "בלי" — "*".
+     */
+    val serverPattern: String
+        get() = alternatives.singleOrNull()?.terms?.firstOrNull { !it.negated }?.raw ?: "*"
+
     fun matches(name: String): Boolean = alternatives.any { it.matches(name) }
 
     /**

@@ -1,5 +1,9 @@
 package com.idanck.nexplorer.data.transfer
 
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.currentCoroutineContext
+import com.idanck.nexplorer.data.net.SynologyFs
 import android.content.Context
 import com.idanck.nexplorer.core.FileNames
 import com.idanck.nexplorer.core.NetPaths
@@ -406,12 +410,40 @@ class TransferManager(
         set(job.id) { it.copy(doneItems = doneItems) }
         if (pending.isEmpty()) return
 
+        // Synology (שלב 7ב): העתקה בתוך אותו NAS — בצד השרת, בלי שהבתים עוברים בטלפון.
+        fun onServer(from: Side) = (from as? RemoteSide)?.fs?.takeIf { !move && to is RemoteSide && it === to.fs } as? SynologyFs
         var total = 0L
-        for ((from, node) in pending) total += copier.sizeOf(from, node)
+        val sizes = pending.map { (from, node) ->
+            val size = onServer(from)?.takeIf { node.isDirectory }?.let { fs ->
+                runCatching { fs.treeStats(listOf(node.path)) { false }.bytes }.getOrNull()
+            } ?: copier.sizeOf(from, node)
+            total += size
+            size
+        }
         set(job.id) { it.copy(status = TransferStatus.Running, totalBytes = total) }
-        for ((from, node) in pending) {
+        for ((index, item) in pending.withIndex()) {
+            val (from, node) = item
             val name = copier.uniqueIn(to, target, node.name)
             val dest = to.child(target, name)
+            val server = onServer(from)
+            if (server != null) {
+                set(job.id) { it.copy(currentName = node.name) }
+                var reported = 0L
+                val context = currentCoroutineContext()
+                withContext(Dispatchers.IO) {
+                    server.copyOnServer(node.path, target, name, isCancelled = { !context.isActive }) { fraction ->
+                        val now = (sizes[index] * fraction.coerceIn(0.0, 1.0)).toLong()
+                        if (now > reported) {
+                            progress.add(now - reported)
+                            reported = now
+                        }
+                    }
+                }
+                checkpoint(job.id)
+                doneItems++
+                set(job.id) { it.copy(doneItems = doneItems) }
+                continue
+            }
             try {
                 copier.copy(from, node, to, target, name, move)
             } catch (e: Exception) {
