@@ -27,11 +27,12 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Dns
-import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Storage
@@ -47,6 +48,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -85,15 +89,16 @@ import com.idanck.nexplorer.data.net.FoundServer
 import com.idanck.nexplorer.data.net.NetConnection
 import com.idanck.nexplorer.data.net.NetDiscovery
 import com.idanck.nexplorer.data.net.OneDriveFs
+import com.idanck.nexplorer.data.net.QuickConnect
 import com.idanck.nexplorer.data.net.SshHostKeys
 import com.idanck.nexplorer.ui.theme.MonoTextStyle
 import com.idanck.nexplorer.ui.theme.NexplorerDimens
 import com.idanck.nexplorer.ui.theme.NexplorerShape
 import com.idanck.nexplorer.ui.theme.NexplorerTheme
+import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.IOException
 
 /**
  * סוג במסך "הוסף מקום" — לפי הלוח. SMB, ‏SFTP, ‏WebDAV וענן פעילים; לשאר — הסבר למה לא. "ענן" — Google Drive
@@ -138,6 +143,10 @@ fun ConnectScreen(
     val dav = protocol == NetProtocol.WebDav
     // Synology (שלב 7): שרת, שיתוף (או כל השיתופים), משתמש וסיסמה — ה-API של DSM ב-https.
     val syno = protocol == NetProtocol.Synology
+    // Synology דרך QuickConnect (שלב 7ג): מזהה במקום שרת; הכתובת נקבעת בכל התחברות (בבית ישירות, בחוץ בממסר).
+    var quick by rememberSaveable { mutableStateOf(editing?.isQuickConnect == true) }
+    var quickId by rememberSaveable { mutableStateOf(editing?.quickConnect.orEmpty()) }
+    val synoQuick = syno && quick
     val cloud = protocol.cloud
     var host by rememberSaveable { mutableStateOf(editing?.host.orEmpty()) }
     // WebDAV: כתובת אחת (scheme, שרת, פורט ונתיב) במקום שרת ושיתוף.
@@ -194,6 +203,10 @@ fun ConnectScreen(
         dav && url.isBlank() -> "צריך כתובת של שרת"
         dav && davAddress == null -> "כתובת לא תקינה — למשל https://cloud.example.com/remote.php/dav/files/idan"
         dav -> null
+        synoQuick && quickId.isBlank() -> "צריך מזהה QuickConnect"
+        synoQuick && !QuickConnect.isValidId(quickId.trim()) -> "מזהה QuickConnect — אותיות באנגלית, ספרות ומקף (בלי .quickconnect.to)"
+        synoQuick && user.isBlank() -> "צריך שם משתמש"
+        synoQuick -> null
         host.isBlank() -> "צריך כתובת של שרת"
         host.trim().any { it.isWhitespace() || it == '/' || it == '\\' } -> "כתובת השרת בלי רווחים ובלי / — רק השם או ה-IP"
         // "nas:4450" — פורט בתוך הכתובת (נקודתיים אחת; IPv6 עובר). הפורט בשדה שלו.
@@ -222,10 +235,11 @@ fun ConnectScreen(
             id = editing?.id ?: NetConnection.newId(),
             protocol = protocol,
             name = name.trim(),
-            host = davAddress?.host ?: host.trim(),
-            port = if (dav) davAddress?.port else portValue?.takeIf { it != protocol.defaultPort },
+            host = if (synoQuick) "" else davAddress?.host ?: host.trim(),
+            port = if (dav) davAddress?.port else portValue?.takeIf { it != protocol.defaultPort && !synoQuick },
             share = when {
                 dav -> davAddress?.path.orEmpty()
+                synoQuick -> ""
                 sftp && share.isBlank() -> NetConnection.HOME
                 else -> share.trim().trim('/')
             },
@@ -234,11 +248,12 @@ fun ConnectScreen(
             secret = editing?.secret?.takeIf { keepsPassword },
             keySecret = editing?.keySecret?.takeIf { hasKey && keepKey },
             plainHttp = davAddress?.plainHttp ?: false,
+            quickConnect = if (synoQuick) quickId.trim().lowercase() else "",
         )
         val address = addressOf(base)
         val place = editing?.takeIf { addressOf(it) == address }
         // שרת אחר (כתובת או פורט) — המפתח או התעודה שלו צריכים אישור מחדש. ב-http אין מה לאשר.
-        val hostKey = (trusted?.takeIf { it.first == address }?.second ?: place?.hostKey)?.takeIf { sftp || ((dav || syno) && !base.plainHttp) }
+        val hostKey = (trusted?.takeIf { it.first == address }?.second ?: place?.hostKey)?.takeIf { sftp || ((dav || syno) && !base.plainHttp && !base.isQuickConnect) }
         return base.copy(hostKey = hostKey)
     }
 
@@ -341,7 +356,24 @@ fun ConnectScreen(
                 }
                 note?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
 
-                if (!cloud) {
+                if (syno) {
+                    SectionLabel("איך מתחבר")
+                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                        listOf(false to "רשת ביתית", true to "QuickConnect").forEachIndexed { index, (value, label) ->
+                            SegmentedButton(
+                                selected = quick == value,
+                                onClick = {
+                                    quick = value
+                                    error = null
+                                },
+                                shape = SegmentedButtonDefaults.itemShape(index, 2),
+                                icon = {},
+                            ) { Text(label, style = MaterialTheme.typography.labelLarge) }
+                        }
+                    }
+                }
+
+                if (!cloud && !synoQuick) {
                     SectionLabel("נמצאו ברשת")
                     FoundCard(found, searching, selectedHost = host.trim()) { server ->
                         host = server.host
@@ -373,7 +405,16 @@ fun ConnectScreen(
                         )
                     }
                 } else Card {
-                    if (dav) {
+                    if (synoQuick) {
+                        Column(verticalArrangement = Arrangement.spacedBy(NexplorerDimens.Space1)) {
+                            Field("מזהה QuickConnect", quickId, { quickId = it.trim(); error = null }, keyboard = KeyboardType.Uri, placeholder = "my-nas")
+                            Text(
+                                "ב-DSM: לוח הבקרה ← גישה חיצונית ← QuickConnect",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    } else if (dav) {
                         Field("כתובת", url, { url = it; error = null }, keyboard = KeyboardType.Uri, placeholder = "https://cloud.example.com/remote.php/dav/files/…")
                     } else {
                         Field("שרת", host, { host = it; error = null }, keyboard = KeyboardType.Uri)
@@ -381,6 +422,8 @@ fun ConnectScreen(
                     Row(horizontalArrangement = Arrangement.spacedBy(NexplorerDimens.Space2 + NexplorerDimens.Space1 / 2)) {
                         if (dav) {
                             Field("משתמש", user, { user = it; error = null }, placeholder = "בלי", modifier = Modifier.weight(1f))
+                        } else if (synoQuick) {
+                            Field("משתמש", user, { user = it; error = null }, modifier = Modifier.weight(1f))
                         } else if (sftp) {
                             Field("תיקייה", share, { share = it; error = null }, placeholder = "תיקיית הבית", modifier = Modifier.weight(1f))
                             Field("משתמש", user, { user = it; error = null }, modifier = Modifier.weight(1f))
@@ -414,9 +457,15 @@ fun ConnectScreen(
                         )
                     }
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NexplorerDimens.Space2 + NexplorerDimens.Space1 / 2)) {
-                        Icon(Icons.Outlined.Lock, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(NexplorerDimens.ConnectHintIcon))
+                        Icon(
+                            if (synoQuick) Icons.AutoMirrored.Outlined.ArrowForward else Icons.Outlined.Lock,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(NexplorerDimens.ConnectHintIcon),
+                        )
                         Text(
                             when {
+                                synoQuick -> "בבית — ישירות ל-NAS, במהירות מלאה. מחוץ לבית — דרך ממסר של Synology, וזה איטי בהרבה: וידאו באיכות גבוהה עלול לעצור."
                                 sftp -> "הסיסמה והמפתח נשמרים מוצפנים ב-${"Android Keystore".isolated()}, ולא יוצאים מהמכשיר."
                                 syno -> "הסיסמה נשמרת מוצפנת ב-${"Android Keystore".isolated()}. ה-NAS זמין ברשת הביתית — מבחוץ דרך VPN, בלי פורט פתוח בראוטר."
                                 // http: הסיסמה מוצפנת במכשיר, אבל עוברת גלויה ברשת.
@@ -432,19 +481,28 @@ fun ConnectScreen(
                 if (advanced) {
                     SectionLabel("מתקדם")
                     Card {
-                        Field("שם במגירה", name, { name = it }, placeholder = (if (cloud) editing?.user?.ifBlank { null } ?: protocol.label else host.trim()).ifEmpty { null }, mono = false)
-                        // WebDAV: הפורט בתוך הכתובת. בענן אין שרת לבחור.
-                        if (!dav && !cloud) Row(horizontalArrangement = Arrangement.spacedBy(NexplorerDimens.Space2 + NexplorerDimens.Space1 / 2)) {
+                        Field(
+                            "שם במגירה",
+                            name,
+                            { name = it },
+                            placeholder = (if (cloud) editing?.user?.ifBlank { null } ?: protocol.label else if (synoQuick) quickId.trim() else host.trim()).ifEmpty { null },
+                            mono = false,
+                        )
+                        // WebDAV: הפורט בתוך הכתובת. בענן וב-QuickConnect אין שרת לבחור.
+                        if (!dav && !cloud && !synoQuick) Row(horizontalArrangement = Arrangement.spacedBy(NexplorerDimens.Space2 + NexplorerDimens.Space1 / 2)) {
                             Field("פורט", port, { port = it.filter(Char::isDigit); error = null }, keyboard = KeyboardType.Number, placeholder = protocol.defaultPort.toString(), modifier = Modifier.weight(1f))
                             if (!sftp && !syno) Field("דומיין", domain, { domain = it }, placeholder = "—", modifier = Modifier.weight(1f))
                         }
                     }
                 }
 
-                (error ?: problem?.takeIf { cloud || (if (dav) url else host).isNotBlank() })?.let {
+                (error ?: problem?.takeIf { cloud || (if (dav) url else if (synoQuick) quickId else host).isNotBlank() })?.let {
                     Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
                 }
                 if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+                if (busy && synoQuick) {
+                    Text("מאתר את ה-NAS דרך QuickConnect — ברשת הזו, או דרך הממסר…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
 
             Column(Modifier.background(MaterialTheme.colorScheme.surface)) {

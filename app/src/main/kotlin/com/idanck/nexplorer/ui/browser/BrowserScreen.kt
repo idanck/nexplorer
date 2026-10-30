@@ -35,6 +35,7 @@ import androidx.compose.material.icons.outlined.ContentPaste
 import androidx.compose.material.icons.outlined.CreateNewFolder
 import androidx.compose.material3.Button
 import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -46,11 +47,9 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTopAppBarState
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.material3.rememberDrawerState
+import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -58,11 +57,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -90,6 +93,7 @@ import com.idanck.nexplorer.data.files.LocalFiles
 import com.idanck.nexplorer.data.files.StorageVolumes
 import com.idanck.nexplorer.data.files.TextFiles
 import com.idanck.nexplorer.data.net.NetConnection
+import com.idanck.nexplorer.data.net.QuickConnect
 import com.idanck.nexplorer.data.net.RemoteFiles
 import com.idanck.nexplorer.data.settings.AppSettings
 import com.idanck.nexplorer.data.transfer.TransferManager
@@ -97,23 +101,20 @@ import com.idanck.nexplorer.data.transfer.TransferStatus
 import com.idanck.nexplorer.ui.apk.ApkSheet
 import com.idanck.nexplorer.ui.drawer.DrawerModel
 import com.idanck.nexplorer.ui.drawer.PlacesDrawer
+import com.idanck.nexplorer.ui.keys.KeyBus
+import com.idanck.nexplorer.ui.keys.KeyCommand
 import com.idanck.nexplorer.ui.net.FetchDialog
 import com.idanck.nexplorer.ui.properties.PropertiesSheet
 import com.idanck.nexplorer.ui.theme.NexplorerDimens
 import com.idanck.nexplorer.ui.theme.NexplorerShape
+import com.idanck.nexplorer.ui.theme.NexplorerTheme
 import com.idanck.nexplorer.ui.transfer.TransferChip
 import com.idanck.nexplorer.ui.transfer.TransfersSheet
 import com.idanck.nexplorer.ui.update.UpdateActions
 import com.idanck.nexplorer.ui.update.UpdateBanner
 import com.idanck.nexplorer.update.UpdateState
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
-import com.idanck.nexplorer.ui.keys.KeyBus
-import com.idanck.nexplorer.ui.keys.KeyCommand
-import com.idanck.nexplorer.ui.theme.NexplorerTheme
-import kotlinx.coroutines.launch
 import java.io.File
+import kotlinx.coroutines.launch
 
 private sealed interface BrowserDialog {
     data object NewFolder : BrowserDialog
@@ -869,7 +870,14 @@ internal fun placesDrawerModel(
     onAnalyzer = { close(); onAnalyzer(state.folderPath?.takeIf { !NetPaths.isRemote(it) }) },
 )
 
-private fun summary(state: BrowserState): String = when (state.location) {
+/** QuickConnect (שלב 7ג): לפני הספירה — איך החיבור עבר ("ממסר QuickConnect · …"). */
+private fun summary(state: BrowserState): String = when (state.route) {
+    QuickConnect.Route.Relay -> "ממסר QuickConnect · "
+    QuickConnect.Route.Local -> "QuickConnect מקומי · "
+    null -> ""
+} + counts(state)
+
+private fun counts(state: BrowserState): String = when (state.location) {
     is Location.Media -> Counts.items(state.listed.size)
     // רשימת השיתופים של שרת: אין קבצים ואין "פנויים" — רק כמה שיתופים.
     is Location.Folder -> if (state.atShareList) Counts.items(state.listed.size) else {

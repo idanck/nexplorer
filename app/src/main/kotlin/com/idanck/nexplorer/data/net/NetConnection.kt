@@ -40,8 +40,18 @@ data class NetConnection(
     val keySecret: String? = null,
     /** WebDAV ו-Synology: http בלי הצפנה (שרת בבית). ברירת המחדל — https. */
     val plainHttp: Boolean = false,
+    /**
+     * Synology דרך QuickConnect (שלב 7ג): המזהה ("my-nas"), ו-[host] ריק — הכתובת נקבעת בכל התחברות ([QuickConnect]).
+     * ריק — רשת ביתית.
+     */
+    val quickConnect: String = "",
 ) {
-    val label: String get() = name.ifBlank { if (protocol.cloud) user.ifBlank { protocol.label } else host }
+    val isQuickConnect: Boolean get() = protocol == NetProtocol.Synology && quickConnect.isNotBlank()
+
+    /** השרת להצגה: ב-QuickConnect — המזהה. */
+    private val server: String get() = if (isQuickConnect) quickConnect else host
+
+    val label: String get() = name.ifBlank { if (protocol.cloud) user.ifBlank { protocol.label } else server }
 
     /**
      * הכותרת בראש המסך, בפירור הראשון, במגירה ובמסילה (1.10): בענן — שם השירות ("Google Drive") או השם שנבחר,
@@ -73,8 +83,8 @@ data class NetConnection(
     val subtitle: String
         get() = if (protocol.cloud) user.ifBlank { protocol.label } else buildString {
             if (user.isNotBlank()) append(user).append('@')
-            append(host)
-            if (port != null && port != defaultPort) append(':').append(port)
+            append(server)
+            if (isQuickConnect) append(" · QuickConnect") else if (port != null && port != defaultPort) append(':').append(port)
         }
 
     /** "smb://192.168.1.20/volume2/Photos" או "sftp://192.168.1.30/home/pi" — מה ש"העתק נתיב" נותן בתוך החיבור. */
@@ -82,7 +92,8 @@ data class NetConnection(
         val segments = NetPaths.segments(path)
         // ענן: אין כתובת אמיתית לנתיב — החשבון במקום השרת ("gdrive://alex@example.com/Photos").
         if (protocol.cloud) return "${protocol.scheme}://${user.ifBlank { id }}" + segments.joinToString("") { "/$it" }
-        val authority = host + if (port != null && port != defaultPort) ":$port" else ""
+        // QuickConnect: הכתובת שעובדת גם בדפדפן ("https://my-nas.quickconnect.to").
+        val authority = if (isQuickConnect) "$quickConnect.quickconnect.to" else host + if (port != null && port != defaultPort) ":$port" else ""
         if (protocol == NetProtocol.WebDav) {
             // כתובת אמיתית: IPv6 בסוגריים, ו-# % ? ורווח מקודדים — אפשר להדביק אותה בחזרה ("ערוך").
             return runCatching {
@@ -127,7 +138,8 @@ data class NetConnection(
                         .put("secret", c.secret ?: JSONObject.NULL)
                         .put("hostKey", c.hostKey ?: JSONObject.NULL)
                         .put("keySecret", c.keySecret ?: JSONObject.NULL)
-                        .put("plainHttp", c.plainHttp),
+                        .put("plainHttp", c.plainHttp)
+                        .put("quickConnect", c.quickConnect),
                 )
             }
         }.toString()
@@ -153,6 +165,7 @@ data class NetConnection(
                         hostKey = o.nullableString("hostKey"),
                         keySecret = o.nullableString("keySecret"),
                         plainHttp = o.optBoolean("plainHttp", false),
+                        quickConnect = o.optString("quickConnect"),
                     )
                 }.getOrNull()
             }.distinctBy { it.id }

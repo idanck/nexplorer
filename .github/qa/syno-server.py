@@ -10,6 +10,10 @@
 # המשתמש: alex / qa-pass. השיתופים — תיקיות תחת --root (ברירת מחדל /tmp/nexplorer-syno).
 #   python3 syno-server.py [--port 8091] [--root DIR]
 # בקרה לבדיקות: POST /qa/reset (חזרה לנתוני ההתחלה), POST /qa/expire (כל ה-sid פגים).
+# QuickConnect (שלב 7ג): POST /Serv.php — ‏get_server_info ו-request_tunnel למזהה "my-nas" (אחר — errno 4/1, "Alias not
+#   found", כמו אצל Synology). הכתובות — של השרת הזה, לפי Host: מקומית בשם "10-0-2-2.my-nas.direct.example" (האפליקציה
+#   מפענחת את הכתובת מהשם, בלי DNS) וממסר. POST /qa/qc?lan=down — הכתובת המקומית לא עונה (פורט סגור), ואין ממסר
+#   פתוח עד request_tunnel ב-control_host — כמו מחוץ לבית. /qa/reset מחזיר ל-up.
 import argparse
 import json
 import os
@@ -31,6 +35,8 @@ sessions = set()
 tasks = {}
 ROOT = "/tmp/nexplorer-syno"
 SHARES = ("nexplorer-qa", "backup")
+QC_ALIAS = "my-nas"
+qc = {"lan": "up"}
 
 
 def png(r, g, b, size=64):
@@ -203,7 +209,15 @@ class Handler(BaseHTTPRequestHandler):
         url = urllib.parse.urlsplit(self.path)
         if url.path == "/qa/reset":
             seed()
+            qc["lan"] = "up"
             return self.no_content()
+        if url.path == "/qa/qc":
+            qc["lan"] = dict(urllib.parse.parse_qsl(url.query)).get("lan", "up")
+            return self.no_content()
+        if url.path == "/Serv.php":
+            return self.quick_connect(raw)
+        if url.path == "/webapi/query.cgi":
+            return self.ok({"SYNO.API.Auth": {"path": "auth.cgi", "minVersion": 1, "maxVersion": 7}})
         if url.path == "/qa/expire":
             with lock:
                 sessions.clear()
@@ -255,6 +269,45 @@ class Handler(BaseHTTPRequestHandler):
                 handler(params)
         except Fail as f:
             self.error(f.code, f.errors)
+
+    # ---------- QuickConnect ----------
+
+    def quick_connect(self, raw):
+        try:
+            body = json.loads(raw.decode() or "{}")
+        except ValueError:
+            body = {}
+        command = body.get("command")
+        alias = str(body.get("serverID", ""))
+        if not alias:
+            return self.send_json({"command": command, "errno": 9, "errinfo": "missing serverID", "version": 1})
+        if alias.lower() != QC_ALIAS:
+            return self.send_json({"command": command, "errno": 4, "suberrno": 1, "errinfo": "get_server_info.go:69[Alias not found]", "version": 1})
+        host = self.headers.get("Host", "127.0.0.1")
+        ip, _, port = host.rpartition(":") if ":" in host else (host, "", "80")
+        port = int(port)
+        down = qc["lan"] == "down"
+        tunnel = command == "request_tunnel"
+        relay = "" if down and not tunnel else ip
+        self.send_json({
+            "command": command,
+            "env": {"control_host": host, "relay_region": "qa1"},
+            "errno": 0,
+            "server": {"serverID": "000000001", "interface": [{"ip": ip, "mask": "255.255.255.0", "name": "eth0"}], "external": {"ip": "", "ipv6": ""}},
+            "service": {
+                # מחוץ לבית: הכתובת המקומית לא עונה — פורט סגור.
+                "port": 9 if down else port,
+                "ext_port": 0,
+                "relay_ip": relay,
+                "relay_dn": relay,
+                "relay_port": port if relay else 0,
+            },
+            "smartdns": {
+                "host": "%s.direct.example" % QC_ALIAS.upper(),
+                "lan": ["%s.%s.direct.example" % (ip.replace(".", "-"), QC_ALIAS)],
+            },
+            "version": 1,
+        })
 
     # ---------- Auth ----------
 

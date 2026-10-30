@@ -21,11 +21,13 @@ import com.idanck.nexplorer.core.NetPaths
 import com.idanck.nexplorer.core.NetProtocol
 import com.idanck.nexplorer.data.net.ConnectionSecrets
 import com.idanck.nexplorer.data.net.NetConnection
+import com.idanck.nexplorer.data.net.QuickConnect
 import com.idanck.nexplorer.data.transfer.TransferKind
 import com.idanck.nexplorer.qa.Qa.waitFor
 import com.idanck.nexplorer.qa.Qa.waitForDisk
 import com.idanck.nexplorer.qa.Qa.waitGone
 import kotlinx.coroutines.flow.first
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
@@ -46,7 +48,7 @@ import kotlin.random.Random
 /**
  * שלב 7א: Synology ברשת הביתית — מול שרת מדומה של DSM על המארח (‏.github/qa/syno-server.py, ‏10.0.2.2:8091, ב-http).
  * המשתמש alex / qa-pass. השיתופים בשורש, תמונות ממוזערות מה-NAS, פתיחה ישירה, העברות לשני הכיוונים ובתוך ה-NAS,
- * יצירה, שינוי שם ומחיקה. מסך "הוסף מקום" — האריח והשדות.
+ * יצירה, שינוי שם ומחיקה. מסך "הוסף מקום" — האריח והשדות. 7ב — חיפוש, העתקה בשרת וגדלים; 7ג — QuickConnect.
  */
 @RunWith(AndroidJUnit4::class)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
@@ -242,6 +244,46 @@ class Phase7Test {
         val stats = runBlocking { container.remote.treeStats(listOf("$base/Photos")) }
         assertEquals(1, stats.files)
         assertEquals(0, stats.folders)
+    }
+
+    /**
+     * שלב 7ג: QuickConnect מול `Serv.php` בשרת המדומה. מחוץ לבית (הכתובת המקומית לא עונה) — דרך הממסר, וכתוב בראש
+     * המסך; חזרה הביתה (הרשת השתנתה) — ישירות.
+     */
+    @Test
+    fun t05_quickConnectFindsTheNasAndSaysHow() = logged("t05") {
+        QuickConnect.directory = "http://$SERVER:$PORT/Serv.php".toHttpUrl()
+        control("/qa/qc?lan=down")
+        scenario = Qa.launch(root.absolutePath)
+        compose.waitFor(hasText("readme.md"), 15_000)
+        compose.onNodeWithContentDescription("פתח מגירת מקומות").performClick()
+        compose.waitFor(hasText("הוסף מקום"))
+        compose.onNodeWithText("הוסף מקום").performClick()
+        compose.waitFor(hasText("פרטי חיבור"))
+        compose.onNodeWithText("Synology").performClick()
+        compose.waitFor(hasText("איך מתחבר"))
+        compose.onNodeWithText("QuickConnect").performClick()
+        compose.waitFor(hasText("מזהה QuickConnect"))
+        // מזהה, משתמש, סיסמה.
+        compose.onAllNodes(hasSetTextAction())[0].performTextInput("my-nas")
+        compose.onAllNodes(hasSetTextAction())[1].performTextInput("alex")
+        compose.onAllNodes(hasSetTextAction())[2].performTextInput("qa-pass")
+        Qa.screenshot(compose, "177-quickconnect-form")
+        compose.onNodeWithText("בדוק והתחבר").performClick()
+        compose.waitFor(hasText("ממסר QuickConnect", substring = true), 30_000)
+        compose.waitFor(hasText("nexplorer-qa"))
+        Qa.screenshot(compose, "178-quickconnect-relay")
+        val saved = container.settings.state.value.connections.single()
+        assertEquals("my-nas", saved.quickConnect)
+        assertEquals("", saved.host)
+
+        // חזרה הביתה: הרשת השתנתה — והתיקייה הבאה עוברת ישירות.
+        control("/qa/qc?lan=up")
+        container.remote.networkChanged()
+        compose.onNodeWithText("nexplorer-qa").performClick()
+        compose.waitFor(hasText("notes.txt"), 30_000)
+        compose.waitFor(hasText("QuickConnect מקומי", substring = true), 15_000)
+        Qa.screenshot(compose, "179-quickconnect-local")
     }
 
     private companion object {

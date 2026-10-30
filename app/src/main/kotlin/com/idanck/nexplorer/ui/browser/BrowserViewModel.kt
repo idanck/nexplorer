@@ -32,10 +32,14 @@ import com.idanck.nexplorer.data.files.MediaCollections
 import com.idanck.nexplorer.data.files.StorageVolumeInfo
 import com.idanck.nexplorer.data.files.StorageVolumes
 import com.idanck.nexplorer.data.net.NetConnection
+import com.idanck.nexplorer.data.net.QuickConnect
 import com.idanck.nexplorer.data.net.RemoteSpace
-import com.idanck.nexplorer.data.transfer.TransferKind
 import com.idanck.nexplorer.data.settings.relocated
+import com.idanck.nexplorer.data.transfer.TransferKind
 import com.idanck.nexplorer.data.transfer.TransferStatus
+import java.io.File
+import java.io.IOException
+import java.time.ZoneId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -50,9 +54,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
-import java.io.IOException
-import java.time.ZoneId
 
 sealed interface Location {
     data class Folder(val path: String) : Location
@@ -90,6 +91,8 @@ data class BrowserState(
     val connections: List<NetConnection> = emptyList(),
     /** מקום פנוי בשיתוף האחרון שנפתח בכל חיבור (מזהה → מקום), כשהשרת מדווח. */
     val remoteSpaces: Map<String, RemoteSpace> = emptyMap(),
+    /** QuickConnect (שלב 7ג): איך כל חיבור עבר ברשימה האחרונה (מזהה → מקומי/ממסר). */
+    val routes: Map<String, QuickConnect.Route> = emptyMap(),
 ) {
     val folderPath: String? get() = (location as? Location.Folder)?.path
 
@@ -104,6 +107,9 @@ data class BrowserState(
     val atShareList: Boolean get() = folderPath?.let(NetPaths::isShareList) == true
 
     val remoteSpace: RemoteSpace? get() = folderPath?.let(NetPaths::connectionId)?.let(remoteSpaces::get)
+
+    /** QuickConnect: איך התיקייה הנוכחית הגיעה; null — לא QuickConnect. */
+    val route: QuickConnect.Route? get() = folderPath?.let(NetPaths::connectionId)?.let(routes::get)
 
     val volume: StorageVolumeInfo? get() = folderPath?.takeIf { !NetPaths.isRemote(it) }?.let { StorageVolumes.volumeOf(it, volumes) }
     val inSelection: Boolean get() = selection.isNotEmpty()
@@ -455,6 +461,9 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
     /** מקום פנוי בשיתוף — בקשה נפרדת, אחרי שהרשימה כבר מוצגת. */
     private fun loadSpace(path: String) {
         val id = NetPaths.connectionId(path) ?: return
+        // QuickConnect: הרשימה כבר עברה — ידוע אם במקומי או בממסר.
+        val route = remote.route(path)
+        _state.update { if (route == null) it.copy(routes = it.routes - id) else it.copy(routes = it.routes + (id to route)) }
         viewModelScope.launch {
             val space = remote.space(path) ?: return@launch
             _state.update { it.copy(remoteSpaces = it.remoteSpaces + (id to space)) }
