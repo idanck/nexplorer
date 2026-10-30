@@ -13,24 +13,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.automirrored.rounded.InsertDriveFile
-import androidx.compose.material.icons.automirrored.rounded.MenuBook
-import androidx.compose.material.icons.automirrored.rounded.Notes
-import androidx.compose.material.icons.rounded.Android
-import androidx.compose.material.icons.rounded.Code
-import androidx.compose.material.icons.rounded.Description
-import androidx.compose.material.icons.rounded.Download
-import androidx.compose.material.icons.rounded.Folder
-import androidx.compose.material.icons.rounded.Image
-import androidx.compose.material.icons.rounded.Inventory2
-import androidx.compose.material.icons.rounded.Lock
-import androidx.compose.material.icons.rounded.Mic
-import androidx.compose.material.icons.rounded.Movie
-import androidx.compose.material.icons.rounded.MusicNote
-import androidx.compose.material.icons.rounded.PhotoCamera
-import androidx.compose.material.icons.rounded.PictureAsPdf
-import androidx.compose.material.icons.rounded.Slideshow
-import androidx.compose.material.icons.rounded.TableChart
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -75,38 +57,40 @@ import java.time.ZoneId
 /** הסוג של האריח (1.10): גוון וסמל לכל סוג. */
 fun typeOf(entry: Entry): FileType = FileTypes.of(entry, encrypted = EncryptedFiles.hasEncryptedName(entry.name))
 
-/** סמלים מלאים ומעוגלים (Rounded) — בגודל של אריח קטן הם קריאים יותר מסמלי קו, וכולם מאותה משפחה. */
+/**
+ * הסמל המקורי של הסוג (1.11, `FileGlyphs`) — וקטור שממלא את האריח כולו. PDF מוצג כטקסט "PDF" ([FileGlyph]);
+ * כאן — שורות המסמך, למי שצריך וקטור.
+ */
 fun iconFor(type: FileType): ImageVector = when (type) {
-    FileType.Folder -> Icons.Rounded.Folder
-    FileType.Image -> Icons.Rounded.Image
-    FileType.Video -> Icons.Rounded.Movie
-    FileType.Audio -> Icons.Rounded.MusicNote
-    FileType.Pdf -> Icons.Rounded.PictureAsPdf
-    FileType.Doc -> Icons.Rounded.Description
-    FileType.Ebook -> Icons.AutoMirrored.Rounded.MenuBook
-    FileType.Sheet -> Icons.Rounded.TableChart
-    FileType.Slides -> Icons.Rounded.Slideshow
-    FileType.Text -> Icons.AutoMirrored.Rounded.Notes
-    FileType.Code -> Icons.Rounded.Code
-    FileType.Archive -> Icons.Rounded.Inventory2
-    FileType.Apk -> Icons.Rounded.Android
-    FileType.Encrypted -> Icons.Rounded.Lock
-    FileType.Other -> Icons.AutoMirrored.Rounded.InsertDriveFile
+    FileType.Folder -> FileGlyphs.Folder
+    FileType.Image -> FileGlyphs.Image
+    FileType.Video -> FileGlyphs.Video
+    FileType.Audio -> FileGlyphs.Audio
+    FileType.Pdf, FileType.Doc -> FileGlyphs.Doc
+    FileType.Ebook -> FileGlyphs.Ebook
+    FileType.Sheet -> FileGlyphs.Sheet
+    FileType.Slides -> FileGlyphs.Slides
+    FileType.Text -> FileGlyphs.Text
+    FileType.Code -> FileGlyphs.Code
+    FileType.Archive -> FileGlyphs.Archive
+    FileType.Apk -> FileGlyphs.Apk
+    FileType.Encrypted -> FileGlyphs.Lock
+    FileType.Other -> FileGlyphs.File
 }
 
 fun iconFor(entry: Entry): ImageVector = iconFor(typeOf(entry))
 
-/** הסמל הקטן בתוך אייקון של תיקייה מוכרת. */
+/** התג על חזית התיקייה המוכרת (באותו גודל כמו התיקייה — הוקטור כבר ממקם אותו). */
 fun badgeFor(folder: SpecialFolder): ImageVector = when (folder) {
-    SpecialFolder.Camera -> Icons.Rounded.PhotoCamera
-    SpecialFolder.Pictures -> Icons.Rounded.Image
-    SpecialFolder.Download -> Icons.Rounded.Download
-    SpecialFolder.Music -> Icons.Rounded.MusicNote
-    SpecialFolder.Movies -> Icons.Rounded.Movie
-    SpecialFolder.Documents -> Icons.Rounded.Description
-    SpecialFolder.Android -> Icons.Rounded.Android
-    SpecialFolder.Recordings -> Icons.Rounded.Mic
-    SpecialFolder.Vault -> Icons.Rounded.Lock
+    SpecialFolder.Camera -> FileGlyphs.CameraBadge
+    SpecialFolder.Pictures -> FileGlyphs.ImageBadge
+    SpecialFolder.Download -> FileGlyphs.DownloadBadge
+    SpecialFolder.Music -> FileGlyphs.AudioBadge
+    SpecialFolder.Movies -> FileGlyphs.VideoBadge
+    SpecialFolder.Documents -> FileGlyphs.DocBadge
+    SpecialFolder.Android -> FileGlyphs.ApkBadge
+    SpecialFolder.Recordings -> FileGlyphs.MicBadge
+    SpecialFolder.Vault -> FileGlyphs.LockBadge
 }
 
 /** צבעי האריח — מהפלטה של סוגי הקבצים (`NexplorerTheme.colors.fileTypes`). */
@@ -137,32 +121,36 @@ fun tileColors(type: FileType): TileColors {
 fun tileColors(entry: Entry): TileColors = tileColors(typeOf(entry))
 
 /**
- * הסמל של הפריט בגודל [glyph]: תיקייה מוכרת — עם סמל קטן בתוכה (בצבע המיכל, כמו חיתוך); קובץ "אחר" עם
- * סיומת קצרה — הסיומת עצמה ("ISO") ב-Mono במקום הסמל הכללי.
+ * הסמל של הפריט על אריח בגודל [tile] (הוקטורים של `FileGlyphs` ממלאים את האריח). תיקייה מוכרת — עם תג על החזית
+ * בצבע המיכל (כמו חיתוך); PDF וקובץ "אחר" עם סיומת קצרה — טקסט ב-Mono ("PDF", "ISO") במקום סמל.
  */
 @Composable
-fun FileGlyph(entry: Entry, colors: TileColors, glyph: Dp) {
+fun FileGlyph(entry: Entry, colors: TileColors, tile: Dp) {
     val type = typeOf(entry)
     val special = FileTypes.specialFolder(entry)
-    val badge = if (type == FileType.Other) FileTypes.badge(entry) else null
+    val label = when (type) {
+        FileType.Pdf -> "PDF"
+        FileType.Other -> FileTypes.badge(entry)
+        else -> null
+    }
     when {
-        special != null -> Box(contentAlignment = Alignment.Center) {
-            Icon(iconFor(type), contentDescription = null, tint = colors.content, modifier = Modifier.size(glyph))
-            Icon(
-                badgeFor(special),
-                contentDescription = null,
-                tint = colors.container,
-                // גוף התיקייה בסמל נמוך מהמרכז (הלשונית למעלה).
-                modifier = Modifier.padding(top = glyph * 0.1f).size(glyph * 0.42f),
-            )
-        }
-        badge != null -> Text(
-            badge,
+        label != null -> Text(
+            label,
             color = colors.content,
             maxLines = 1,
-            style = TextStyle(fontFamily = JetBrainsMono, fontWeight = FontWeight.Medium, fontSize = (glyph.value * 0.5f).sp, letterSpacing = 0.sp),
+            style = TextStyle(
+                fontFamily = JetBrainsMono,
+                fontWeight = FontWeight.Medium,
+                fontSize = (tile.value * NexplorerDimens.TileLabelRatio).sp,
+                letterSpacing = 0.sp,
+            ),
         )
-        else -> Icon(iconFor(type), contentDescription = null, tint = colors.content, modifier = Modifier.size(glyph))
+        else -> Box(contentAlignment = Alignment.Center) {
+            Icon(iconFor(type), contentDescription = null, tint = colors.content, modifier = Modifier.size(tile))
+            if (special != null) {
+                Icon(badgeFor(special), contentDescription = null, tint = colors.container, modifier = Modifier.size(tile))
+            }
+        }
     }
 }
 
@@ -176,7 +164,7 @@ fun FileIconTile(entry: Entry, modifier: Modifier = Modifier, size: Dp = Nexplor
             .background(colors.container),
         contentAlignment = Alignment.Center,
     ) {
-        FileGlyph(entry, colors, size * NexplorerDimens.TileGlyphRatio)
+        FileGlyph(entry, colors, size)
     }
 }
 
@@ -188,7 +176,7 @@ val Entry.hasThumbnail: Boolean get() = (kind == FileKind.Image || kind == FileK
 fun FileThumbnail(entry: Entry, modifier: Modifier = Modifier) {
     val colors = tileColors(entry)
     Box(modifier.background(colors.container), contentAlignment = Alignment.Center) {
-        FileGlyph(entry, colors, NexplorerDimens.TileGlyph)
+        FileGlyph(entry, colors, NexplorerDimens.ThumbnailGlyphTile)
         if (entry.hasThumbnail) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current).data(File(entry.path)).build(),
