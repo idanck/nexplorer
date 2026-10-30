@@ -61,6 +61,11 @@ class RemoteFiles(
 
     suspend fun space(path: String): RemoteSpace? = withContext(Dispatchers.IO) { runCatching { fsFor(path).space(path) }.getOrNull() }
 
+    /** תמונה ממוזערת מהשרת (Synology); null — אין, או כשל. */
+    suspend fun thumbnail(path: String, large: Boolean): ByteArray? = withContext(Dispatchers.IO) {
+        runCatching { fsFor(path).thumbnail(path, large) }.getOrNull()
+    }
+
     suspend fun createFolder(parent: String, name: String): Result<String> = io {
         val target = NetPaths.child(parent, name)
         validate(parent, name)
@@ -190,6 +195,7 @@ class RemoteFiles(
             NetProtocol.Smb -> SmbFs(connection, password)
             NetProtocol.Sftp -> SftpFs(connection, password, privateKey)
             NetProtocol.WebDav -> WebDavFs(connection, password)
+            NetProtocol.Synology -> SynologyFs(connection, password)
             NetProtocol.GoogleDrive -> DriveFs(connection, auth ?: throw IOException("אין התחברות ל-Google Drive"))
             NetProtocol.OneDrive -> OneDriveFs(connection, auth ?: throw IOException("אין התחברות ל-OneDrive"))
         }

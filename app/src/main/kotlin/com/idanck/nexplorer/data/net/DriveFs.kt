@@ -76,7 +76,7 @@ class DriveFs(private val connection: NetConnection, auth: CloudAuth) : RemoteFs
      * הגוש הראשון נאסף בזיכרון: קובץ קטן — בקשת multipart אחת; גדול — resumable upload בגושים של [CHUNK]
      * (כפולה של 256KB). Drive לא מסרב לשם קיים — הבדיקה כאן, לפני היצירה.
      */
-    override fun openWrite(path: String, size: Long): OutputStream {
+    override fun openWrite(path: String, size: Long, lastModified: Long): OutputStream {
         val parent = folderOf(path)
         val name = NetPaths.name(path)
         if (findIn(parent, name) != null) throw IOException("כבר קיים פריט בשם הזה")

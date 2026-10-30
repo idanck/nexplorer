@@ -36,7 +36,7 @@ private class OneFile(val data: ByteArray) : RemoteFs {
 
     override fun list(path: String): List<Entry> = throw UnsupportedOperationException()
     override fun stat(path: String): Entry? = throw UnsupportedOperationException()
-    override fun openWrite(path: String, size: Long): OutputStream = throw UnsupportedOperationException()
+    override fun openWrite(path: String, size: Long, lastModified: Long): OutputStream = throw UnsupportedOperationException()
     override fun mkdir(path: String) = throw UnsupportedOperationException()
     override fun delete(path: String, isDirectory: Boolean) = throw UnsupportedOperationException()
     override fun rename(path: String, target: String) = throw UnsupportedOperationException()

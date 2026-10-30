@@ -4,14 +4,20 @@ import java.io.File
 
 /**
  * פרוטוקול של מקום ברשת (D3): SMB (5א), SFTP (5ב), WebDAV (5ג; הפורט — של https, ו-80 ל-http). ענן (D4, שלב 6):
- * Google Drive ו-OneDrive — [cloud]: בלי שרת לבחור, ההתחברות בחשבון של השירות.
+ * Google Drive ו-OneDrive — [cloud]: בלי שרת לבחור, ההתחברות בחשבון של השירות. Synology (שלב 7): ה-API של DSM
+ * (File Station) ב-https — בשורש השיתופים, כמו ב-SMB ([sharesAtRoot]).
  */
 enum class NetProtocol(val scheme: String, val label: String, val defaultPort: Int, val cloud: Boolean = false) {
     Smb("smb", "SMB", 445),
     Sftp("sftp", "SFTP", 22),
     WebDav("dav", "WebDAV", 443),
+    Synology("syno", "Synology", 5001),
     GoogleDrive("gdrive", "Google Drive", 443, cloud = true),
     OneDrive("onedrive", "OneDrive", 443, cloud = true),
+    ;
+
+    /** בשורש של החיבור — רשימת השיתופים (SMB, ‏Synology), לא תיקייה. */
+    val sharesAtRoot: Boolean get() = this == Smb || this == Synology
 }
 
 /**
@@ -86,17 +92,18 @@ object NetPaths {
     /** [path] בתוך [dir] או זהה לו — בנתיבים באותה צורה (שניהם ברשת או שניהם מקומיים). */
     fun isInside(path: String, dir: String): Boolean = FileNames.isInside(path, dir)
 
-    /** SMB: השורש של החיבור — רשימת השיתופים, לא תיקייה (אין בה קבצים, ואי אפשר ליצור או להדביק בה). */
-    fun isShareList(path: String): Boolean = protocolOf(path) == NetProtocol.Smb && segments(path).isEmpty()
+    /** SMB ו-Synology: השורש של החיבור — רשימת השיתופים, לא תיקייה (אין בה קבצים, ואי אפשר ליצור או להדביק בה). */
+    fun isShareList(path: String): Boolean = protocolOf(path)?.sharesAtRoot == true && segments(path).isEmpty()
 
-    /** SMB: שיתוף שלם — לא נמחק, לא משנה שם ולא מועתק כיחידה. */
-    fun isShare(path: String): Boolean = protocolOf(path) == NetProtocol.Smb && segments(path).size == 1
+    /** SMB ו-Synology: שיתוף שלם — לא נמחק, לא משנה שם ולא מועתק כיחידה. */
+    fun isShare(path: String): Boolean = protocolOf(path)?.sharesAtRoot == true && segments(path).size == 1
 
     /** מה שאי אפשר לבחור כפריט: רשימת השיתופים, שיתוף, ו-`/` של שרת SFTP. */
     fun isFixed(path: String): Boolean = isShareList(path) || isShare(path) || (isRemote(path) && segments(path).isEmpty())
 
     /**
-     * אפשר להעביר בשינוי שם, בלי להעתיק בתים: אותו חיבור, וב-SMB גם אותו שיתוף. ב-SFTP השרת עצמו מסרב
+     * אפשר להעביר בשינוי שם, בלי להעתיק בתים: אותו חיבור, וב-SMB גם אותו שיתוף (ב-Synology — כל ה-NAS: ההעברה
+     * בצד השרת, גם בין שיתופים). ב-SFTP השרת עצמו מסרב
      * כשהיעד בכונן אחר — ואז זו שגיאה, כמו `mv` בין כוננים בלי העתקה.
      */
     fun sameShare(a: String, b: String): Boolean {
@@ -122,6 +129,8 @@ object NetPaths {
             NetProtocol.Sftp -> null
             // השם עובר מקודד בכתובת; רק מה שבלתי אפשרי בה ממילא.
             NetProtocol.WebDav -> if (name.any { it == '\\' }) "בשרת הזה השם לא יכול להכיל \\" else null
+            // DSM (ext4/Btrfs): כל שם שמקומי מקבל.
+            NetProtocol.Synology -> null
             // Drive מקבל כל שם (גם / — הוא מוצג כ-∕, ראה DriveNames).
             NetProtocol.GoogleDrive -> null
             NetProtocol.OneDrive -> when {

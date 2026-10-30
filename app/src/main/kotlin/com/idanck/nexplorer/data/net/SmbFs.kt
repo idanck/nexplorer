@@ -110,7 +110,7 @@ class SmbFs(private val connection: NetConnection, password: CharArray?) : Remot
         }
     }
 
-    override fun openWrite(path: String, size: Long): OutputStream = withShare(path) { share, inner ->
+    override fun openWrite(path: String, size: Long, lastModified: Long): OutputStream = withShare(path) { share, inner ->
         val file = share.openFile(
             inner,
             EnumSet.of(AccessMask.GENERIC_WRITE, AccessMask.FILE_WRITE_ATTRIBUTES),

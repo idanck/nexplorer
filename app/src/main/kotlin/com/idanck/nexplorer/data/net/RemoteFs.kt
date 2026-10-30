@@ -32,9 +32,10 @@ interface RemoteFs : Closeable {
 
     /**
      * קובץ חדש. קיים כבר — כשל ("כבר קיים פריט בשם הזה"): העתקה אף פעם לא דורסת. [size] — הגודל שייכתב, כשידוע
-     * (-1 — לא ידוע); OneDrive צריך אותו מראש לקובץ גדול.
+     * (-1 — לא ידוע); OneDrive צריך אותו מראש לקובץ גדול. [lastModified] — תאריך השינוי של המקור (-1 — לא ידוע):
+     * Synology קובע אותו רק בהעלאה, ולא אחריה ([setLastModified]).
      */
-    fun openWrite(path: String, size: Long = -1): OutputStream
+    fun openWrite(path: String, size: Long = -1, lastModified: Long = -1): OutputStream
 
     fun mkdir(path: String)
 
@@ -48,6 +49,9 @@ interface RemoteFs : Closeable {
     fun setLastModified(path: String, time: Long)
 
     fun space(path: String): RemoteSpace?
+
+    /** תמונה ממוזערת מהשרת (JPEG/PNG), כשהשרת מכין כאלה (Synology); null — אין. [large] — לרשת ולגלריה. */
+    fun thumbnail(path: String, large: Boolean): ByteArray? = null
 }
 
 /** העברה בשינוי שם בין שני כוננים באותו שרת — לא אפשרית; מעתיקים ומוחקים במקום. */

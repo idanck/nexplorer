@@ -100,7 +100,7 @@ class SftpFs(private val connection: NetConnection, password: CharArray?, privat
         }
     }
 
-    override fun openWrite(path: String, size: Long): OutputStream {
+    override fun openWrite(path: String, size: Long, lastModified: Long): OutputStream {
         val file = retrying {
             try {
                 // EXCL: נכשל כשהקובץ קיים — אף פעם לא דורסים.

@@ -31,11 +31,14 @@ data class NetConnection(
     val domain: String = "",
     /** הצופן של הסיסמה — או, כשיש [keySecret], של הסיסמה של המפתח. */
     val secret: String? = null,
-    /** SFTP: המפתח של השרת שאושר ("ssh-ed25519 AAAA…") — חיבור לשרת עם מפתח אחר נדחה. */
+    /**
+     * SFTP: המפתח של השרת שאושר ("ssh-ed25519 AAAA…") — חיבור לשרת עם מפתח אחר נדחה. WebDAV ו-Synology: התעודה
+     * שאושרה ("x509-sha256 …").
+     */
     val hostKey: String? = null,
     /** SFTP: הצופן של קובץ המפתח הפרטי (OpenSSH / PEM / PuTTY), באותו מפתח Keystore כמו הסיסמה. */
     val keySecret: String? = null,
-    /** WebDAV: http בלי הצפנה (שרת בבית). ברירת המחדל — https. */
+    /** WebDAV ו-Synology: http בלי הצפנה (שרת בבית). ברירת המחדל — https. */
     val plainHttp: Boolean = false,
 ) {
     val label: String get() = name.ifBlank { if (protocol.cloud) user.ifBlank { protocol.label } else host }
@@ -49,8 +52,13 @@ data class NetConnection(
     /** החשבון של חיבור ענן ("alex@example.com"); null בשאר, או כשעוד לא ידוע. */
     val account: String? get() = user.takeIf { protocol.cloud && it.isNotBlank() }
 
-    /** WebDAV ב-http — 80; אחרת של הפרוטוקול. */
-    val defaultPort: Int get() = if (protocol == NetProtocol.WebDav && plainHttp) 80 else protocol.defaultPort
+    /** WebDAV ב-http — 80; Synology ב-http — 5000 (ה-http של DSM); אחרת של הפרוטוקול. */
+    val defaultPort: Int
+        get() = when {
+            protocol == NetProtocol.WebDav && plainHttp -> 80
+            protocol == NetProtocol.Synology && plainHttp -> 5000
+            else -> protocol.defaultPort
+        }
 
     val effectivePort: Int get() = port ?: defaultPort
 
