@@ -5,6 +5,9 @@ import android.util.Log
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.decode.VideoFrameDecoder
+import com.idanck.nexplorer.data.net.RemoteThumb
+import com.idanck.nexplorer.data.net.RemoteThumbFetcher
+import com.idanck.nexplorer.data.net.RemoteThumbKeyer
 import com.idanck.nexplorer.data.crypto.EncryptedPreview
 import com.idanck.nexplorer.data.crypto.VaultKeys
 import com.idanck.nexplorer.data.net.CloudAuths
@@ -61,10 +64,16 @@ class NexplorerApp : Application(), ImageLoaderFactory {
         }
     }
 
-    /** תמונות ממוזערות ברשת ובגלריה, כולל פריים ראשון של וידאו. */
+    /**
+     * תמונות ממוזערות ברשת ובגלריה, כולל פריים ראשון של וידאו; ומ-Synology — התמונה שה-NAS מכין ([RemoteThumb]).
+     */
     override fun newImageLoader(): ImageLoader =
         ImageLoader.Builder(this)
-            .components { add(VideoFrameDecoder.Factory()) }
+            .components {
+                add(VideoFrameDecoder.Factory())
+                add(RemoteThumbKeyer())
+                add(RemoteThumbFetcher.Factory { container.remote })
+            }
             .crossfade(true)
             .build()
 }

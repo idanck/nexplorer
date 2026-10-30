@@ -11,7 +11,6 @@ import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
-import okhttp3.internal.tls.OkHostnameVerifier
 import okio.BufferedSink
 import okio.Pipe
 import okio.buffer
@@ -22,22 +21,11 @@ import java.io.FilterInputStream
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
-import java.net.Socket
-import java.security.KeyStore
-import java.security.MessageDigest
-import java.security.cert.CertificateException
-import java.security.cert.X509Certificate
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit
-import javax.net.ssl.SSLContext
-import javax.net.ssl.SSLEngine
 import javax.net.ssl.SSLHandshakeException
 import javax.net.ssl.SSLPeerUnverifiedException
-import javax.net.ssl.SSLSession
-import javax.net.ssl.TrustManagerFactory
-import javax.net.ssl.X509ExtendedTrustManager
-import javax.net.ssl.X509TrustManager
 import javax.xml.parsers.DocumentBuilderFactory
 import kotlin.concurrent.thread
 
@@ -45,9 +33,8 @@ import kotlin.concurrent.thread
  * חיבור WebDAV אחד (Nextcloud, ‏ownCloud, ‏Synology, Apache) מעל OkHttp: PROPFIND לרשימה, GET ו-PUT
  * לקבצים, MKCOL, ‏MOVE ו-DELETE. הנתיבים יחסיים לכתובת של החיבור ([NetConnection.share]).
  *
- * https: תעודה שהמערכת מכירה — כמו בדפדפן. תעודה עצמית (שרת בבית) — רק אם היא זו שאושרה
- * ([NetConnection.hostKey], "x509-sha256 …"); אחרת [HostKeyUntrusted] עם התעודה שהוצגה, ו"בדוק והתחבר"
- * שואל את המשתמש. http — בלי הצפנה, לבחירת המשתמש.
+ * https: [PinnedTls] — תעודה שהמערכת מכירה, או זו שאושרה ([NetConnection.hostKey], "x509-sha256 …"); אחרת
+ * [HostKeyUntrusted] עם התעודה שהוצגה, ו"בדוק והתחבר" שואל את המשתמש. http — בלי הצפנה, לבחירת המשתמש.
  */
 class WebDavFs(private val connection: NetConnection, password: CharArray?) : RemoteFs {
 
@@ -61,10 +48,7 @@ class WebDavFs(private val connection: NetConnection, password: CharArray?) : Re
         .port(connection.effectivePort)
         .apply { connection.share.split('/').filter { it.isNotEmpty() }.forEach { addPathSegment(it) } }
         .build()
-    private val trust = Trust()
-
-    @Volatile
-    private var offered: String? = null
+    private val tls = PinnedTls(connection.hostKey)
 
     private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(CONNECT_TIMEOUT_S, TimeUnit.SECONDS)
@@ -74,14 +58,7 @@ class WebDavFs(private val connection: NetConnection, password: CharArray?) : Re
         // ההתחברות בהפניה ל-https. הפניות בתוך אותו שרת — ב-[execute], עם אותה שיטה.
         .followRedirects(false)
         .followSslRedirects(false)
-        .apply {
-            if (!connection.plainHttp) {
-                val context = SSLContext.getInstance("TLS").apply { init(null, arrayOf(trust), null) }
-                sslSocketFactory(context.socketFactory, trust)
-                // תעודה שאושרה — גם כשהשם שבה אינו הכתובת (תעודה עצמית ל-"nas.local", גישה ב-IP).
-                hostnameVerifier { host, session -> trust.pinned(session) || verifyName(host, session) }
-            }
-        }
+        .apply { if (!connection.plainHttp) tls.apply(this) }
         .build()
 
     override fun list(path: String): List<Entry> {
@@ -141,7 +118,7 @@ class WebDavFs(private val connection: NetConnection, password: CharArray?) : Re
      * אחר) לבקשה שרצה ב-thread משלה. `If-None-Match: *` — השרת מסרב לדרוס קובץ קיים. הכשל של הבקשה
      * (שרת מלא, אין הרשאה) נראה ב-[OutputStream.close], או בכתיבה שאחריו.
      */
-    override fun openWrite(path: String, size: Long): OutputStream {
+    override fun openWrite(path: String, size: Long, lastModified: Long): OutputStream {
         val pipe = Pipe(PIPE_BUFFER)
         val body = object : RequestBody() {
             override fun contentType() = OCTET_STREAM
@@ -310,7 +287,7 @@ class WebDavFs(private val connection: NetConnection, password: CharArray?) : Re
         val chain = generateSequence(e) { it.cause }.toList()
         // רק כשל בלחיצת היד (התעודה, או השם שבה) — לא ניתוק באמצע העברה, שגם הוא SSLException.
         if (chain.any { it is SSLHandshakeException || it is SSLPeerUnverifiedException }) {
-            offered?.let { if (it != connection.hostKey) return HostKeyUntrusted(it, connection.hostKey != null) }
+            tls.untrusted(e)?.let { return it }
             return IOException("החיבור המאובטח לשרת נכשל — אם השרת ב-http, כתוב http:// בכתובת", e)
         }
         // מדיניות האבטחה של אנדרואיד חוסמת http — לא אמור לקרות (network_security_config מתיר).
@@ -374,58 +351,6 @@ class WebDavFs(private val connection: NetConnection, password: CharArray?) : Re
         )
     }
 
-    private fun verifyName(host: String, session: SSLSession): Boolean {
-        if (OkHostnameVerifier.verify(host, session)) return true
-        // תעודה של רשות מוכרת, אבל לשם אחר — גם היא ניתנת לאישור (כתובת IP לשרת עם תעודה לדומיין).
-        offered = (session.peerCertificates.firstOrNull() as? X509Certificate)?.let(::certKey)
-        return false
-    }
-
-    /**
-     * תעודה שהמערכת מכירה, או זו שאושרה בחיבור. את מה שהוצג שומר — לשאלה "לסמוך על השרת?". Extended:
-     * באנדרואיד, עם network_security_config שיש בו domain-config, מנהל האמון של המערכת דוחה כל בדיקה
-     * בלי שם השרת — וכל תעודה של רשות מוכרת הייתה נראית "עצמית".
-     */
-    private inner class Trust : X509ExtendedTrustManager() {
-        private val system: X509TrustManager = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm())
-            .apply { init(null as KeyStore?) }
-            .trustManagers.filterIsInstance<X509TrustManager>().first()
-
-        fun pinned(session: SSLSession): Boolean =
-            connection.hostKey != null && (session.peerCertificates.firstOrNull() as? X509Certificate)?.let(::certKey) == connection.hostKey
-
-        private fun check(chain: Array<X509Certificate>, systemCheck: () -> Unit) {
-            val key = certKey(chain.first())
-            if (key == connection.hostKey) return
-            try {
-                systemCheck()
-            } catch (e: CertificateException) {
-                offered = key
-                throw e
-            }
-        }
-
-        override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String, socket: Socket) = check(chain) {
-            (system as? X509ExtendedTrustManager)?.checkServerTrusted(chain, authType, socket) ?: system.checkServerTrusted(chain, authType)
-        }
-
-        override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String, engine: SSLEngine) = check(chain) {
-            (system as? X509ExtendedTrustManager)?.checkServerTrusted(chain, authType, engine) ?: system.checkServerTrusted(chain, authType)
-        }
-
-        override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) = check(chain) {
-            system.checkServerTrusted(chain, authType)
-        }
-
-        override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String, socket: Socket) = system.checkClientTrusted(chain, authType)
-
-        override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String, engine: SSLEngine) = system.checkClientTrusted(chain, authType)
-
-        override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) = system.checkClientTrusted(chain, authType)
-
-        override fun getAcceptedIssuers(): Array<X509Certificate> = system.acceptedIssuers
-    }
-
     /** "לא נמצא" — [stat] מחזיר null במקום לזרוק. */
     class NotFound(message: String) : IOException(message)
 
@@ -441,10 +366,6 @@ class WebDavFs(private val connection: NetConnection, password: CharArray?) : Re
             """<d:resourcetype/><d:getcontentlength/><d:getlastmodified/></d:prop></d:propfind>"""
         private const val QUOTA = """<?xml version="1.0" encoding="utf-8"?><d:propfind xmlns:d="DAV:"><d:prop>""" +
             """<d:quota-available-bytes/><d:quota-used-bytes/></d:prop></d:propfind>"""
-
-        /** "x509-sha256 AB:CD:…" — טביעת ה-SHA-256 של התעודה, כמו שדפדפן מציג אותה. */
-        fun certKey(certificate: X509Certificate): String =
-            "x509-sha256 " + MessageDigest.getInstance("SHA-256").digest(certificate.encoded).joinToString(":") { "%02X".format(it) }
 
         private fun parseDate(value: String): Long? = runCatching {
             ZonedDateTime.parse(value.trim(), DateTimeFormatter.RFC_1123_DATE_TIME).toInstant().toEpochMilli()

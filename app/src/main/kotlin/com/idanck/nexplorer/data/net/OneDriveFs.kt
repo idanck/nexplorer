@@ -66,7 +66,7 @@ class OneDriveFs(private val connection: NetConnection, auth: CloudAuth) : Remot
      * עד [SIMPLE_MAX] — PUT אחד. גדול — upload session בגושים של [CHUNK], עם [size] בכל גוש (Graph דורש את הגודל
      * הכולל מראש). גודל לא ידוע (ייצוא של Google Docs) — מה שמעבר לגוש הראשון נאסף בקובץ זמני, ואז נשלח.
      */
-    override fun openWrite(path: String, size: Long): OutputStream {
+    override fun openWrite(path: String, size: Long, lastModified: Long): OutputStream {
         val parent = NetPaths.parent(path) ?: throw IOException("אי אפשר ליצור פריט מעל השורש")
         // Graph יוצר תיקיות חסרות בדרך; כאן — כמו בשאר המקומות, רק בתוך תיקייה קיימת.
         if (stat(parent)?.isDirectory != true) throw IOException("תיקיית היעד לא קיימת ב-$SERVICE")

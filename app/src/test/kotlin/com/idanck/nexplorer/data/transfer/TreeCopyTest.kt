@@ -50,7 +50,7 @@ private class MemorySide : Side {
 
     override fun read(path: String): InputStream = ByteArrayInputStream(files[path] ?: throw IOException("no file $path"))
 
-    override fun write(path: String, size: Long): OutputStream {
+    override fun write(path: String, size: Long, modified: Long): OutputStream {
         if (stat(path) != null) throw IOException("exists $path")
         files[path] = ByteArray(0)
         return object : ByteArrayOutputStream() {

@@ -38,6 +38,8 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.idanck.nexplorer.core.Counts
 import com.idanck.nexplorer.core.Entry
+import com.idanck.nexplorer.core.NetProtocol
+import com.idanck.nexplorer.data.net.RemoteThumb
 import com.idanck.nexplorer.core.FileKind
 import com.idanck.nexplorer.core.FileType
 import com.idanck.nexplorer.core.FileTypes
@@ -168,8 +170,11 @@ fun FileIconTile(entry: Entry, modifier: Modifier = Modifier, size: Dp = Nexplor
     }
 }
 
-/** ברשת אין תמונות ממוזערות (שלב 5א): כל אחת הייתה הורדה של הקובץ כולו. */
-val Entry.hasThumbnail: Boolean get() = (kind == FileKind.Image || kind == FileKind.Video) && !NetPaths.isRemote(path)
+/** תמונה או וידאו במכשיר — ומ-Synology (שלב 7), שמכין תמונה ממוזערת בעצמו. */
+val Entry.hasThumbnail: Boolean
+    get() = (kind == FileKind.Image || kind == FileKind.Video) &&
+        // ברשת — רק משרת שמכין תמונות ממוזערות בעצמו (Synology); אחרת זו הורדה של הקובץ כולו.
+        (!NetPaths.isRemote(path) || NetPaths.protocolOf(path) == NetProtocol.Synology)
 
 /** תמונה ממוזערת (Coil, כולל פריים מווידאו) על רקע האריח; עד שנטענת — האייקון. */
 @Composable
@@ -179,7 +184,9 @@ fun FileThumbnail(entry: Entry, modifier: Modifier = Modifier) {
         FileGlyph(entry, colors, NexplorerDimens.ThumbnailGlyphTile)
         if (entry.hasThumbnail) {
             AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current).data(File(entry.path)).build(),
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(if (NetPaths.isRemote(entry.path)) RemoteThumb(entry.path, large = true, modified = entry.lastModified) else File(entry.path))
+                    .build(),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),

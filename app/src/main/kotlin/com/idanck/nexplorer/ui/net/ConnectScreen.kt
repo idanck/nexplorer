@@ -28,7 +28,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.outlined.Archive
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Dns
 import androidx.compose.material.icons.outlined.Key
@@ -104,11 +103,11 @@ private enum class PlaceType(val label: String, val icon: ImageVector, val proto
     Smb("SMB", Icons.Outlined.Dns, NetProtocol.Smb, null),
     Sftp("SFTP", Icons.Outlined.Terminal, NetProtocol.Sftp, null),
     WebDav("WebDAV", Icons.Outlined.Language, NetProtocol.WebDav, null),
+    Synology("Synology", NasIcon, NetProtocol.Synology, null),
     Cloud("ענן", Icons.Outlined.Cloud, NetProtocol.GoogleDrive, null),
     Ftp("FTP/S", Icons.Outlined.Download, null, "FTP/S לא בתוכנית: ב-D3 נבחרו SMB, SFTP ו-WebDAV"),
     S3("S3", Icons.Outlined.Storage, null, "S3 לא בתוכנית: ב-D3 נבחרו SMB, SFTP ו-WebDAV"),
     Vault("כספת", Icons.Outlined.Lock, null, "תיקייה מוצפנת נוצרת מהכפתור הצף: חדש ← תיקייה מוצפנת"),
-    Archive("ארכיון", Icons.Outlined.Archive, null, "ארכיון נפתח בהקשה עליו ברשימת הקבצים"),
 }
 
 /**
@@ -137,6 +136,8 @@ fun ConnectScreen(
     var protocol by rememberSaveable { mutableStateOf(editing?.protocol ?: NetProtocol.Smb) }
     val sftp = protocol == NetProtocol.Sftp
     val dav = protocol == NetProtocol.WebDav
+    // Synology (שלב 7): שרת, שיתוף (או כל השיתופים), משתמש וסיסמה — ה-API של DSM ב-https.
+    val syno = protocol == NetProtocol.Synology
     val cloud = protocol.cloud
     var host by rememberSaveable { mutableStateOf(editing?.host.orEmpty()) }
     // WebDAV: כתובת אחת (scheme, שרת, פורט ונתיב) במקום שרת ושיתוף.
@@ -167,7 +168,8 @@ fun ConnectScreen(
     val keepsPassword = editing != null && editing.secret != null && (editing.keySecret != null) == hasKey && (editing.keySecret == null || keepKey) &&
         // מ-https ל-http: הסיסמה השמורה לא נשלחת גלויה בלי שהוזנה מחדש.
         !(editing.protocol == NetProtocol.WebDav && !editing.plainHttp && davAddress?.plainHttp == true)
-    val found = allFound.filter { it.protocol == protocol }
+    // Synology: ה-NAS מפרסם את עצמו כשרת SMB — אותה כתובת, והפורט של DSM.
+    val found = allFound.filter { it.protocol == protocol || (syno && it.protocol == NetProtocol.Smb) }
 
     val pickKey = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
@@ -197,8 +199,8 @@ fun ConnectScreen(
         // "nas:4450" — פורט בתוך הכתובת (נקודתיים אחת; IPv6 עובר). הפורט בשדה שלו.
         host.trim().count { it == ':' } == 1 -> "הפורט בשדה \"פורט\" שב\"מתקדם\", לא בכתובת"
         port.isNotBlank() && (portValue == null || portValue !in 1..65535) -> "פורט — מספר בין 1 ל-65535"
-        // ל-SSH אין "אורח".
-        sftp && user.isBlank() -> "צריך שם משתמש"
+        // ל-SSH ול-DSM אין "אורח".
+        (sftp || syno) && user.isBlank() -> "צריך שם משתמש"
         !sftp && share.isNotBlank() -> NetPaths.validateName(NetProtocol.Smb, share.trim())
         else -> null
     }
@@ -228,7 +230,7 @@ fun ConnectScreen(
                 else -> share.trim().trim('/')
             },
             user = user.trim(),
-            domain = if (sftp || dav) "" else domain.trim(),
+            domain = if (sftp || dav || syno) "" else domain.trim(),
             secret = editing?.secret?.takeIf { keepsPassword },
             keySecret = editing?.keySecret?.takeIf { hasKey && keepKey },
             plainHttp = davAddress?.plainHttp ?: false,
@@ -236,7 +238,7 @@ fun ConnectScreen(
         val address = addressOf(base)
         val place = editing?.takeIf { addressOf(it) == address }
         // שרת אחר (כתובת או פורט) — המפתח או התעודה שלו צריכים אישור מחדש. ב-http אין מה לאשר.
-        val hostKey = (trusted?.takeIf { it.first == address }?.second ?: place?.hostKey)?.takeIf { sftp || (dav && !base.plainHttp) }
+        val hostKey = (trusted?.takeIf { it.first == address }?.second ?: place?.hostKey)?.takeIf { sftp || ((dav || syno) && !base.plainHttp) }
         return base.copy(hostKey = hostKey)
     }
 
@@ -343,7 +345,7 @@ fun ConnectScreen(
                     SectionLabel("נמצאו ברשת")
                     FoundCard(found, searching, selectedHost = host.trim()) { server ->
                         host = server.host
-                        if (server.port != protocol.defaultPort) {
+                        if (server.protocol == protocol && server.port != protocol.defaultPort) {
                             port = server.port.toString()
                             advanced = true
                         }
@@ -384,7 +386,7 @@ fun ConnectScreen(
                             Field("משתמש", user, { user = it; error = null }, modifier = Modifier.weight(1f))
                         } else {
                             Field("שיתוף", share, { share = it; error = null }, placeholder = "כל השיתופים", modifier = Modifier.weight(1f))
-                            Field("משתמש", user, { user = it; error = null }, placeholder = "אורח", modifier = Modifier.weight(1f))
+                            Field("משתמש", user, { user = it; error = null }, placeholder = if (syno) null else "אורח", modifier = Modifier.weight(1f))
                         }
                     }
                     Field(
@@ -416,6 +418,7 @@ fun ConnectScreen(
                         Text(
                             when {
                                 sftp -> "הסיסמה והמפתח נשמרים מוצפנים ב-${"Android Keystore".isolated()}, ולא יוצאים מהמכשיר."
+                                syno -> "הסיסמה נשמרת מוצפנת ב-${"Android Keystore".isolated()}. ה-NAS זמין ברשת הביתית — מבחוץ דרך VPN, בלי פורט פתוח בראוטר."
                                 // http: הסיסמה מוצפנת במכשיר, אבל עוברת גלויה ברשת.
                                 davAddress?.plainHttp == true -> "בלי הצפנה (${"http".isolated()}): הסיסמה והקבצים עוברים ברשת גלויים. במכשיר הסיסמה נשמרת מוצפנת."
                                 else -> "הסיסמה נשמרת מוצפנת ב-${"Android Keystore".isolated()}, ולא יוצאת מהמכשיר."
@@ -433,7 +436,7 @@ fun ConnectScreen(
                         // WebDAV: הפורט בתוך הכתובת. בענן אין שרת לבחור.
                         if (!dav && !cloud) Row(horizontalArrangement = Arrangement.spacedBy(NexplorerDimens.Space2 + NexplorerDimens.Space1 / 2)) {
                             Field("פורט", port, { port = it.filter(Char::isDigit); error = null }, keyboard = KeyboardType.Number, placeholder = protocol.defaultPort.toString(), modifier = Modifier.weight(1f))
-                            if (!sftp) Field("דומיין", domain, { domain = it }, placeholder = "—", modifier = Modifier.weight(1f))
+                            if (!sftp && !syno) Field("דומיין", domain, { domain = it }, placeholder = "—", modifier = Modifier.weight(1f))
                         }
                     }
                 }

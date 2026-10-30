@@ -124,6 +124,8 @@ fi
 run_class Phase5cTest
 # שלב 6: Google Drive ו-OneDrive מול cloud-server.py על המארח (10.0.2.2:8090).
 run_class Phase6Test
+# שלב 7: Synology מול syno-server.py על המארח (10.0.2.2:8091).
+run_class Phase7Test
 # Phase2bTest מדמה טאבלט ו-Phase3bTest מסובב; אם התהליך קרס לפני tearDown — שהמונקי ירוץ על המסך הרגיל.
 adb shell wm size reset || true
 adb shell wm density reset || true
@@ -177,6 +179,7 @@ adb logcat -d -b events -s am_anr > "$out/anr.txt" || true
 sudo cat /tmp/nexplorer-sftp/sshd.log > "$out/sshd.log" 2>/dev/null || true
 # הבקשות שהשרת המדומה של הענן קיבל (Phase6Test).
 cat /tmp/nexplorer-cloud.log > "$out/cloud-server.log" 2>/dev/null || true
+cat /tmp/nexplorer-syno.log > "$out/syno-server.log" 2>/dev/null || true
 if grep -q "$pkg" "$out/anr.txt"; then
   echo "::error::the app stopped responding on API $api (anr.txt, anr-traces.txt)"
   # המחסנית של ה-main בזמן ה-ANR: ‏DropBox שומר אותה (data_app_anr), בלי root. בלעדיה רואים רק "Waited 5012ms".

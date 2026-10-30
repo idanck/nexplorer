@@ -115,4 +115,18 @@ class NetPathsTest {
         assertFalse(NetPaths.isFixed("$root/volume2/Photos"))
         assertFalse(NetPaths.isFixed("/storage/emulated/0"))
     }
+
+    @Test
+    fun `synology has shares at the root and moves anywhere on the nas`() {
+        val root = NetPaths.root(NetProtocol.Synology, "nas01")
+        assertEquals("syno://nas01", root)
+        assertTrue(NetPaths.isShareList(root))
+        assertTrue(NetPaths.isShare("$root/photo"))
+        assertFalse(NetPaths.isShare("$root/photo/2026"))
+        assertTrue(NetPaths.isFixed("$root/photo"))
+        // ההעברה בצד השרת (CopyMove) — גם בין שיתופים.
+        assertTrue(NetPaths.sameShare("$root/photo/a.jpg", "$root/backup/a.jpg"))
+        assertEquals(NetProtocol.Synology, NetPaths.protocolOf("$root/photo"))
+        assertNull(NetPaths.validateName(NetProtocol.Synology, "a:b?.txt"))
+    }
 }
