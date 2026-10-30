@@ -149,6 +149,13 @@
       "w": 1720,
       "h": 1586,
       "title": "אריחי סוגי קבצים ו-Google Drive"
+    },
+    "Synology.dc.html": {
+      "x": 0,
+      "y": 5946,
+      "w": 1720,
+      "h": 1000,
+      "title": "Synology — שני סוגי חיבור (שלב 7)"
     }
   },
   "order": [
@@ -171,7 +178,8 @@
     "VideoPlayer.dc.html",
     "VideoDoubleTap.dc.html",
     "AudioPlayer.dc.html",
-    "FileIcons.dc.html"
+    "FileIcons.dc.html",
+    "Synology.dc.html"
   ],
   "notes": {
     "t1": {
