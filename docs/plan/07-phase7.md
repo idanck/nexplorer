@@ -2,7 +2,7 @@
 
 # תוכנית מימוש — שלב 7: Synology
 
-> 30/10/2026. ממשיך את [`06-phase6.md`](06-phase6.md). **טיוטה לאישור עידן** — לוח [Synology](../design/screens/Synology.webp) (`boards/Synology.dc.html`). D2, ‏D6 ו-D10 נשארים פתוחים, ושום דבר כאן לא תלוי בהם.
+> 30/10/2026. ממשיך את [`06-phase6.md`](06-phase6.md). **אושר על ידי עידן (30/10/2026)** — לוח [Synology](../design/screens/Synology.webp) (`boards/Synology.dc.html`). D2, ‏D6 ו-D10 נשארים פתוחים, ושום דבר כאן לא תלוי בהם.
 
 ## מטרה
 
