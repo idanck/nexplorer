@@ -46,6 +46,10 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTopAppBarState
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -162,6 +166,7 @@ private val BrowserDialogSaver = Saver<BrowserDialog?, String>(
 /**
  * המסך הראשי: מגירה (מקומות) ‹ רשימה (תוכן) ‹ כפתור צף ותפריט ⋮ (פעולות) — עיקרון 1 בשפת העיצוב.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BrowserScreen(
     vm: BrowserViewModel,
@@ -188,6 +193,10 @@ fun BrowserScreen(
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
     val drawerState = rememberDrawerState(DrawerValue.Closed)
+    // ראש המסך (1.12): שורת הסיכום מתכווצת בגלילה מטה וחוזרת בגלילה מעלה; בכל מעבר מקום — פתוחה מחדש.
+    val headerState = rememberTopAppBarState()
+    val headerScroll = TopAppBarDefaults.enterAlwaysScrollBehavior(headerState)
+    LaunchedEffect(state.location) { headerState.heightOffset = 0f }
     val scope = rememberCoroutineScope()
     val snackbar = remember { SnackbarHostState() }
 
@@ -377,7 +386,9 @@ fun BrowserScreen(
                         .statusBarsPadding()
                         // לרוחב: סרגל ניווט צדדי וחריץ מצלמה; ומקלדת הסינון לא מסתירה את סוף הרשימה.
                         .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
-                        .imePadding(),
+                        .imePadding()
+                        // הראש מתכווץ עם גלילת הרשימה (רק בחלון יחיד — לכותרת חלון אין שורה מתכווצת).
+                        .then(if (pane == null) Modifier.nestedScroll(headerScroll.nestedScrollConnection) else Modifier),
                 ) {
                     if (state.inSelection) {
                         SelectionHeader(
@@ -398,8 +409,8 @@ fun BrowserScreen(
                         )
                     } else {
                         BrowserTopBar(
-                            title = state.title,
-                            titleIsLtr = state.titleIsLtr,
+                            crumbs = state.crumbs,
+                            onCrumb = { crumb -> openCrumb(vm, state, crumb) },
                             summary = summary(state),
                             clipboardCount = state.clipboard?.paths?.size ?: 0,
                             onMenu = { scope.launch { drawerState.open() } },
@@ -407,15 +418,13 @@ fun BrowserScreen(
                             onMore = { overflowOpen = true },
                             onClipboard = { dialog = BrowserDialog.Clipboard },
                             moreMenu = moreMenu,
+                            collapse = headerState,
                             cloud = state.cloudConnection?.protocol,
-                            cloudTitle = state.cloudConnection?.title,
                             account = state.cloudConnection?.account,
-                            atCloudRoot = state.isAtRoot,
                         )
                     }
                     if (pane == null) {
                         UpdateBanner(updateState, updateActions)
-                        Breadcrumbs(state.crumbs, onCrumb = { crumb -> openCrumb(vm, state, crumb) }, modifier = Modifier.fillMaxWidth())
                     }
                     if (state.filter != null) {
                         FilterBar(state.filter.orEmpty(), onChange = vm::setFilter, onClose = { vm.setFilter(null) })

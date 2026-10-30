@@ -53,6 +53,15 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TopAppBarState
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.Constraints
+import kotlin.math.roundToInt
 import com.idanck.nexplorer.core.Counts
 import com.idanck.nexplorer.core.NetProtocol
 import com.idanck.nexplorer.ui.net.ConnectionIcon
@@ -63,16 +72,17 @@ import com.idanck.nexplorer.ui.theme.NexplorerDimens
 import com.idanck.nexplorer.ui.theme.NexplorerShape
 
 /**
- * הראש של המסך הראשי (לוח "מסך ראשי", 1.9): סרגל חיפוש בצורת גלולה — ☰, "חיפוש ב-…" (הקשה פותחת את
- * החיפוש), צ'יפ "N בלוח" כשיש מה להדביק, ⋮ — ומתחתיו שם המקום בכותרת גדולה והסיכום.
+ * הראש של המסך הראשי (1.12, "פס אחד"): הנתיב עצמו בתוך הגלולה — ☰, פירורי הלחם (הקשה על מקטע = מעבר אליו,
+ * האחרון מודגש), צ'יפ "N בלוח" כשיש מה להדביק, 🔍 ו-⋮ — ומתחתיו שורת סיכום דקה.
  *
- * בתוך חיבור ענן ([cloud], 1.10): בשורש — אייקון השירות ליד הכותרת ("Google Drive"), והחשבון ([account]) בשורה
- * קטנה מתחתיה, מעל הסיכום; בתיקייה בתוכו — הכותרת היא שם התיקייה, ובשורה הקטנה אייקון השירות, השם והחשבון.
+ * שורת הסיכום מתכווצת בגלילה ([collapse], התנהגות enterAlways): גלילה מטה מסתירה אותה, גלילה מעלה מחזירה.
+ * בתוך חיבור ענן ([cloud]): אייקון השירות לפני הנתיב, והחשבון ([account]) בתחילת שורת הסיכום.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BrowserTopBar(
-    title: String,
-    titleIsLtr: Boolean,
+    crumbs: List<Crumb>,
+    onCrumb: (Crumb) -> Unit,
     summary: String,
     clipboardCount: Int,
     onMenu: () -> Unit,
@@ -80,10 +90,9 @@ fun BrowserTopBar(
     onMore: () -> Unit,
     onClipboard: () -> Unit,
     moreMenu: @Composable () -> Unit,
+    collapse: TopAppBarState,
     cloud: NetProtocol? = null,
-    cloudTitle: String? = null,
     account: String? = null,
-    atCloudRoot: Boolean = false,
 ) {
     Column(Modifier.fillMaxWidth()) {
         Row(
@@ -99,32 +108,11 @@ fun BrowserTopBar(
             IconButton(onClick = onMenu) {
                 Icon(Icons.Filled.Menu, contentDescription = "פתח מגירת מקומות", tint = MaterialTheme.colorScheme.onSurface)
             }
-            // כל הגלולה (חוץ מהכפתורים) פותחת את החיפוש — "חיפוש" לקורא המסך ולבדיקות.
-            Row(
-                modifier = Modifier
-                    .weight(1f)
-                    .heightIn(min = NexplorerDimens.TouchTarget)
-                    .clip(NexplorerShape.Pill)
-                    .clickable(onClick = onSearch)
-                    .semantics(mergeDescendants = true) { contentDescription = "חיפוש" }
-                    .padding(horizontal = NexplorerDimens.Space2),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    Icons.Filled.Search,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(NexplorerDimens.Space5 - NexplorerDimens.Space1),
-                )
-                Spacer(Modifier.width(NexplorerDimens.Space2))
-                Text(
-                    "חיפוש ב-${title.isolated()}",
-                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Normal),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+            if (cloud != null) {
+                ConnectionIcon(cloud, size = NexplorerDimens.PathCloudIcon, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(NexplorerDimens.Space1))
             }
+            PathCrumbs(crumbs, onCrumb, Modifier.weight(1f))
             if (clipboardCount > 0) {
                 // לוח "הדבקה": צ'יפ "3 בלוח" בצד הסוף של הסרגל.
                 Row(
@@ -148,66 +136,100 @@ fun BrowserTopBar(
                     )
                 }
             }
+            IconButton(onClick = onSearch) {
+                Icon(Icons.Filled.Search, contentDescription = "חיפוש", tint = MaterialTheme.colorScheme.onSurface)
+            }
             Box {
                 IconButton(onClick = onMore) { Icon(Icons.Filled.MoreVert, contentDescription = "עוד פעולות") }
                 moreMenu()
             }
         }
-        // כותרת גדולה: ברוחב הטבעי — כותרת LTR ("Pictures") נצמדת לצד ההתחלה, מעל הסיכום.
-        Column(
-            Modifier.padding(start = NexplorerDimens.Space5, end = NexplorerDimens.Space5, top = NexplorerDimens.Space4, bottom = NexplorerDimens.Space1),
-            verticalArrangement = Arrangement.spacedBy(NexplorerDimens.Space1 / 2),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (cloud != null && atCloudRoot) {
-                    ConnectionIcon(cloud, size = NexplorerDimens.CloudTitleIcon, tint = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.width(NexplorerDimens.Space2 + NexplorerDimens.Space1 / 2))
-                }
-                Text(
-                    title,
-                    style = MaterialTheme.typography.headlineMedium.let { if (titleIsLtr) it.copy(textDirection = TextDirection.Ltr) else it },
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            if (cloud != null && (account != null || !atCloudRoot)) {
-                CloudAccountLine(cloud, if (atCloudRoot) null else cloudTitle, account)
-            }
+        CollapsingLine(collapse) {
+            // החשבון LTR ומבודד, כדי שכתובת מייל לא תתהפך בשורה עברית.
             Text(
-                summary,
-                style = MaterialTheme.typography.bodyMedium,
+                listOfNotNull(account?.isolated(), summary.ifEmpty { null }).joinToString(" · "),
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Normal),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = NexplorerDimens.Space5, end = NexplorerDimens.Space5, top = NexplorerDimens.Space2, bottom = NexplorerDimens.Space1),
             )
         }
     }
 }
 
 /**
- * השורה הקטנה מתחת לכותרת בתוך חיבור ענן: בשורש — רק החשבון; בתיקייה — אייקון השירות, השם ("Google Drive")
- * והחשבון. החשבון LTR ומבודד, כדי שכתובת מייל לא תתהפך בשורה עברית.
+ * הנתיב בתוך הגלולה: מקטעים כטקסט (בלי צ'יפים), חץ ביניהם, והאחרון — המיקום הנוכחי — מודגש. נגלל אוטומטית
+ * לסוף, כך שבתיקייה עמוקה רואים את השם הנוכחי; שם ארוך מאוד נחתך ב-[NexplorerDimens.PathCrumbMax].
  */
 @Composable
-private fun CloudAccountLine(cloud: NetProtocol, service: String?, account: String?) {
-    val text = listOfNotNull(service?.isolated(), account?.isolated()).joinToString(" · ")
-    if (text.isEmpty()) return
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        if (service != null) {
-            ConnectionIcon(cloud, size = NexplorerDimens.CloudAccountIcon, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.width(NexplorerDimens.Space1 + NexplorerDimens.Space1 / 2))
+private fun PathCrumbs(crumbs: List<Crumb>, onCrumb: (Crumb) -> Unit, modifier: Modifier) {
+    val listState = rememberLazyListState()
+    LaunchedEffect(crumbs.size, crumbs.lastOrNull()?.path) {
+        if (crumbs.isNotEmpty()) listState.scrollToItem(crumbs.lastIndex)
+    }
+    LazyRow(state = listState, modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        itemsIndexed(crumbs, key = { i, c -> "$i:${c.path}" }) { index, crumb ->
+            val current = index == crumbs.lastIndex
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (index > 0) {
+                    // "ימינה" משוקף: ב-RTL החץ מצביע שמאלה, לכיוון ההמשך.
+                    Icon(
+                        Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.size(NexplorerDimens.Space4),
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .heightIn(min = NexplorerDimens.TouchTarget)
+                        .widthIn(max = NexplorerDimens.PathCrumbMax)
+                        .clip(NexplorerShape.Pill)
+                        .clickable { onCrumb(crumb) }
+                        .padding(horizontal = NexplorerDimens.Space1 + NexplorerDimens.Space1 / 2),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        crumb.label,
+                        style = (if (current) MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
+                        else MaterialTheme.typography.bodyMedium)
+                            .let { if (crumb.isLtr) it.copy(textDirection = TextDirection.Ltr) else it },
+                        color = if (current) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
         }
-        Text(
-            text,
-            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Normal),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
     }
 }
 
-/** פירורי לחם כצ'יפים; האחרון (המיקום הנוכחי) מודגש. הקשה עליו = רענון. */
+/**
+ * שורה שמתכווצת עם הגלילה: הגובה שלה הוא גבול ההתכווצות של [state], והיא נחתכת ודוהה לפי ההיסט. כך
+ * גלילה מטה ברשימה מעלימה אותה (והרשימה מקבלת את המקום), וגלילה מעלה מחזירה אותה.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CollapsingLine(state: TopAppBarState, content: @Composable () -> Unit) {
+    Layout(
+        content = {
+            Box(Modifier.onSizeChanged { state.heightOffsetLimit = -it.height.toFloat() }) { content() }
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .clipToBounds()
+            .graphicsLayer { alpha = 1f - state.collapsedFraction },
+    ) { measurables, constraints ->
+        val line = measurables.single().measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
+        val height = (line.height + state.heightOffset).roundToInt().coerceIn(0, line.height)
+        layout(constraints.maxWidth, height) { line.placeRelative(0, height - line.height) }
+    }
+}
+
+/** פירורי לחם כצ'יפים (כותרת חלון בשני חלונות); האחרון (המיקום הנוכחי) מודגש. הקשה עליו = רענון. */
 @Composable
 fun Breadcrumbs(
     crumbs: List<Crumb>,
