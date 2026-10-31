@@ -4,6 +4,11 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -187,6 +192,17 @@ fun NexplorerRoot(
     // העברה בין מכשירים (1.16): קוד לחיבור, קבלת קבצים, "שלח אל" — מעל כל מסך.
     PeerOverlays()
 
+    // Google TV: מסך שנפתח (הגדרות, חיבור, חיפוש…) מקבל את הפוקוס לפריט הראשון — אחרת הפוקוס נשאר על המסך
+    // שנסגר, ושום לחיצה בשלט לא מגיעה לרשימה. מסך הקבצים ונגן הווידאו מנהלים את הפוקוס בעצמם.
+    val tvEntry = tv && screen != Screen.Browser && screen != Screen.Video && screen != Screen.Viewer
+    val entryFocus = remember(screen) { FocusRequester() }
+    if (tvEntry) {
+        LaunchedEffect(screen) {
+            delay(TV_ENTRY_FOCUS_DELAY_MS)
+            runCatching { entryFocus.requestFocus() }
+        }
+    }
+    Box(if (tvEntry) Modifier.fillMaxSize().focusRequester(entryFocus).focusGroup() else Modifier.fillMaxSize()) {
     when (screen) {
         Screen.Browser -> BoxWithConstraints(Modifier.fillMaxSize()) {
             val onOpenSearch: (String?) -> Unit = { root ->
@@ -427,6 +443,7 @@ fun NexplorerRoot(
             )
         }
     }
+    }
 }
 
 /** המפתח של ה-ViewModel של החלון השני (הראשון הוא ברירת המחדל, משותף עם תצוגת הטלפון). */
@@ -522,3 +539,6 @@ private suspend fun connectAndSave(container: AppContainer, draft: NetConnection
         keptKey?.fill('\u0000')
     }
 }
+
+/** אחרי שהמסך החדש מצויר — אז יש לו ילדים שאפשר להעביר אליהם פוקוס. */
+private const val TV_ENTRY_FOCUS_DELAY_MS = 150L

@@ -14,6 +14,8 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -67,7 +69,14 @@ class MainActivity : ComponentActivity() {
                 // הממשק כתוב בעברית בלבד בשלב הזה, ולכן תמיד מימין לשמאל — גם במכשיר באנגלית (D7).
                 // העברה בין מכשירים (1.16): מה שפתוח ("שלח אל", קוד) — משותף לכל המסכים.
                 val peerUi = remember { PeerUi(container.peers, container.transfers, container.scope) }
-                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl, LocalTvMode provides tv, LocalPeerUi provides peerUi) {
+                // צבע הטקסט ברירת המחדל: onBackground — טקסט בלי צבע מפורש מחוץ ל-Surface (כמו במסך הטלוויזיה) היה יוצא
+                // שחור (Color.Black של Compose) על הרקע הכהה.
+                CompositionLocalProvider(
+                    LocalLayoutDirection provides LayoutDirection.Rtl,
+                    LocalTvMode provides tv,
+                    LocalPeerUi provides peerUi,
+                    LocalContentColor provides MaterialTheme.colorScheme.onBackground,
+                ) {
                     NexplorerRoot(
                         container = container,
                         pendingPath = pendingPath.value,

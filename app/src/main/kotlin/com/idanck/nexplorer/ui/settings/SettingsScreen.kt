@@ -1,6 +1,9 @@
 package com.idanck.nexplorer.ui.settings
 
 import androidx.compose.foundation.background
+import com.idanck.nexplorer.ui.tv.tvFocusRing
+import com.idanck.nexplorer.ui.tv.LocalTvMode
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -327,10 +330,15 @@ private fun Group(title: String, content: @Composable ColumnScope.() -> Unit) {
 
 @Composable
 private fun Item(title: String, subtitle: String? = null, onClick: (() -> Unit)? = null, trailing: @Composable () -> Unit) {
+    // Google TV: הפוקוס של השלט — טבעת בהירה סביב השורה (כמו בכרטיסים במסך הטלוויזיה), לא רק הצללה עדינה.
+    val tv = LocalTvMode.current
+    var focused by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
+            .then(if (tv) Modifier.tvFocusRing(focused, MaterialTheme.colorScheme.onSurface, NexplorerDimens.Space4) else Modifier)
             .segment(MaterialTheme.colorScheme.surface)
             .heightIn(min = NexplorerDimens.SettingsRowHeight)
+            .onFocusChanged { focused = it.hasFocus }
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = NexplorerDimens.Space4, vertical = NexplorerDimens.Space2),
         verticalAlignment = Alignment.CenterVertically,
@@ -352,7 +360,8 @@ private fun SwitchItem(title: String, subtitle: String?, checked: Boolean, enabl
         // מתג M3 עם ✓ על הידית כשהוא דולק (לוח "הגדרות", 1.9).
         Switch(
             checked = checked,
-            onCheckedChange = if (enabled) onChange else null,
+            // בטלוויזיה השורה כולה היא המתג — בלי עצירת פוקוס שנייה על המתג עצמו.
+            onCheckedChange = if (enabled && !LocalTvMode.current) onChange else null,
             enabled = enabled,
             thumbContent = if (checked) {
                 { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(SwitchDefaults.IconSize)) }
