@@ -54,6 +54,8 @@ import com.idanck.nexplorer.core.FileKind
 import com.idanck.nexplorer.core.MediaFormats
 import com.idanck.nexplorer.ui.browser.DualPaneScreen
 import com.idanck.nexplorer.ui.theme.NexplorerDimens
+import com.idanck.nexplorer.ui.tv.LocalTvMode
+import com.idanck.nexplorer.ui.tv.TvBrowserScreen
 import com.idanck.nexplorer.ui.player.AudioPlayerScreen
 import com.idanck.nexplorer.ui.player.AudioPlayerViewModel
 import com.idanck.nexplorer.ui.player.VideoPlayerScreen
@@ -78,6 +80,7 @@ fun NexplorerRoot(
     onShowPlayerConsumed: () -> Unit,
 ) {
     val context = LocalContext.current
+    val tv = LocalTvMode.current
     val settings by container.settings.state.collectAsStateWithLifecycle()
     val updateState by container.updates.state.collectAsStateWithLifecycle()
     val canInstall by container.updates.canInstall.collectAsStateWithLifecycle()
@@ -184,8 +187,24 @@ fun NexplorerRoot(
                 editorPath = path
                 screen = Screen.Editor
             }
-            // טאבלט: שני חלונות (לוח Tablet). החלון הראשון הוא אותו חלון של הטלפון.
-            if (maxWidth >= NexplorerDimens.DualPaneMinWidth && maxHeight >= NexplorerDimens.DualPaneMinHeight) {
+            // Google TV (1.15): מסך לשלט, על אותו ViewModel. טאבלט: שני חלונות (לוח Tablet). החלון הראשון הוא אותו
+            // חלון של הטלפון.
+            if (tv) {
+                TvBrowserScreen(
+                    vm = browser,
+                    transfers = container.transfers,
+                    settings = settings,
+                    updateState = updateState,
+                    updateActions = updateActions,
+                    keys = container.keys,
+                    remote = container.remote,
+                    onOpenSearch = onOpenSearch,
+                    onOpenSettings = { screen = Screen.Settings },
+                    onEditText = onEditText,
+                    onOpenMedia = ::openMedia,
+                    onOpenConnect = onOpenConnect,
+                )
+            } else if (maxWidth >= NexplorerDimens.DualPaneMinWidth && maxHeight >= NexplorerDimens.DualPaneMinHeight) {
                 DualPaneScreen(
                     panes = listOf(browser, viewModel<BrowserViewModel>(key = SECOND_PANE)),
                     transfers = container.transfers,

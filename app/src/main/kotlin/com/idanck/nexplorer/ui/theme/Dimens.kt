@@ -191,4 +191,32 @@ object NexplorerDimens {
     val ConnectStatusDot = 8.dp
     val ConnectChooseButton = 32.dp
     val ConnectHintIcon = 18.dp
+    /**
+     * Google TV (1.15, לוחות Tv-*): מסך של 960×540 dp. שוליים בטוחים (overscan) 48/27; מסילת מקומות צרה (64) שנפתחת
+     * ל-300 כשהפוקוס בה; רשת של [TvGridColumns] כרטיסים (תמונה 92, פינות 16) עם פוקוס — הגדלה ×[TvFocusScale]
+     * וטבעת בהירה 3 במרחק 3; כפתורי ראש 40; פאנל הפעולות 360 (שורה 44, בפוקוס 52); סרגל הבחירה — כפתורים 48.
+     */
+    val TvOverscanHorizontal = 48.dp
+    val TvOverscanVertical = 27.dp
+    val TvRailCollapsed = 64.dp
+    val TvRailExpanded = 300.dp
+    val TvRailButton = 52.dp
+    val TvRailLogo = 44.dp
+    val TvRailRow = 48.dp
+    val TvContentGap = 24.dp
+    val TvGridGapHorizontal = 18.dp
+    val TvGridGapVertical = 22.dp
+    val TvCardThumbHeight = 92.dp
+    val TvCardGlyph = 40.dp
+    val TvFocusRing = 3.dp
+    val TvFocusRingGap = 3.dp
+    val TvHeaderButton = 40.dp
+    val TvActionsPanelWidth = 360.dp
+    val TvActionRow = 44.dp
+    val TvActionRowFocused = 52.dp
+    val TvToolbarButton = 48.dp
+    val TvSelectionPill = 52.dp
+    const val TvGridColumns = 5
+    const val TvFocusScale = 1.08f
+    const val TvRowFocusScale = 1.03f
 }

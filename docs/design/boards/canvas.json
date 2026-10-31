@@ -191,6 +191,55 @@
       "w": 390,
       "h": 844,
       "title": "סטטוס חיבור · פרטי חיבור (1.14)"
+    },
+    "Tv-Main.dc.html": {
+      "x": 0,
+      "y": 8310,
+      "w": 960,
+      "h": 540,
+      "title": "T1 · טלוויזיה — מסך ראשי, פוקוס על אריח"
+    },
+    "Tv-Rail.dc.html": {
+      "x": 1040,
+      "y": 8310,
+      "w": 960,
+      "h": 540,
+      "title": "T2 · מסילת מקומות פתוחה + מכשירים קרובים"
+    },
+    "Tv-Actions.dc.html": {
+      "x": 2080,
+      "y": 8310,
+      "w": 960,
+      "h": 540,
+      "title": "T3 · פאנל פעולות (לחיצה ארוכה על OK)"
+    },
+    "Tv-Select.dc.html": {
+      "x": 3120,
+      "y": 8310,
+      "w": 960,
+      "h": 540,
+      "title": "T4 · בחירה מרובה וסרגל פעולות"
+    },
+    "Tv-Receive.dc.html": {
+      "x": 4160,
+      "y": 8310,
+      "w": 960,
+      "h": 540,
+      "title": "T5 · קבלת קבצים מהטלפון"
+    },
+    "Tv-Pair.dc.html": {
+      "x": 5200,
+      "y": 8310,
+      "w": 960,
+      "h": 540,
+      "title": "T6 · חיבור מכשיר — קוד על המסך"
+    },
+    "Tv-Launcher.dc.html": {
+      "x": 6240,
+      "y": 8310,
+      "w": 960,
+      "h": 540,
+      "title": "T7 · באנר במסך הבית של הטלוויזיה"
     }
   },
   "order": [
@@ -219,7 +268,14 @@
     "ConnectionStatus-Relay.dc.html",
     "ConnectionStatus-Drawer.dc.html",
     "ConnectionStatus-Menu.dc.html",
-    "ConnectionStatus-Details.dc.html"
+    "ConnectionStatus-Details.dc.html",
+    "Tv-Main.dc.html",
+    "Tv-Rail.dc.html",
+    "Tv-Actions.dc.html",
+    "Tv-Select.dc.html",
+    "Tv-Receive.dc.html",
+    "Tv-Pair.dc.html",
+    "Tv-Launcher.dc.html"
   ],
   "notes": {
     "t1": {
@@ -249,6 +305,13 @@
       "text": "4 · נגנים",
       "kind": "title1",
       "maxW": 2238
+    },
+    "tv": {
+      "x": 0,
+      "y": 8010,
+      "text": "Google TV (1.15)",
+      "kind": "title1",
+      "maxW": 7200
     }
   },
   "designSystems": []

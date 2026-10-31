@@ -27,6 +27,8 @@ import com.idanck.nexplorer.media.PlaybackService
 import com.idanck.nexplorer.ui.NexplorerRoot
 import com.idanck.nexplorer.ui.keys.KeyShortcuts
 import com.idanck.nexplorer.ui.theme.NexplorerTheme
+import com.idanck.nexplorer.ui.tv.LocalTvMode
+import com.idanck.nexplorer.ui.tv.TvMode
 
 class MainActivity : ComponentActivity() {
 
@@ -41,9 +43,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         if (savedInstanceState == null) readIntent(intent)
         val container = (application as NexplorerApp).container
+        // Google TV (1.15): מסך לשלט, וערכה כהה תמיד (מסך גדול בחדר — בלי משטחים לבנים).
+        val tv = TvMode.isTv(this)
         setContent {
             val settings by container.settings.state.collectAsStateWithLifecycle()
-            val dark = when (settings.theme) {
+            val dark = if (tv) true else when (settings.theme) {
                 ThemeMode.System -> isSystemInDarkTheme()
                 ThemeMode.Light -> false
                 ThemeMode.Dark -> true
@@ -58,7 +62,7 @@ class MainActivity : ComponentActivity() {
             }
             NexplorerTheme(darkTheme = dark) {
                 // הממשק כתוב בעברית בלבד בשלב הזה, ולכן תמיד מימין לשמאל — גם במכשיר באנגלית (D7).
-                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl, LocalTvMode provides tv) {
                     NexplorerRoot(
                         container = container,
                         pendingPath = pendingPath.value,

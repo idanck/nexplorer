@@ -99,6 +99,16 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
@@ -216,11 +226,44 @@ fun VideoPlayerScreen(viewModel: VideoPlayerViewModel, path: String, onPathChang
     val insets = WindowInsets.systemBars.union(WindowInsets.displayCutout)
     val name = state.name ?: path.substringAfterLast('/')
 
+    // שלט (Google TV, 1.15): כשאף כפתור לא בפוקוס — OK נגן/השהה, ימינה/שמאלה ±10 שניות (ציר הזמן משמאל לימין),
+    // למעלה/למטה מציגים את הבקרים ונכנסים אליהם; מקשי המדיה תמיד. כל מקש מציג את הבקרים ומאפס את ההסתרה.
+    val rootFocus = remember { FocusRequester() }
+    var rootFocused by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { runCatching { rootFocus.requestFocus() } }
+    LaunchedEffect(chrome) { if (!chrome) runCatching { rootFocus.requestFocus() } }
+    val onRemoteKey: (KeyEvent) -> Boolean = onRemoteKey@{ e ->
+        if (e.type != KeyEventType.KeyDown) return@onRemoteKey false
+        val wasHidden = !chrome
+        chrome = true
+        poke++
+        when (e.key) {
+            Key.MediaPlayPause, Key.MediaPlay, Key.MediaPause -> true.also { viewModel.togglePlay() }
+            Key.MediaFastForward -> true.also { viewModel.seekBy(VIDEO_SKIP_MS) }
+            Key.MediaRewind -> true.also { viewModel.seekBy(-VIDEO_SKIP_MS) }
+            Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> rootFocused.also { if (it && !locked) viewModel.togglePlay() }
+            Key.DirectionRight -> (rootFocused && !locked).also {
+                if (it) {
+                    viewModel.seekBy(VIDEO_SKIP_MS)
+                    skipped += (VIDEO_SKIP_MS / 1000).toInt()
+                    skipTap++
+                }
+            }
+            Key.DirectionLeft -> (rootFocused && !locked).also { if (it) viewModel.seekBy(-VIDEO_SKIP_MS) }
+            Key.DirectionUp, Key.DirectionDown -> rootFocused && wasHidden
+            else -> false
+        }
+    }
+
     Box(
         Modifier
             .fillMaxSize()
             .background(colors.viewerBackground)
-            .semantics { stateDescription = if (state.playing) "מנגן" else "מושהה" },
+            .semantics { stateDescription = if (state.playing) "מנגן" else "מושהה" }
+            .onPreviewKeyEvent(onRemoteKey)
+            .focusRequester(rootFocus)
+            .onFocusChanged { rootFocused = it.isFocused }
+            .focusable(),
     ) {
         AndroidView(
             factory = { ctx ->
