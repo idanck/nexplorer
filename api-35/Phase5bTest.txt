@@ -1,0 +1,8 @@
+
+com.idanck.nexplorer.qa.Phase5bTest:.....
+
+Time: 53.521
+
+OK (5 tests)
+
+

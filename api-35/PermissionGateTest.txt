@@ -1,0 +1,8 @@
+
+com.idanck.nexplorer.qa.PermissionGateTest:.
+
+Time: 12.958
+
+OK (1 test)
+
+

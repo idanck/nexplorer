@@ -1,0 +1,8 @@
+
+com.idanck.nexplorer.qa.Phase2bTest:...
+
+Time: 31.974
+
+OK (3 tests)
+
+

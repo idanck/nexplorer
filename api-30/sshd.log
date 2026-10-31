@@ -1,0 +1,194 @@
+Server listening on 0.0.0.0 port 2222.
+Connection from 127.0.0.1 port 57406 on 127.0.0.1 port 2222 rdomain ""
+kex_exchange_identification: Connection closed by remote host
+Connection closed by 127.0.0.1 port 57406
+Connection from 127.0.0.1 port 55054 on 127.0.0.1 port 2222 rdomain ""
+Received disconnect from 127.0.0.1 port 55054:9: Could not verify `ssh-ed25519` host key with fingerprint `a9:f6:be:fe:01:1e:2b:cf:fc:2a:73:70:36:f5:1d:52` for `10.0.2.2` on port 2222 [preauth]
+Disconnected from 127.0.0.1 port 55054 [preauth]
+Connection from 127.0.0.1 port 55062 on 127.0.0.1 port 2222 rdomain ""
+Accepted password for qa from 127.0.0.1 port 55062 ssh2
+User child is on pid 6021
+Starting session: forced-command (config) 'internal-sftp' for qa from 127.0.0.1 port 55062 id 0
+Close session: user qa from 127.0.0.1 port 55062 id 0
+Received disconnect from 127.0.0.1 port 55062:11: 
+Disconnected from user qa 127.0.0.1 port 55062
+Connection from 127.0.0.1 port 60602 on 127.0.0.1 port 2222 rdomain ""
+Received disconnect from 127.0.0.1 port 60602:9: Could not verify `ssh-ed25519` host key with fingerprint `a9:f6:be:fe:01:1e:2b:cf:fc:2a:73:70:36:f5:1d:52` for `10.0.2.2` on port 2222 [preauth]
+Disconnected from 127.0.0.1 port 60602 [preauth]
+Connection from 127.0.0.1 port 60612 on 127.0.0.1 port 2222 rdomain ""
+Failed password for qa from 127.0.0.1 port 60612 ssh2
+Received disconnect from 127.0.0.1 port 60612:11:  [preauth]
+Disconnected from authenticating user qa 127.0.0.1 port 60612 [preauth]
+Connection from 127.0.0.1 port 60622 on 127.0.0.1 port 2222 rdomain ""
+Accepted password for qa from 127.0.0.1 port 60622 ssh2
+User child is on pid 6039
+Starting session: forced-command (config) 'internal-sftp' for qa from 127.0.0.1 port 60622 id 0
+Close session: user qa from 127.0.0.1 port 60622 id 0
+Received disconnect from 127.0.0.1 port 60622:11: 
+Disconnected from user qa 127.0.0.1 port 60622
+Connection from 127.0.0.1 port 60628 on 127.0.0.1 port 2222 rdomain ""
+Accepted password for qa from 127.0.0.1 port 60628 ssh2
+User child is on pid 6043
+Starting session: forced-command (config) 'internal-sftp' for qa from 127.0.0.1 port 60628 id 0
+Connection from 127.0.0.1 port 60636 on 127.0.0.1 port 2222 rdomain ""
+Accepted password for qa from 127.0.0.1 port 60636 ssh2
+User child is on pid 6055
+Starting session: forced-command (config) 'internal-sftp' for qa from 127.0.0.1 port 60636 id 0
+Close session: user qa from 127.0.0.1 port 60636 id 0
+Received disconnect from 127.0.0.1 port 60636:11: 
+Disconnected from user qa 127.0.0.1 port 60636
+Connection from 127.0.0.1 port 48028 on 127.0.0.1 port 2222 rdomain ""
+Received disconnect from 127.0.0.1 port 48028:9: Could not verify `ssh-ed25519` host key with fingerprint `a9:f6:be:fe:01:1e:2b:cf:fc:2a:73:70:36:f5:1d:52` for `10.0.2.2` on port 2222 [preauth]
+Disconnected from 127.0.0.1 port 48028 [preauth]
+Connection from 127.0.0.1 port 48040 on 127.0.0.1 port 2222 rdomain ""
+Accepted password for qa from 127.0.0.1 port 48040 ssh2
+User child is on pid 6061
+Starting session: forced-command (config) 'internal-sftp' for qa from 127.0.0.1 port 48040 id 0
+Close session: user qa from 127.0.0.1 port 48040 id 0
+Received disconnect from 127.0.0.1 port 48040:11: 
+Disconnected from user qa 127.0.0.1 port 48040
+Connection from 127.0.0.1 port 48044 on 127.0.0.1 port 2222 rdomain ""
+Accepted password for qa from 127.0.0.1 port 48044 ssh2
+User child is on pid 6067
+Starting session: forced-command (config) 'internal-sftp' for qa from 127.0.0.1 port 48044 id 0
+Connection from 127.0.0.1 port 44024 on 127.0.0.1 port 2222 rdomain ""
+Accepted password for qa from 127.0.0.1 port 44024 ssh2
+User child is on pid 6080
+Starting session: forced-command (config) 'internal-sftp' for qa from 127.0.0.1 port 44024 id 0
+Close session: user qa from 127.0.0.1 port 44024 id 0
+Received disconnect from 127.0.0.1 port 44024:11: 
+Disconnected from user qa 127.0.0.1 port 44024
+Close session: user qa from 127.0.0.1 port 48044 id 0
+Received disconnect from 127.0.0.1 port 48044:11: 
+Disconnected from user qa 127.0.0.1 port 48044
+Connection from 127.0.0.1 port 44030 on 127.0.0.1 port 2222 rdomain ""
+Received disconnect from 127.0.0.1 port 44030:9: Could not verify `ssh-ed25519` host key with fingerprint `a9:f6:be:fe:01:1e:2b:cf:fc:2a:73:70:36:f5:1d:52` for `10.0.2.2` on port 2222 [preauth]
+Disconnected from 127.0.0.1 port 44030 [preauth]
+Connection from 127.0.0.1 port 44038 on 127.0.0.1 port 2222 rdomain ""
+Accepted password for qa from 127.0.0.1 port 44038 ssh2
+User child is on pid 6086
+Starting session: forced-command (config) 'internal-sftp' for qa from 127.0.0.1 port 44038 id 0
+Close session: user qa from 127.0.0.1 port 44038 id 0
+Received disconnect from 127.0.0.1 port 44038:11: 
+Disconnected from user qa 127.0.0.1 port 44038
+Connection from 127.0.0.1 port 44052 on 127.0.0.1 port 2222 rdomain ""
+Accepted key ED25519 SHA256:9sMySKrrfGYjEqoDwcps3cm+9AELHqS9B/QtXy4uALQ found at /tmp/nexplorer-sftp/authorized/qa:1
+Postponed publickey for qa from 127.0.0.1 port 44052 ssh2 [preauth]
+Accepted key ED25519 SHA256:9sMySKrrfGYjEqoDwcps3cm+9AELHqS9B/QtXy4uALQ found at /tmp/nexplorer-sftp/authorized/qa:1
+Accepted publickey for qa from 127.0.0.1 port 44052 ssh2: ED25519 SHA256:9sMySKrrfGYjEqoDwcps3cm+9AELHqS9B/QtXy4uALQ
+User child is on pid 6091
+Starting session: forced-command (config) 'internal-sftp' for qa from 127.0.0.1 port 44052 id 0
+Close session: user qa from 127.0.0.1 port 44052 id 0
+Received disconnect from 127.0.0.1 port 44052:11: 
+Disconnected from user qa 127.0.0.1 port 44052
+Connection from 127.0.0.1 port 44066 on 127.0.0.1 port 2222 rdomain ""
+Received disconnect from 127.0.0.1 port 44066:11:  [preauth]
+Disconnected from 127.0.0.1 port 44066 [preauth]
+Connection from 127.0.0.1 port 57558 on 127.0.0.1 port 2222 rdomain ""
+Accepted key ED25519 SHA256:OgOpse5NFH0y+flOC4+3G8EPHvc3lUHVef1TfGzDU7Q found at /tmp/nexplorer-sftp/authorized/qa:2
+Postponed publickey for qa from 127.0.0.1 port 57558 ssh2 [preauth]
+Accepted key ED25519 SHA256:OgOpse5NFH0y+flOC4+3G8EPHvc3lUHVef1TfGzDU7Q found at /tmp/nexplorer-sftp/authorized/qa:2
+Accepted publickey for qa from 127.0.0.1 port 57558 ssh2: ED25519 SHA256:OgOpse5NFH0y+flOC4+3G8EPHvc3lUHVef1TfGzDU7Q
+User child is on pid 6118
+Starting session: forced-command (config) 'internal-sftp' for qa from 127.0.0.1 port 57558 id 0
+Connection from 127.0.0.1 port 57572 on 127.0.0.1 port 2222 rdomain ""
+Accepted password for qa from 127.0.0.1 port 57572 ssh2
+User child is on pid 6128
+Starting session: forced-command (config) 'internal-sftp' for qa from 127.0.0.1 port 57572 id 0
+Close session: user qa from 127.0.0.1 port 57572 id 0
+Received disconnect from 127.0.0.1 port 57572:11: 
+Disconnected from user qa 127.0.0.1 port 57572
+Close session: user qa from 127.0.0.1 port 57558 id 0
+Received disconnect from 127.0.0.1 port 57558:11: 
+Disconnected from user qa 127.0.0.1 port 57558
+Connection from 127.0.0.1 port 57582 on 127.0.0.1 port 2222 rdomain ""
+Received disconnect from 127.0.0.1 port 57582:9: Could not verify `ssh-ed25519` host key with fingerprint `a9:f6:be:fe:01:1e:2b:cf:fc:2a:73:70:36:f5:1d:52` for `10.0.2.2` on port 2222 [preauth]
+Disconnected from 127.0.0.1 port 57582 [preauth]
+Connection from 127.0.0.1 port 57592 on 127.0.0.1 port 2222 rdomain ""
+Accepted password for qa from 127.0.0.1 port 57592 ssh2
+User child is on pid 6134
+Starting session: forced-command (config) 'internal-sftp' for qa from 127.0.0.1 port 57592 id 0
+Close session: user qa from 127.0.0.1 port 57592 id 0
+Received disconnect from 127.0.0.1 port 57592:11: 
+Disconnected from user qa 127.0.0.1 port 57592
+Connection from 127.0.0.1 port 57598 on 127.0.0.1 port 2222 rdomain ""
+Received disconnect from 127.0.0.1 port 57598:9: Could not verify `ssh-ed25519` host key with fingerprint `a9:f6:be:fe:01:1e:2b:cf:fc:2a:73:70:36:f5:1d:52` for `10.0.2.2` on port 2222 [preauth]
+Disconnected from 127.0.0.1 port 57598 [preauth]
+Connection from 127.0.0.1 port 57604 on 127.0.0.1 port 2222 rdomain ""
+Received disconnect from 127.0.0.1 port 57604:9: Could not verify `ssh-ed25519` host key with fingerprint `a9:f6:be:fe:01:1e:2b:cf:fc:2a:73:70:36:f5:1d:52` for `10.0.2.2` on port 2222 [preauth]
+Disconnected from 127.0.0.1 port 57604 [preauth]
+Connection from 127.0.0.1 port 57616 on 127.0.0.1 port 2222 rdomain ""
+Accepted password for qa from 127.0.0.1 port 57616 ssh2
+User child is on pid 6148
+Starting session: forced-command (config) 'internal-sftp' for qa from 127.0.0.1 port 57616 id 0
+Close session: user qa from 127.0.0.1 port 57616 id 0
+Received disconnect from 127.0.0.1 port 57616:11: 
+Disconnected from user qa 127.0.0.1 port 57616
+Connection from 127.0.0.1 port 57632 on 127.0.0.1 port 2222 rdomain ""
+Accepted password for qa from 127.0.0.1 port 57632 ssh2
+User child is on pid 6152
+Starting session: forced-command (config) 'internal-sftp' for qa from 127.0.0.1 port 57632 id 0
+Connection from 127.0.0.1 port 57638 on 127.0.0.1 port 2222 rdomain ""
+Accepted password for qa from 127.0.0.1 port 57638 ssh2
+User child is on pid 6162
+Starting session: forced-command (config) 'internal-sftp' for qa from 127.0.0.1 port 57638 id 0
+Close session: user qa from 127.0.0.1 port 57638 id 0
+Received disconnect from 127.0.0.1 port 57638:11: 
+Disconnected from user qa 127.0.0.1 port 57638
+Close session: user qa from 127.0.0.1 port 57632 id 0
+Received disconnect from 127.0.0.1 port 57632:11: 
+Disconnected from user qa 127.0.0.1 port 57632
+Connection from 127.0.0.1 port 38048 on 127.0.0.1 port 2222 rdomain ""
+Received disconnect from 127.0.0.1 port 38048:9: Could not verify `ssh-ed25519` host key with fingerprint `a9:f6:be:fe:01:1e:2b:cf:fc:2a:73:70:36:f5:1d:52` for `10.0.2.2` on port 2222 [preauth]
+Disconnected from 127.0.0.1 port 38048 [preauth]
+Connection from 127.0.0.1 port 38062 on 127.0.0.1 port 2222 rdomain ""
+Accepted password for qa from 127.0.0.1 port 38062 ssh2
+User child is on pid 6168
+Starting session: forced-command (config) 'internal-sftp' for qa from 127.0.0.1 port 38062 id 0
+Close session: user qa from 127.0.0.1 port 38062 id 0
+Received disconnect from 127.0.0.1 port 38062:11: 
+Disconnected from user qa 127.0.0.1 port 38062
+Connection from 127.0.0.1 port 38066 on 127.0.0.1 port 2222 rdomain ""
+Accepted password for qa from 127.0.0.1 port 38066 ssh2
+User child is on pid 6172
+Starting session: forced-command (config) 'internal-sftp' for qa from 127.0.0.1 port 38066 id 0
+Close session: user qa from 127.0.0.1 port 38066 id 0
+Received disconnect from 127.0.0.1 port 38066:11: 
+Disconnected from user qa 127.0.0.1 port 38066
+Connection from 127.0.0.1 port 38082 on 127.0.0.1 port 2222 rdomain ""
+Accepted password for qa from 127.0.0.1 port 38082 ssh2
+User child is on pid 6176
+Starting session: forced-command (config) 'internal-sftp' for qa from 127.0.0.1 port 38082 id 0
+Connection from 127.0.0.1 port 35496 on 127.0.0.1 port 2222 rdomain ""
+Accepted password for qa from 127.0.0.1 port 35496 ssh2
+User child is on pid 6187
+Starting session: forced-command (config) 'internal-sftp' for qa from 127.0.0.1 port 35496 id 0
+Close session: user qa from 127.0.0.1 port 35496 id 0
+Received disconnect from 127.0.0.1 port 35496:11: 
+Disconnected from user qa 127.0.0.1 port 35496
+Connection closed by 127.0.0.1 port 38082
+Close session: user qa from 127.0.0.1 port 38082 id 0
+Transferred: sent 704288, received 5248 bytes
+Closing connection to 127.0.0.1 port 38082
+Connection closed by 127.0.0.1 port 60628
+Close session: user qa from 127.0.0.1 port 60628 id 0
+Transferred: sent 4368, received 3456 bytes
+Closing connection to 127.0.0.1 port 60628
+Connection from 127.0.0.1 port 35000 on 127.0.0.1 port 2222 rdomain ""
+Received disconnect from 127.0.0.1 port 35000:9: Could not verify `ssh-ed25519` host key with fingerprint `a9:f6:be:fe:01:1e:2b:cf:fc:2a:73:70:36:f5:1d:52` for `10.0.2.2` on port 2222 [preauth]
+Disconnected from 127.0.0.1 port 35000 [preauth]
+Connection from 127.0.0.1 port 35004 on 127.0.0.1 port 2222 rdomain ""
+Accepted password for qa from 127.0.0.1 port 35004 ssh2
+User child is on pid 6883
+Starting session: forced-command (config) 'internal-sftp' for qa from 127.0.0.1 port 35004 id 0
+Close session: user qa from 127.0.0.1 port 35004 id 0
+Received disconnect from 127.0.0.1 port 35004:11: 
+Disconnected from user qa 127.0.0.1 port 35004
+Connection from 127.0.0.1 port 35010 on 127.0.0.1 port 2222 rdomain ""
+Accepted password for qa from 127.0.0.1 port 35010 ssh2
+User child is on pid 6887
+Starting session: forced-command (config) 'internal-sftp' for qa from 127.0.0.1 port 35010 id 0
+Connection closed by 127.0.0.1 port 35010
+Close session: user qa from 127.0.0.1 port 35010 id 0
+Transferred: sent 3392, received 3136 bytes
+Closing connection to 127.0.0.1 port 35010
