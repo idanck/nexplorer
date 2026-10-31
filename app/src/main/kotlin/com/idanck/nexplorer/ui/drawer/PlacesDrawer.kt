@@ -386,16 +386,10 @@ private fun ConnectionRow(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
                     )
-                    if (space != null) {
-                        Text(
-                            "${SizeFormat.short(space.used)} / ${SizeFormat.short(space.total)}",
-                            style = MonoTextStyle.copy(fontSize = MaterialTheme.typography.labelSmall.fontSize),
-                            color = if (active) scheme.onPrimaryContainer else scheme.onSurfaceVariant,
-                        )
-                    }
                 }
                 if (space != null) UsageBar(space.usedFraction, active)
-                StatusLine(connection, route, active)
+                // התפוסה בסוף שורת "איך מתחבר" (1.14) — כך לשם יש את כל הרוחב לצד ה-ⓘ.
+                StatusLine(connection, route, active, space?.let { "${SizeFormat.short(it.used)} / ${SizeFormat.short(it.total)}" })
             }
             IconButton(onClick = onDetails, modifier = Modifier.size(NexplorerDimens.TouchTarget)) {
                 Icon(
@@ -523,13 +517,16 @@ private fun displayPath(path: String, connections: List<NetConnection>): String 
  * והשרת, כמו קודם.
  */
 @Composable
-private fun StatusLine(connection: NetConnection, route: QuickConnect.Route?, active: Boolean) {
+private fun StatusLine(connection: NetConnection, route: QuickConnect.Route?, active: Boolean, usage: String?) {
     val scheme = MaterialTheme.colorScheme
     val c = NexplorerTheme.colors
     val muted = if (active) scheme.onPrimaryContainer else scheme.onSurfaceVariant
     val small = MonoTextStyle.copy(fontSize = MaterialTheme.typography.labelSmall.fontSize)
     if (connection.protocol != NetProtocol.Synology) {
-        Text(connection.subtitle, style = small, color = muted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth())
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NexplorerDimens.Space2)) {
+            Text(connection.subtitle, style = small, color = muted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            if (usage != null) Text(usage, style = small, color = muted, maxLines = 1)
+        }
         return
     }
     val (label, icon, colors) = when {
@@ -557,6 +554,8 @@ private fun StatusLine(connection: NetConnection, route: QuickConnect.Route?, ac
             color = muted,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
         )
+        if (usage != null) Text(usage, style = small, color = muted, maxLines = 1)
     }
 }
