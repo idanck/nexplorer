@@ -320,7 +320,8 @@ class Phase5aTest {
         var other = false
         while (SystemClock.uptimeMillis() < deadline) {
             other = Qa.device.currentPackageName != Qa.packageName
-            if (other || compose.exists(hasText("אין אפליקציה שפותחת קבצים מסוג זה"))) break
+            // בזמן המעבר לאפליקציה האחרת אין לרגע חלון Compose — exists זורק במקום להחזיר false.
+            if (other || runCatching { compose.exists(hasText("אין אפליקציה שפותחת קבצים מסוג זה")) }.getOrDefault(false)) break
             Thread.sleep(250)
         }
         Log.i("Phase5aTest", "readme.txt opened in ${Qa.device.currentPackageName}")
