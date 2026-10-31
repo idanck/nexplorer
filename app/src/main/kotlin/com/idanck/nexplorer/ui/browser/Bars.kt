@@ -11,9 +11,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -24,52 +26,53 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.ContentCut
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Deselect
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.FilterList
+import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.SelectAll
 import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.text.style.TextDirection
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.TopAppBarState
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
-import kotlin.math.roundToInt
 import com.idanck.nexplorer.core.Counts
 import com.idanck.nexplorer.core.NetProtocol
-import com.idanck.nexplorer.ui.net.ConnectionIcon
-import com.idanck.nexplorer.ui.theme.NexplorerTheme
 import com.idanck.nexplorer.core.isolated
+import com.idanck.nexplorer.data.net.QuickConnect
+import com.idanck.nexplorer.ui.net.ConnectionIcon
 import com.idanck.nexplorer.ui.theme.MonoTextStyle
 import com.idanck.nexplorer.ui.theme.NexplorerDimens
 import com.idanck.nexplorer.ui.theme.NexplorerShape
+import com.idanck.nexplorer.ui.theme.NexplorerTheme
+import kotlin.math.roundToInt
 
 /**
  * הראש של המסך הראשי (1.12, "פס אחד"): הנתיב עצמו בתוך הגלולה — ☰, פירורי הלחם (הקשה על מקטע = מעבר אליו,
@@ -93,6 +96,9 @@ fun BrowserTopBar(
     collapse: TopAppBarState,
     cloud: NetProtocol? = null,
     account: String? = null,
+    /** QuickConnect (1.14): שבב "מקומי" / "ממסר" לפני החיפוש; הקשה — "פרטי חיבור". */
+    route: QuickConnect.Route? = null,
+    onRoute: () -> Unit = {},
 ) {
     Column(Modifier.fillMaxWidth()) {
         Row(
@@ -136,6 +142,7 @@ fun BrowserTopBar(
                     )
                 }
             }
+            if (route != null) RouteChip(route, onRoute)
             IconButton(onClick = onSearch) {
                 Icon(Icons.Filled.Search, contentDescription = "חיפוש", tint = MaterialTheme.colorScheme.onSurface)
             }
@@ -407,5 +414,36 @@ fun SelectionActionBar(
             IconButton(onClick = onCopy) { Icon(Icons.Outlined.ContentCopy, contentDescription = "העתק") }
             IconButton(onClick = onCut) { Icon(Icons.Outlined.ContentCut, contentDescription = "גזור") }
         }
+    }
+}
+
+/**
+ * QuickConnect (שפת העיצוב 1.14, לוח "סטטוס חיבור"): בבית — "מקומי" בכחול (primaryContainer); בחוץ — "ממסר" בענבר,
+ * כמו כל מה שבתנועה ואיטי. באותה צורה כמו צ'יפ הלוח.
+ */
+@Composable
+fun RouteChip(route: QuickConnect.Route, onClick: () -> Unit) {
+    val local = route == QuickConnect.Route.Local
+    val c = NexplorerTheme.colors
+    val container = if (local) MaterialTheme.colorScheme.primaryContainer else c.amberContainer
+    val content = if (local) MaterialTheme.colorScheme.onPrimaryContainer else c.onAmberContainer
+    Row(
+        modifier = Modifier
+            .background(container, NexplorerShape.Pill)
+            .clickable(onClickLabel = "פרטי חיבור", onClick = onClick)
+            .semantics(mergeDescendants = true) {
+                contentDescription = if (local) "מחובר ישירות ברשת הביתית" else "מחובר דרך הממסר של Synology"
+            }
+            .padding(horizontal = NexplorerDimens.Space2 + NexplorerDimens.Space1 / 2, vertical = NexplorerDimens.Space1 + NexplorerDimens.Space1 / 2),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            if (local) Icons.Outlined.Home else Icons.Outlined.Cloud,
+            contentDescription = null,
+            tint = content,
+            modifier = Modifier.size(NexplorerDimens.Space4),
+        )
+        Spacer(Modifier.width(NexplorerDimens.Space1))
+        Text(if (local) "מקומי" else "ממסר", style = MaterialTheme.typography.labelLarge, color = content)
     }
 }

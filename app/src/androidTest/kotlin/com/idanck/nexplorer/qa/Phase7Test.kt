@@ -2,6 +2,7 @@ package com.idanck.nexplorer.qa
 
 import android.content.Context
 import android.util.Log
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
@@ -272,7 +273,15 @@ class Phase7Test {
         compose.onNodeWithText("בדוק והתחבר").performClick()
         compose.waitFor(hasText("ממסר QuickConnect", substring = true), 30_000)
         compose.waitFor(hasText("nexplorer-qa"))
+        // 1.14: שבב "ממסר" בראש המסך — והקשה עליו פותחת את פרטי החיבור.
+        compose.waitFor(hasContentDescription("מחובר דרך הממסר של Synology"))
         Qa.screenshot(compose, "178-quickconnect-relay")
+        compose.onNodeWithContentDescription("מחובר דרך הממסר של Synology").performClick()
+        compose.waitFor(hasText("פרטי חיבור"))
+        compose.waitFor(hasText("Synology · QuickConnect"))
+        Qa.screenshot(compose, "180-connection-details-relay")
+        Qa.device.pressBack()
+        compose.waitGone(hasText("Synology · QuickConnect"))
         val saved = container.settings.state.value.connections.single()
         assertEquals("my-nas", saved.quickConnect)
         assertEquals("", saved.host)
@@ -283,7 +292,14 @@ class Phase7Test {
         compose.onNodeWithText("nexplorer-qa").performClick()
         compose.waitFor(hasText("notes.txt"), 30_000)
         compose.waitFor(hasText("QuickConnect מקומי", substring = true), 15_000)
+        compose.waitFor(hasContentDescription("מחובר ישירות ברשת הביתית"))
         Qa.screenshot(compose, "179-quickconnect-local")
+        // במגירה: "מקומי · QuickConnect" ו-ⓘ, שפותח את אותו גיליון.
+        compose.onNodeWithContentDescription("פתח מגירת מקומות").performClick()
+        compose.waitFor(hasContentDescription("פרטי חיבור — my-nas"))
+        Qa.screenshot(compose, "181-drawer-connection-status")
+        compose.onNodeWithContentDescription("פרטי חיבור — my-nas").performClick()
+        compose.waitFor(hasText("מחובר ישירות ברשת הביתית"))
     }
 
     private companion object {

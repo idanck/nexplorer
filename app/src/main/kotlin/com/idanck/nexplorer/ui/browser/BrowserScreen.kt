@@ -45,6 +45,7 @@ import androidx.compose.material3.OutlinedIconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
@@ -103,6 +104,7 @@ import com.idanck.nexplorer.ui.drawer.DrawerModel
 import com.idanck.nexplorer.ui.drawer.PlacesDrawer
 import com.idanck.nexplorer.ui.keys.KeyBus
 import com.idanck.nexplorer.ui.keys.KeyCommand
+import com.idanck.nexplorer.ui.net.ConnectionDetailsSheet
 import com.idanck.nexplorer.ui.net.FetchDialog
 import com.idanck.nexplorer.ui.properties.PropertiesSheet
 import com.idanck.nexplorer.ui.theme.NexplorerDimens
@@ -232,6 +234,11 @@ fun BrowserScreen(
             when (event) {
                 // showSnackbar ממתין עד שההודעה נעלמת — בלי launch, פתיחת קובץ הייתה מחכה מאחוריה.
                 is BrowserEvent.Message -> launch { snackbar.showSnackbar(event.text) }
+                // QuickConnect יצא מהבית (1.14): הודעה, ו"פרטים" פותח את פרטי החיבור.
+                is BrowserEvent.RouteToRelay -> launch {
+                    val result = snackbar.showSnackbar("יצאת מהרשת הביתית — ה-NAS עכשיו דרך הממסר", actionLabel = "פרטים")
+                    if (result == SnackbarResult.ActionPerformed) vm.openConnectionDetails(event.connectionId)
+                }
                 // תמונה, שמע ווידאו נפתחים במציג ובנגנים המובנים (עם הקבצים האחרים בתיקייה);
                 // "פתיחה באמצעות" שם פותח אחרת. פורמט שהנגן לא מכיר עובר ישר לאפליקציה אחרת.
                 is BrowserEvent.OpenFile -> if (MediaFormats.opensInApp(event.entry)) {
@@ -368,6 +375,7 @@ fun BrowserScreen(
                 onTransfers = { showTransfers = true },
                 onSettings = onOpenSettings,
                 onAnalyzer = { onOpenAnalyzer(state.folderPath) },
+                onConnectionDetails = { state.connection?.let { vm.openConnectionDetails(it.id) } },
             ),
         )
     }
@@ -426,6 +434,8 @@ fun BrowserScreen(
                             collapse = headerState,
                             cloud = state.cloudConnection?.protocol,
                             account = state.cloudConnection?.account,
+                            route = state.route,
+                            onRoute = { state.connection?.let { vm.openConnectionDetails(it.id) } },
                         )
                     }
                     if (pane == null) {
@@ -791,6 +801,19 @@ fun BrowserScreen(
             onDismiss = { apk = null },
         )
     }
+    state.connectionDetails?.let { id -> state.connections.firstOrNull { it.id == id } }?.let { connection ->
+        ConnectionDetailsSheet(
+            connection = connection,
+            status = vm.connectionStatus(connection.id),
+            checking = state.recheckingConnection,
+            onEdit = {
+                vm.closeConnectionDetails()
+                onOpenConnect(vm, connection)
+            },
+            onRecheck = { vm.recheckConnection(connection) },
+            onDismiss = vm::closeConnectionDetails,
+        )
+    }
     properties?.let { list ->
         PropertiesSheet(
             entries = list,
@@ -851,6 +874,8 @@ internal fun placesDrawerModel(
     onConnection = { c -> close(); vm.navigate(Location.Folder(c.root)) },
     onEditConnection = { c -> close(); onOpenConnect(c) },
     onRemoveConnection = { c -> vm.removeConnection(c.id) },
+    onConnectionDetails = { c -> close(); vm.openConnectionDetails(c.id) },
+    routes = state.routes,
     activeCollection = (state.location as? Location.Media)?.collection,
     favorites = state.favorites,
     activeTransfers = activeTransfers,
@@ -900,6 +925,7 @@ private fun overflowModel(
     onTransfers: () -> Unit,
     onSettings: () -> Unit,
     onAnalyzer: () -> Unit,
+    onConnectionDetails: () -> Unit,
 ): OverflowMenuModel {
     val running = activeTransfers.firstOrNull { it.status == TransferStatus.Running }
     return OverflowMenuModel(
@@ -933,6 +959,8 @@ private fun overflowModel(
         onRefresh = vm::refresh,
         onSettings = onSettings,
         onAnalyzer = onAnalyzer,
+        canConnectionDetails = state.isRemote && state.connection != null,
+        onConnectionDetails = onConnectionDetails,
     )
 }
 

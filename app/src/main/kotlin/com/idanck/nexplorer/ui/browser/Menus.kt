@@ -23,6 +23,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.outlined.DriveFileMove
+import androidx.compose.material.icons.automirrored.outlined.NoteAdd
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Star
@@ -34,14 +37,12 @@ import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.CreateNewFolder
 import androidx.compose.material.icons.outlined.DonutLarge
 import androidx.compose.material.icons.outlined.EditNote
-import androidx.compose.material.icons.automirrored.outlined.DriveFileMove
 import androidx.compose.material.icons.outlined.FilterList
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Lan
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.LockOpen
-import androidx.compose.material.icons.automirrored.outlined.NoteAdd
-import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.SelectAll
@@ -141,6 +142,9 @@ class OverflowMenuModel(
     /** "גודל תיקיות" ו"מנתח אחסון" — לא במקום ברשת. */
     val canFolderSizes: Boolean = true,
     val canAnalyze: Boolean = true,
+    /** במקום ברשת: "פרטי חיבור" (1.14). */
+    val canConnectionDetails: Boolean = false,
+    val onConnectionDetails: () -> Unit = {},
 )
 
 @Composable
@@ -174,6 +178,7 @@ fun OverflowMenu(expanded: Boolean, onDismiss: () -> Unit, model: OverflowMenuMo
         }
         MenuRow("בחר הכל", Icons.Outlined.SelectAll, act(model.onSelectAll), trailing = { TrailingText(model.count.toString()) }, enabled = model.count > 0)
         if (model.isFolder) MenuRow("מאפייני התיקייה", Icons.Outlined.Info, act(model.onProperties))
+        if (model.canConnectionDetails) MenuRow("פרטי חיבור", Icons.Outlined.Lan, act(model.onConnectionDetails))
         if (model.canLockVault) MenuRow("נעל תיקייה מוצפנת", Icons.Outlined.Lock, act(model.onLockVault))
         MenuRow("רענן", Icons.Outlined.Refresh, act(model.onRefresh))
         if (model.canAnalyze) MenuRow("מנתח אחסון", Icons.Outlined.DonutLarge, act(model.onAnalyzer))

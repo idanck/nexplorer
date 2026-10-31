@@ -54,7 +54,10 @@ class SynologyFs(private val connection: NetConnection, password: CharArray?) : 
         .build()
 
     /** לאן הבקשות הולכות: הכתובת של ה-API (`…/webapi`), ה-client שלה, ואיך עוברים (ב-QuickConnect). */
-    private class Target(val base: HttpUrl, val client: OkHttpClient, val route: QuickConnect.Route?)
+    private class Target(val base: HttpUrl, val client: OkHttpClient, val route: QuickConnect.Route?, val at: Long = System.currentTimeMillis())
+
+    /** QuickConnect: איך החיבור עובר ([route]), לאיזו כתובת ([host]:[port]) ומתי נקבע ([checkedAt], אלפיות שנייה). */
+    data class Status(val route: QuickConnect.Route, val host: String, val port: Int, val checkedAt: Long)
 
     @Volatile
     private var target: Target? = if (quick) null else Target(
@@ -73,6 +76,10 @@ class SynologyFs(private val connection: NetConnection, password: CharArray?) : 
 
     /** QuickConnect: מקומי או ממסר — אחרי הבקשה הראשונה; null — לא QuickConnect, או שעוד לא נקבע. */
     val route: QuickConnect.Route? get() = target?.route
+
+    /** QuickConnect: המצב הנוכחי — לראש המסך, למגירה ול"פרטי חיבור"; null — לא QuickConnect, או שעוד לא נקבע. */
+    val status: Status?
+        get() = target?.let { t -> t.route?.let { Status(it, t.base.host, t.base.port, t.at) } }
 
     /** הרשת השתנתה (בית ↔ סלולר): ב-QuickConnect — הבקשה הבאה בודקת שוב לאן להתחבר. */
     fun recheck() {

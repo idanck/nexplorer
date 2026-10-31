@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -25,15 +26,18 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.DeleteOutline
-import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.DonutLarge
 import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.PhoneAndroid
-import androidx.compose.material.icons.outlined.DonutLarge
-import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SdCard
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.SwapVert
 import androidx.compose.material.icons.outlined.Usb
 import androidx.compose.material.icons.outlined.VideoLibrary
@@ -59,22 +63,24 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import com.idanck.nexplorer.core.NetPaths
+import com.idanck.nexplorer.core.NetProtocol
 import com.idanck.nexplorer.core.SizeFormat
 import com.idanck.nexplorer.data.files.MediaCollection
 import com.idanck.nexplorer.data.files.StorageVolumeInfo
 import com.idanck.nexplorer.data.net.NetConnection
+import com.idanck.nexplorer.data.net.QuickConnect
 import com.idanck.nexplorer.data.net.RemoteSpace
 import com.idanck.nexplorer.ui.browser.AmberBadge
 import com.idanck.nexplorer.ui.components.DrawerBanner
-import androidx.compose.foundation.layout.heightIn
-import com.idanck.nexplorer.ui.components.segment
 import com.idanck.nexplorer.ui.components.SegmentedGroup
+import com.idanck.nexplorer.ui.components.segment
+import com.idanck.nexplorer.ui.net.ConnectionIcon
+import com.idanck.nexplorer.ui.net.hasOwnIcon
 import com.idanck.nexplorer.ui.theme.FileNameTextStyle
 import com.idanck.nexplorer.ui.theme.MonoTextStyle
 import com.idanck.nexplorer.ui.theme.NexplorerDimens
 import com.idanck.nexplorer.ui.theme.NexplorerShape
-import com.idanck.nexplorer.ui.net.ConnectionIcon
-import com.idanck.nexplorer.ui.net.hasOwnIcon
+import com.idanck.nexplorer.ui.theme.NexplorerTheme
 
 class DrawerModel(
     val volumes: List<StorageVolumeInfo>,
@@ -87,6 +93,10 @@ class DrawerModel(
     val onConnection: (NetConnection) -> Unit,
     val onEditConnection: (NetConnection) -> Unit,
     val onRemoveConnection: (NetConnection) -> Unit,
+    /** ⓘ — "פרטי חיבור" (1.14). */
+    val onConnectionDetails: (NetConnection) -> Unit,
+    /** QuickConnect: מקומי או ממסר, לפי מזהה החיבור (רק מה שכבר ידוע). */
+    val routes: Map<String, QuickConnect.Route>,
     val activeCollection: MediaCollection?,
     val favorites: List<String>,
     val activeTransfers: Int,
@@ -128,8 +138,10 @@ fun PlacesDrawer(model: DrawerModel) {
                     ConnectionRow(
                         connection = connection,
                         space = model.spaces[connection.id],
+                        route = model.routes[connection.id],
                         active = connection.id == model.activeConnectionId,
                         onClick = { model.onConnection(connection) },
+                        onDetails = { model.onConnectionDetails(connection) },
                         onEdit = { model.onEditConnection(connection) },
                         onRemove = { model.onRemoveConnection(connection) },
                     )
@@ -321,11 +333,20 @@ private fun UsageBar(fraction: Float, active: Boolean) {
 
 /**
  * מקום ברשת (לוח "מגירת מקומות": "NAS · SMB" עם פס תפוסה, או "Pi · SFTP" עם המשתמש והשרת).
- * לחיצה ארוכה — "ערוך" ו"הסר".
+ * לחיצה ארוכה — "ערוך" ו"הסר". מ-1.14: שורת "איך מתחבר" ([StatusLine]) גם מתחת לפס התפוסה, ו-ⓘ ל"פרטי חיבור".
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ConnectionRow(connection: NetConnection, space: RemoteSpace?, active: Boolean, onClick: () -> Unit, onEdit: () -> Unit, onRemove: () -> Unit) {
+private fun ConnectionRow(
+    connection: NetConnection,
+    space: RemoteSpace?,
+    route: QuickConnect.Route?,
+    active: Boolean,
+    onClick: () -> Unit,
+    onDetails: () -> Unit,
+    onEdit: () -> Unit,
+    onRemove: () -> Unit,
+) {
     val scheme = MaterialTheme.colorScheme
     val accent = if (active) scheme.onPrimaryContainer else scheme.onSurface
     var menu by remember { mutableStateOf(false) }
@@ -365,26 +386,17 @@ private fun ConnectionRow(connection: NetConnection, space: RemoteSpace?, active
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
                     )
-                    if (space != null) {
-                        Text(
-                            "${SizeFormat.short(space.used)} / ${SizeFormat.short(space.total)}",
-                            style = MonoTextStyle.copy(fontSize = MaterialTheme.typography.labelSmall.fontSize),
-                            color = if (active) scheme.onPrimaryContainer else scheme.onSurfaceVariant,
-                        )
-                    }
                 }
-                if (space != null) {
-                    UsageBar(space.usedFraction, active)
-                } else {
-                    Text(
-                        connection.subtitle,
-                        style = MonoTextStyle.copy(fontSize = MaterialTheme.typography.labelSmall.fontSize),
-                        color = if (active) scheme.onPrimaryContainer else scheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
+                if (space != null) UsageBar(space.usedFraction, active)
+                // התפוסה בסוף שורת "איך מתחבר" (1.14) — כך לשם יש את כל הרוחב לצד ה-ⓘ.
+                StatusLine(connection, route, active, space?.let { "${SizeFormat.short(it.used)} / ${SizeFormat.short(it.total)}" })
+            }
+            IconButton(onClick = onDetails, modifier = Modifier.size(NexplorerDimens.TouchTarget)) {
+                Icon(
+                    Icons.Outlined.Info,
+                    contentDescription = "פרטי חיבור — ${connection.label}",
+                    tint = if (active) scheme.onPrimaryContainer else scheme.onSurfaceVariant,
+                )
             }
         }
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, shape = NexplorerShape.Menu) {
@@ -498,4 +510,52 @@ private fun favoriteLabel(path: String, connections: List<NetConnection>): Strin
 private fun displayPath(path: String, connections: List<NetConnection>): String {
     if (!NetPaths.isRemote(path)) return path
     return connections.firstOrNull { it.id == NetPaths.connectionId(path) }?.displayPath(path) ?: path
+}
+
+/**
+ * איך מתחברים (1.14): Synology — תג ("⌂ רשת ביתית" + הכתובת, או "מקומי"/"ממסר" + QuickConnect); בשאר — המשתמש
+ * והשרת, כמו קודם.
+ */
+@Composable
+private fun StatusLine(connection: NetConnection, route: QuickConnect.Route?, active: Boolean, usage: String?) {
+    val scheme = MaterialTheme.colorScheme
+    val c = NexplorerTheme.colors
+    val muted = if (active) scheme.onPrimaryContainer else scheme.onSurfaceVariant
+    val small = MonoTextStyle.copy(fontSize = MaterialTheme.typography.labelSmall.fontSize)
+    if (connection.protocol != NetProtocol.Synology) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NexplorerDimens.Space2)) {
+            Text(connection.subtitle, style = small, color = muted, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            if (usage != null) Text(usage, style = small, color = muted, maxLines = 1)
+        }
+        return
+    }
+    val (label, icon, colors) = when {
+        !connection.isQuickConnect -> Triple("רשת ביתית", Icons.Outlined.Home, scheme.surfaceVariant to scheme.onSurfaceVariant)
+        route == QuickConnect.Route.Relay -> Triple("ממסר", Icons.Outlined.Cloud, c.amberContainer to c.onAmberContainer)
+        route == QuickConnect.Route.Local -> Triple("מקומי", Icons.Outlined.Home, scheme.primaryContainer to scheme.onPrimaryContainer)
+        else -> Triple(null, null, scheme.surfaceVariant to scheme.onSurfaceVariant)
+    }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NexplorerDimens.Space1 + NexplorerDimens.Space1 / 2)) {
+        if (label != null && icon != null) {
+            Row(
+                Modifier
+                    .background(if (active && colors.first == scheme.primaryContainer) scheme.surface else colors.first, NexplorerShape.Pill)
+                    .padding(horizontal = NexplorerDimens.Space2, vertical = NexplorerDimens.Space1 / 2),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(NexplorerDimens.Space1 / 2),
+            ) {
+                Icon(icon, contentDescription = null, tint = colors.second, modifier = Modifier.size(NexplorerDimens.Space3))
+                Text(label, style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold), color = colors.second)
+            }
+        }
+        Text(
+            if (connection.isQuickConnect) "QuickConnect" else connection.host,
+            style = if (connection.isQuickConnect) MaterialTheme.typography.labelMedium else small,
+            color = muted,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        if (usage != null) Text(usage, style = small, color = muted, maxLines = 1)
+    }
 }

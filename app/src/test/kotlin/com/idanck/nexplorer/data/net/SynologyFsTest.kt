@@ -179,6 +179,9 @@ class SynologyFsTest {
             assertNull(fs.route)
             assertEquals(4, fs.list(quickQa).size)
             assertEquals(QuickConnect.Route.Local, fs.route)
+            // הכתובת בפועל — השם המקומי, עם הפורט של DSM.
+            assertEquals("127-0-0-1.my-nas.direct.example", fs.status?.host)
+            assertEquals(port, fs.status?.port)
         }
         // מחוץ לבית: המקומית לא עונה, והממסר נפתח רק אחרי request_tunnel.
         control("/qa/qc?lan=down")

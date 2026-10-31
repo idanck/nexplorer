@@ -69,9 +69,20 @@ class RemoteFiles(
     }
 
     /** QuickConnect: איך החיבור של [path] עובר עכשיו — רק כשכבר פתוח (לא מתחבר בשביל זה). */
-    fun route(path: String): QuickConnect.Route? {
-        val id = NetPaths.connectionId(path) ?: return null
-        return (synchronized(open) { open[id]?.second } as? SynologyFs)?.route
+    fun route(path: String): QuickConnect.Route? = NetPaths.connectionId(path)?.let { status(it)?.route }
+
+    /** QuickConnect: המצב של החיבור [id] — רק כשכבר פתוח. */
+    fun status(id: String): SynologyFs.Status? = (synchronized(open) { open[id]?.second } as? SynologyFs)?.status
+
+    /**
+     * "בדוק שוב" (פרטי חיבור): QuickConnect קובע מחדש לאן להתחבר — מקומי או ממסר — ומתחבר (רשימת השורש).
+     * המצב החדש, או [IOException].
+     */
+    suspend fun recheck(connection: NetConnection): SynologyFs.Status? = withContext(Dispatchers.IO) {
+        val fs = fsFor(connection.root) as? SynologyFs ?: return@withContext null
+        fs.recheck()
+        fs.list(NetPaths.root(connection.protocol, connection.id))
+        fs.status
     }
 
     /** החיבור של [path] כשהוא NAS של Synology — לחיפוש, להעתקה ולחישוב גדלים בצד השרת. */

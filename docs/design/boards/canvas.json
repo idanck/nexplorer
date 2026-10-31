@@ -156,6 +156,41 @@
       "w": 1720,
       "h": 1000,
       "title": "Synology — שני סוגי חיבור (שלב 7)"
+    },
+    "ConnectionStatus-Main.dc.html": {
+      "x": 0,
+      "y": 7066,
+      "w": 390,
+      "h": 844,
+      "title": "סטטוס חיבור · ראש המסך — מקומי (1.14)"
+    },
+    "ConnectionStatus-Relay.dc.html": {
+      "x": 470,
+      "y": 7066,
+      "w": 390,
+      "h": 844,
+      "title": "סטטוס חיבור · ראש המסך — ממסר (1.14)"
+    },
+    "ConnectionStatus-Drawer.dc.html": {
+      "x": 940,
+      "y": 7066,
+      "w": 390,
+      "h": 844,
+      "title": "סטטוס חיבור · מגירה ו-ⓘ (1.14)"
+    },
+    "ConnectionStatus-Menu.dc.html": {
+      "x": 1410,
+      "y": 7066,
+      "w": 390,
+      "h": 844,
+      "title": "סטטוס חיבור · תפריט ⋮ (1.14)"
+    },
+    "ConnectionStatus-Details.dc.html": {
+      "x": 1880,
+      "y": 7066,
+      "w": 390,
+      "h": 844,
+      "title": "סטטוס חיבור · פרטי חיבור (1.14)"
     }
   },
   "order": [
@@ -179,7 +214,12 @@
     "VideoDoubleTap.dc.html",
     "AudioPlayer.dc.html",
     "FileIcons.dc.html",
-    "Synology.dc.html"
+    "Synology.dc.html",
+    "ConnectionStatus-Main.dc.html",
+    "ConnectionStatus-Relay.dc.html",
+    "ConnectionStatus-Drawer.dc.html",
+    "ConnectionStatus-Menu.dc.html",
+    "ConnectionStatus-Details.dc.html"
   ],
   "notes": {
     "t1": {

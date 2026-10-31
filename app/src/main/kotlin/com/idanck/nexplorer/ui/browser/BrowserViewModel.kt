@@ -34,6 +34,7 @@ import com.idanck.nexplorer.data.files.StorageVolumes
 import com.idanck.nexplorer.data.net.NetConnection
 import com.idanck.nexplorer.data.net.QuickConnect
 import com.idanck.nexplorer.data.net.RemoteSpace
+import com.idanck.nexplorer.data.net.SynologyFs
 import com.idanck.nexplorer.data.settings.relocated
 import com.idanck.nexplorer.data.transfer.TransferKind
 import com.idanck.nexplorer.data.transfer.TransferStatus
@@ -91,8 +92,12 @@ data class BrowserState(
     val connections: List<NetConnection> = emptyList(),
     /** מקום פנוי בשיתוף האחרון שנפתח בכל חיבור (מזהה → מקום), כשהשרת מדווח. */
     val remoteSpaces: Map<String, RemoteSpace> = emptyMap(),
-    /** QuickConnect (שלב 7ג): איך כל חיבור עבר ברשימה האחרונה (מזהה → מקומי/ממסר). */
-    val routes: Map<String, QuickConnect.Route> = emptyMap(),
+    /** QuickConnect (שלב 7ג): איך כל חיבור עבר ברשימה האחרונה (מזהה → מקומי/ממסר, כתובת, מתי). */
+    val statuses: Map<String, SynologyFs.Status> = emptyMap(),
+    /** "פרטי חיבור" פתוח — מזהה החיבור (מהמגירה, מהתפריט ⋮ או מהשבב בראש המסך). */
+    val connectionDetails: String? = null,
+    /** "בדוק שוב" באמצע. */
+    val recheckingConnection: Boolean = false,
 ) {
     val folderPath: String? get() = (location as? Location.Folder)?.path
 
@@ -109,7 +114,10 @@ data class BrowserState(
     val remoteSpace: RemoteSpace? get() = folderPath?.let(NetPaths::connectionId)?.let(remoteSpaces::get)
 
     /** QuickConnect: איך התיקייה הנוכחית הגיעה; null — לא QuickConnect. */
-    val route: QuickConnect.Route? get() = folderPath?.let(NetPaths::connectionId)?.let(routes::get)
+    val route: QuickConnect.Route? get() = folderPath?.let(NetPaths::connectionId)?.let(statuses::get)?.route
+
+    /** QuickConnect: מקומי או ממסר, לכל חיבור — למגירה. */
+    val routes: Map<String, QuickConnect.Route> get() = statuses.mapValues { it.value.route }
 
     val volume: StorageVolumeInfo? get() = folderPath?.takeIf { !NetPaths.isRemote(it) }?.let { StorageVolumes.volumeOf(it, volumes) }
     val inSelection: Boolean get() = selection.isNotEmpty()
@@ -177,6 +185,9 @@ data class BrowserState(
 
 sealed interface BrowserEvent {
     data class Message(val text: String) : BrowserEvent
+
+    /** QuickConnect עבר ממקומי לממסר — הודעה עם "פרטים". */
+    data class RouteToRelay(val connectionId: String) : BrowserEvent
     data class OpenFile(val entry: Entry) : BrowserEvent
     /** ארכיון שנפתח בתוך האפליקציה (ZIP, 7z, TAR…): חלון "חלץ". */
     data class OpenArchive(val entry: Entry) : BrowserEvent
@@ -462,8 +473,7 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
     private fun loadSpace(path: String) {
         val id = NetPaths.connectionId(path) ?: return
         // QuickConnect: הרשימה כבר עברה — ידוע אם במקומי או בממסר.
-        val route = remote.route(path)
-        _state.update { if (route == null) it.copy(routes = it.routes - id) else it.copy(routes = it.routes + (id to route)) }
+        updateStatus(id, remote.status(id))
         viewModelScope.launch {
             val space = remote.space(path) ?: return@launch
             _state.update { it.copy(remoteSpaces = it.remoteSpaces + (id to space)) }
@@ -902,6 +912,41 @@ class BrowserViewModel(app: Application, private val saved: SavedStateHandle) : 
     }
 
     /** "הסר" במגירה: החיבור, הסיסמה שלו (ובענן — האסימון), והמועדפים והתצוגות בתוכו. */
+    /**
+     * המצב של QuickConnect אחרי בקשה: נשמר, ומעבר ממקומי לממסר (יצאת מהבית) — הודעה עם "פרטים"
+     * ([BrowserEvent.RouteToRelay]).
+     */
+    private fun updateStatus(id: String, status: SynologyFs.Status?) {
+        val before = _state.value.statuses[id]?.route
+        _state.update { if (status == null) it.copy(statuses = it.statuses - id) else it.copy(statuses = it.statuses + (id to status)) }
+        if (before == QuickConnect.Route.Local && status?.route == QuickConnect.Route.Relay) {
+            _events.trySend(BrowserEvent.RouteToRelay(id))
+        }
+    }
+
+    /** QuickConnect: המצב הידוע של החיבור [id] — גם כשלא נפתח מהמסך הזה. */
+    fun connectionStatus(id: String): SynologyFs.Status? = _state.value.statuses[id] ?: remote.status(id)
+
+    fun openConnectionDetails(id: String) = _state.update { it.copy(connectionDetails = id) }
+
+    fun closeConnectionDetails() = _state.update { it.copy(connectionDetails = null) }
+
+    /** "בדוק שוב" בפרטי החיבור: לאן להתחבר עכשיו (מקומי או ממסר), והתיקייה הנוכחית מחדש אם היא בחיבור הזה. */
+    fun recheckConnection(connection: NetConnection) {
+        if (_state.value.recheckingConnection) return
+        _state.update { it.copy(recheckingConnection = true) }
+        viewModelScope.launch {
+            try {
+                updateStatus(connection.id, remote.recheck(connection))
+                if (_state.value.folderPath?.let(NetPaths::connectionId) == connection.id) refresh()
+            } catch (e: IOException) {
+                _events.trySend(BrowserEvent.Message(e.message ?: "ה-NAS לא זמין"))
+            } finally {
+                _state.update { it.copy(recheckingConnection = false) }
+            }
+        }
+    }
+
     fun removeConnection(id: String) {
         val connection = _state.value.connections.firstOrNull { it.id == id } ?: return
         val root = NetPaths.root(connection.protocol, id)
