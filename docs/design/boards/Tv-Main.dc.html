@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>טלוויזיה — מסך ראשי</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#7FB0FF}a:hover{color:#D5E3FE}
+</style>
+</helmet>
+<div style="width: 960px; height: 540px; box-sizing: border-box; direction: rtl; font-family: 'Noto Sans Hebrew', system-ui, sans-serif; color: #E6ECF1; background: #0E1215; padding: 27px 48px; display: flex; gap: 24px; overflow: hidden">
+
+  <nav aria-label="מקומות" style="width: 64px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 10px">
+    <div style="width: 44px; height: 44px; border-radius: 14px; background: #2B6FEE; display: flex; align-items: center; justify-content: center; margin-bottom: 10px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#D5E3FE" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M4 8l8-4 8 4v8l-8 4-8-4z"/><path d="M4 8l8 4 8-4M12 12v8"/></svg></div>
+    <button aria-label="אחסון פנימי" style="width: 52px; height: 52px; border: 0; border-radius: 18px; background: #1C3F7A; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#D5E3FE" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="6" y="3" width="12" height="18" rx="2"/><path d="M10 18h4"/></svg></button>
+    <button aria-label="הורדות" style="width: 52px; height: 52px; border: 0; border-radius: 18px; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A3AFBA" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg></button>
+    <button aria-label="my-nas" style="width: 52px; height: 52px; border: 0; border-radius: 18px; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A3AFBA" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="3" width="14" height="18" rx="3"/><path d="M9 8h6M9 12h6"/><circle cx="12" cy="17" r="1"/></svg></button>
+    <button aria-label="הטלפון של alex" style="width: 52px; height: 52px; border: 0; border-radius: 18px; background: transparent; display: flex; align-items: center; justify-content: center; position: relative"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A3AFBA" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/></svg><span style="position: absolute; top: 12px; left: 12px; width: 8px; height: 8px; border-radius: 50%; background: #66BB6A"></span></button>
+    <div style="flex: 1"></div>
+    <button aria-label="הגדרות" style="width: 52px; height: 52px; border: 0; border-radius: 18px; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A3AFBA" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg></button>
+  </nav>
+
+  <main style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px">
+    <header style="display: flex; align-items: flex-end; justify-content: space-between; gap: 16px">
+      <div style="min-width: 0">
+        <div style="display: flex; align-items: center; gap: 6px; font-size: 13px; color: #A3AFBA"><span>אחסון פנימי</span><span>‹</span></div>
+        <div style="font-size: 28px; font-weight: 600; line-height: 36px; direction: ltr; text-align: right">Movies</div>
+        <div style="font-size: 13px; color: #A3AFBA">2 תיקיות · 6 סרטונים · <span style="font-family: 'JetBrains Mono', monospace; direction: ltr; unicode-bidi: isolate">18.4 GB</span></div>
+      </div>
+      <div style="display: flex; gap: 8px">
+        <button style="height: 40px; padding: 0 16px; border: 0; border-radius: 999px; background: #1F262D; color: #E6ECF1; font-family: inherit; font-size: 14px; display: flex; align-items: center; gap: 8px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/></svg>חיפוש</button>
+        <button style="height: 40px; padding: 0 16px; border: 0; border-radius: 999px; background: #1F262D; color: #E6ECF1; font-family: inherit; font-size: 14px; display: flex; align-items: center; gap: 8px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>תצוגה</button>
+        <button style="height: 40px; padding: 0 16px; border: 0; border-radius: 999px; background: #1F262D; color: #E6ECF1; font-family: inherit; font-size: 14px; display: flex; align-items: center; gap: 8px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>חדש</button>
+      </div>
+    </header>
+
+    <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 22px 18px; padding-top: 6px">
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <div style="height: 92px; border-radius: 16px; background: #1C3F7A; display: flex; align-items: center; justify-content: center"><svg width="40" height="40" viewBox="0 0 24 24" fill="#7FB0FF" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>
+        <div style="font-size: 14px; direction: ltr; text-align: right">Series</div>
+        <div style="font-size: 12px; color: #A3AFBA; margin-top: -6px">24 פריטים</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px; transform: scale(1.08); transform-origin: center top">
+        <div style="height: 92px; border-radius: 16px; background: #1C3F7A; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 3px #0E1215, 0 0 0 6px #E6ECF1, 0 10px 24px rgba(0,0,0,0.5)"><svg width="40" height="40" viewBox="0 0 24 24" fill="#7FB0FF" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>
+        <div style="font-size: 14px; font-weight: 600; direction: ltr; text-align: right">Kids</div>
+        <div style="font-size: 12px; color: #A3AFBA; margin-top: -6px">9 פריטים</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <div style="height: 92px; border-radius: 16px; background: #3B3226; display: flex; align-items: center; justify-content: center; position: relative"><svg width="34" height="34" viewBox="0 0 24 24" fill="#F2B35B" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg><span style="position: absolute; bottom: 6px; left: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; background: rgba(0,0,0,0.6); padding: 1px 6px; border-radius: 6px; direction: ltr">1:42:10</span></div>
+        <div style="font-size: 14px; direction: ltr; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Trip.Eilat.2026.mp4</div>
+        <div style="font-size: 12px; color: #A3AFBA; margin-top: -6px; direction: ltr; text-align: right; font-family: 'JetBrains Mono', monospace">4.2 GB</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <div style="height: 92px; border-radius: 16px; background: #26333B; display: flex; align-items: center; justify-content: center; position: relative"><svg width="34" height="34" viewBox="0 0 24 24" fill="#9CC9E0" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg><span style="position: absolute; bottom: 6px; left: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; background: rgba(0,0,0,0.6); padding: 1px 6px; border-radius: 6px; direction: ltr">0:12:38</span></div>
+        <div style="font-size: 14px; direction: ltr; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Birthday.mp4</div>
+        <div style="font-size: 12px; color: #A3AFBA; margin-top: -6px; direction: ltr; text-align: right; font-family: 'JetBrains Mono', monospace">880 MB</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <div style="height: 92px; border-radius: 16px; background: #2E2A3B; display: flex; align-items: center; justify-content: center; position: relative"><svg width="34" height="34" viewBox="0 0 24 24" fill="#C4B5FD" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg><span style="position: absolute; bottom: 6px; left: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; background: rgba(0,0,0,0.6); padding: 1px 6px; border-radius: 6px; direction: ltr">2:05:51</span></div>
+        <div style="font-size: 14px; direction: ltr; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Concert.1080p.mkv</div>
+        <div style="font-size: 12px; color: #A3AFBA; margin-top: -6px; direction: ltr; text-align: right; font-family: 'JetBrains Mono', monospace">6.1 GB</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <div style="height: 92px; border-radius: 16px; background: #2B3A2C; display: flex; align-items: center; justify-content: center; position: relative"><svg width="34" height="34" viewBox="0 0 24 24" fill="#A5D6A7" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg><span style="position: absolute; bottom: 6px; left: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; background: rgba(0,0,0,0.6); padding: 1px 6px; border-radius: 6px; direction: ltr">0:03:20</span></div>
+        <div style="font-size: 14px; direction: ltr; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Dog.Park.mp4</div>
+        <div style="font-size: 12px; color: #A3AFBA; margin-top: -6px; direction: ltr; text-align: right; font-family: 'JetBrains Mono', monospace">310 MB</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <div style="height: 92px; border-radius: 16px; background: #3B2A2A; display: flex; align-items: center; justify-content: center; position: relative"><svg width="34" height="34" viewBox="0 0 24 24" fill="#F4A6A0" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg><span style="position: absolute; bottom: 6px; left: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; background: rgba(0,0,0,0.6); padding: 1px 6px; border-radius: 6px; direction: ltr">1:31:04</span></div>
+        <div style="font-size: 14px; direction: ltr; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Wedding.mkv</div>
+        <div style="font-size: 12px; color: #A3AFBA; margin-top: -6px; direction: ltr; text-align: right; font-family: 'JetBrains Mono', monospace">3.9 GB</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <div style="height: 92px; border-radius: 16px; background: #1F262D; display: flex; align-items: center; justify-content: center"><span style="font-family: 'JetBrains Mono', monospace; font-size: 18px; font-weight: 500; color: #A3AFBA">SRT</span></div>
+        <div style="font-size: 14px; direction: ltr; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Concert.1080p.srt</div>
+        <div style="font-size: 12px; color: #A3AFBA; margin-top: -6px; direction: ltr; text-align: right; font-family: 'JetBrains Mono', monospace">84 KB</div>
+      </div>
+    </div>
+
+    <div style="flex: 1"></div>
+    <footer style="display: flex; gap: 22px; font-size: 12px; color: #A3AFBA; align-items: center">
+      <span style="display: flex; align-items: center; gap: 6px"><span style="border: 1px solid #3A454E; border-radius: 6px; padding: 0 6px; font-weight: 600; color: #E6ECF1">OK</span>פתיחה</span>
+      <span style="display: flex; align-items: center; gap: 6px"><span style="border: 1px solid #3A454E; border-radius: 6px; padding: 0 6px; font-weight: 600; color: #E6ECF1">OK ארוך</span>פעולות</span>
+      <span style="display: flex; align-items: center; gap: 6px"><span style="border: 1px solid #3A454E; border-radius: 6px; padding: 0 6px; font-weight: 600; color: #E6ECF1">→</span>מקומות</span>
+      <span style="display: flex; align-items: center; gap: 6px"><span style="border: 1px solid #3A454E; border-radius: 6px; padding: 0 6px; font-weight: 600; color: #E6ECF1">חזור</span>תיקייה למעלה</span>
+    </footer>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":540}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

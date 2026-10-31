@@ -4,6 +4,11 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import com.idanck.nexplorer.ui.tv.LocalScreenEntry
+import androidx.compose.runtime.CompositionLocalProvider
+import kotlinx.coroutines.delay
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,6 +59,16 @@ import com.idanck.nexplorer.core.FileKind
 import com.idanck.nexplorer.core.MediaFormats
 import com.idanck.nexplorer.ui.browser.DualPaneScreen
 import com.idanck.nexplorer.ui.theme.NexplorerDimens
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Send
+import com.idanck.nexplorer.data.peer.PeerHost
+import com.idanck.nexplorer.ui.peer.LocalPeerUi
+import com.idanck.nexplorer.ui.peer.PeerOverlays
+import com.idanck.nexplorer.ui.peer.TvNearbyRail
+import com.idanck.nexplorer.ui.settings.PeerSettings
+import com.idanck.nexplorer.ui.tv.LocalTvMode
+import com.idanck.nexplorer.ui.tv.TvAction
+import com.idanck.nexplorer.ui.tv.TvBrowserScreen
 import com.idanck.nexplorer.ui.player.AudioPlayerScreen
 import com.idanck.nexplorer.ui.player.AudioPlayerViewModel
 import com.idanck.nexplorer.ui.player.VideoPlayerScreen
@@ -78,6 +93,7 @@ fun NexplorerRoot(
     onShowPlayerConsumed: () -> Unit,
 ) {
     val context = LocalContext.current
+    val tv = LocalTvMode.current
     val settings by container.settings.state.collectAsStateWithLifecycle()
     val updateState by container.updates.state.collectAsStateWithLifecycle()
     val canInstall by container.updates.canInstall.collectAsStateWithLifecycle()
@@ -95,6 +111,9 @@ fun NexplorerRoot(
     }
 
     val browser: BrowserViewModel = viewModel()
+    val browserState by browser.state.collectAsStateWithLifecycle()
+    val peerUi = LocalPeerUi.current
+    val peerDevices by container.peers.devices.collectAsStateWithLifecycle()
     val search: SearchViewModel = viewModel()
     var screen by rememberSaveable { mutableStateOf(Screen.Browser) }
     var searchRoot by rememberSaveable { mutableStateOf<String?>(null) }
@@ -170,6 +189,23 @@ fun NexplorerRoot(
         container.scope.launch { container.settings.update(transform) }
     }
 
+    // העברה בין מכשירים (1.16): קוד לחיבור, קבלת קבצים, "שלח אל" — מעל כל מסך.
+    PeerOverlays()
+
+    // Google TV: מסך שנפתח (הגדרות, חיפוש, מנתח…) מקבל את הפוקוס לפריט הראשון שלו ([screenEntry]) — אחרת הפוקוס
+    // נשאר על המסך שנסגר, ושום לחיצה בשלט לא מגיעה לרשימה. מסך הקבצים ונגן הווידאו מנהלים את הפוקוס בעצמם.
+    val tvEntry = tv && screen != Screen.Browser && screen != Screen.Video && screen != Screen.Viewer
+    val entryFocus = remember(screen) { FocusRequester() }
+    if (tvEntry) {
+        LaunchedEffect(screen) {
+            // המסך עוד מצטייר בפריים הראשון: כמה ניסיונות עד שהפריט קיים.
+            repeat(TV_ENTRY_FOCUS_TRIES) {
+                delay(TV_ENTRY_FOCUS_DELAY_MS)
+                if (runCatching { entryFocus.requestFocus() }.getOrDefault(false)) return@LaunchedEffect
+            }
+        }
+    }
+    CompositionLocalProvider(LocalScreenEntry provides if (tvEntry) entryFocus else null) {
     when (screen) {
         Screen.Browser -> BoxWithConstraints(Modifier.fillMaxSize()) {
             val onOpenSearch: (String?) -> Unit = { root ->
@@ -184,8 +220,37 @@ fun NexplorerRoot(
                 editorPath = path
                 screen = Screen.Editor
             }
-            // טאבלט: שני חלונות (לוח Tablet). החלון הראשון הוא אותו חלון של הטלפון.
-            if (maxWidth >= NexplorerDimens.DualPaneMinWidth && maxHeight >= NexplorerDimens.DualPaneMinHeight) {
+            // Google TV (1.15): מסך לשלט, על אותו ViewModel. טאבלט: שני חלונות (לוח Tablet). החלון הראשון הוא אותו
+            // חלון של הטלפון.
+            if (tv) {
+                TvBrowserScreen(
+                    vm = browser,
+                    transfers = container.transfers,
+                    settings = settings,
+                    updateState = updateState,
+                    updateActions = updateActions,
+                    keys = container.keys,
+                    remote = container.remote,
+                    onOpenSearch = onOpenSearch,
+                    onOpenSettings = { screen = Screen.Settings },
+                    onEditText = onEditText,
+                    onOpenMedia = ::openMedia,
+                    onOpenConnect = onOpenConnect,
+                    nearbyContent = { expanded ->
+                        TvNearbyRail(expanded, activeConnectionId = browserState.folderPath?.let(NetPaths::connectionId)) { c ->
+                            browser.navigate(Location.Folder(c.root))
+                        }
+                    },
+                    extraActions = peerUi?.let { ui ->
+                        listOf(
+                            TvAction("שלח למכשיר", Icons.AutoMirrored.Outlined.Send) { entries ->
+                                ui.requestSend(entries.map { it.path })
+                                browser.clearSelection()
+                            },
+                        )
+                    }.orEmpty(),
+                )
+            } else if (maxWidth >= NexplorerDimens.DualPaneMinWidth && maxHeight >= NexplorerDimens.DualPaneMinHeight) {
                 DualPaneScreen(
                     panes = listOf(browser, viewModel<BrowserViewModel>(key = SECOND_PANE)),
                     transfers = container.transfers,
@@ -356,11 +421,31 @@ fun NexplorerRoot(
                     onCheckUpdates = { container.scope.launch { container.updates.check(force = true) } },
                     onAutoCheck = { v -> updateSettings { it.copy(updateAutoCheck = v) } },
                     onWifiOnly = { v -> updateSettings { it.copy(updateWifiOnly = v) } },
+                    peers = PeerSettings(
+                        name = settings.peerName.ifBlank { container.peers.defaultName },
+                        visible = settings.peerVisible,
+                        receiveDir = PeerHost.RECEIVE_DIR,
+                        devices = peerDevices,
+                        onVisible = { v ->
+                            container.scope.launch {
+                                container.settings.update { it.copy(peerVisible = v) }
+                                withContext(Dispatchers.Main) { container.peers.refresh() }
+                            }
+                        },
+                        onRename = { name ->
+                            container.scope.launch {
+                                container.settings.update { it.copy(peerName = name.trim()) }
+                                withContext(Dispatchers.Main) { container.peers.refresh() }
+                            }
+                        },
+                        onUnpair = { c -> container.scope.launch { container.peers.unpair(c) } },
+                    ),
                     updateActions = updateActions,
                     onBack = { screen = Screen.Browser },
                 ),
             )
         }
+    }
     }
 }
 
@@ -457,3 +542,7 @@ private suspend fun connectAndSave(container: AppContainer, draft: NetConnection
         keptKey?.fill('\u0000')
     }
 }
+
+/** אחרי שהמסך החדש מצויר — אז יש לו ילדים שאפשר להעביר אליהם פוקוס. */
+private const val TV_ENTRY_FOCUS_DELAY_MS = 120L
+private const val TV_ENTRY_FOCUS_TRIES = 10

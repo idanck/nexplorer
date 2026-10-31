@@ -23,6 +23,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -38,14 +42,17 @@ object StorageAccess {
 
     fun granted(): Boolean = Environment.isExternalStorageManager()
 
-    /** מסך ההגדרה של "גישה לכל הקבצים" לאפליקציה הזו, ואם הוא לא קיים — הרשימה הכללית. */
-    fun openSettings(context: Context) {
-        val specific = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:${context.packageName}"))
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        runCatching { context.startActivity(specific) }.onFailure {
-            runCatching {
-                context.startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            }
+    /**
+     * מסך ההגדרה של "גישה לכל הקבצים" לאפליקציה הזו; אם הוא לא קיים — הרשימה הכללית, ואחריה פרטי האפליקציה.
+     * false — אף אחד מהם לא נפתח (בחלק מהטלוויזיות אין את המסכים האלה): המסך מסביר איך לאפשר בדרך אחרת.
+     */
+    fun openSettings(context: Context): Boolean {
+        val candidates = listOf(
+            Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:${context.packageName}")),
+            Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION),
+        )
+        return candidates.any { intent ->
+            runCatching { context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess
         }
     }
 }
@@ -54,6 +61,7 @@ object StorageAccess {
 @Composable
 fun StorageAccessScreen() {
     val context = LocalContext.current
+    var unavailable by remember { mutableStateOf(false) }
     Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxSize().safeDrawingPadding().padding(NexplorerDimens.Space5), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(NexplorerDimens.Space4)) {
@@ -74,8 +82,17 @@ fun StorageAccessScreen() {
                     textAlign = TextAlign.Center,
                 )
                 Spacer(Modifier.height(NexplorerDimens.Space2))
+                if (unavailable) {
+                    Text(
+                        "במכשיר הזה אין מסך הגדרה ל\"גישה לכל הקבצים\". אפשר לאפשר אותה ממחשב, ב-adb:\n" +
+                            "adb shell appops set ${context.packageName} MANAGE_EXTERNAL_STORAGE allow",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        textAlign = TextAlign.Center,
+                    )
+                }
                 Button(
-                    onClick = { StorageAccess.openSettings(context) },
+                    onClick = { if (!StorageAccess.openSettings(context)) unavailable = true },
                     shape = NexplorerShape.Pill,
                     modifier = Modifier.fillMaxWidth().height(NexplorerDimens.BottomBarButton),
                 ) { Text("אפשר גישה") }

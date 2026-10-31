@@ -1,5 +1,6 @@
 package com.idanck.nexplorer.ui.analyzer
 
+import com.idanck.nexplorer.ui.tv.screenEntry
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -116,7 +117,7 @@ private fun Header(state: AnalyzerState, onBack: () -> Unit, onVolume: (com.idan
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(NexplorerDimens.Space2),
     ) {
-        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "חזרה") }
+        IconButton(onClick = onBack, modifier = Modifier.screenEntry()) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "חזרה") }
         Column(Modifier.weight(1f)) {
             Text("מנתח אחסון", style = MaterialTheme.typography.titleLarge)
             val volume = state.volume

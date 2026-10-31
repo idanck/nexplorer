@@ -1,5 +1,6 @@
 package com.idanck.nexplorer.ui.net
 
+import com.idanck.nexplorer.ui.tv.screenEntry
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -320,7 +321,7 @@ fun ConnectScreen(
                 horizontalArrangement = Arrangement.spacedBy(NexplorerDimens.Space2),
                 modifier = Modifier.padding(start = NexplorerDimens.Space3, end = NexplorerDimens.Space3, top = NexplorerDimens.Space3, bottom = NexplorerDimens.Space2),
             ) {
-                IconButton(onClick = onClose, modifier = Modifier.size(NexplorerDimens.TouchTarget)) {
+                IconButton(onClick = onClose, modifier = Modifier.size(NexplorerDimens.TouchTarget).screenEntry()) {
                     Icon(Icons.Filled.Close, contentDescription = "סגור")
                 }
                 Text(if (editing == null) "הוסף מקום" else "ערוך מקום", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))

@@ -87,6 +87,8 @@ import com.idanck.nexplorer.core.NetPaths
 import com.idanck.nexplorer.core.NetProtocol
 import com.idanck.nexplorer.core.SizeFormat
 import com.idanck.nexplorer.core.isolated
+import com.idanck.nexplorer.ui.peer.LocalPeerUi
+import com.idanck.nexplorer.ui.peer.NearbyDrawerSection
 import com.idanck.nexplorer.data.apk.ApkInspector
 import com.idanck.nexplorer.data.crypto.EncryptedFiles
 import com.idanck.nexplorer.data.files.FileIntents
@@ -196,6 +198,7 @@ fun BrowserScreen(
     val transferList by transfers.transfers.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
+    val peerUi = LocalPeerUi.current
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     // ראש המסך (1.12): שורת הסיכום מתכווצת בגלילה מטה וחוזרת בגלילה מעלה; בכל מעבר מקום — פתוחה מחדש.
     val headerState = rememberTopAppBarState()
@@ -570,6 +573,12 @@ fun BrowserScreen(
                                     },
                                     onToggleFavorite = { single?.let { vm.toggleFavorite(it.path) } },
                                     onProperties = { properties = selected },
+                                    onSendToDevice = peerUi?.let { ui ->
+                                        {
+                                            ui.requestSend(selected.map { it.path })
+                                            vm.clearSelection()
+                                        }
+                                    },
                                     // ברשת (שלב 5א): עריכה, ארכיונים והצפנה — דרך עותק במכשיר.
                                     canEditText = !state.isRemote && single?.canEditAsText() == true,
                                     isArchive = !state.isRemote && single?.let { ArchiveFormats.of(it.name) } != null,
@@ -868,7 +877,8 @@ internal fun placesDrawerModel(
 ): DrawerModel = DrawerModel(
     volumes = state.volumes,
     activeVolumePath = if (state.location is Location.Folder) state.volume?.path else null,
-    connections = state.connections,
+    // מכשירים מחוברים (1.16) — במדור "מכשירים קרובים", לא בין המקומות.
+    connections = state.connections.filter { it.protocol != NetProtocol.Peer },
     activeConnectionId = state.folderPath?.let(NetPaths::connectionId),
     spaces = state.remoteSpaces,
     onConnection = { c -> close(); vm.navigate(Location.Folder(c.root)) },
@@ -893,6 +903,12 @@ internal fun placesDrawerModel(
     onSettings = { close(); onSettings() },
     // המנתח סורק את המכשיר; מתוך מקום ברשת — את האחסון הראשי.
     onAnalyzer = { close(); onAnalyzer(state.folderPath?.takeIf { !NetPaths.isRemote(it) }) },
+    nearby = {
+        NearbyDrawerSection(activeConnectionId = state.folderPath?.let(NetPaths::connectionId)) { c ->
+            close()
+            vm.navigate(Location.Folder(c.root))
+        }
+    },
 )
 
 /** QuickConnect (שלב 7ג): לפני הספירה — איך החיבור עבר ("ממסר QuickConnect · …"). */
