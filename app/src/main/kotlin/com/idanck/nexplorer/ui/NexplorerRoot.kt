@@ -4,10 +4,10 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import com.idanck.nexplorer.ui.tv.LocalScreenEntry
+import androidx.compose.runtime.CompositionLocalProvider
 import kotlinx.coroutines.delay
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -192,17 +192,20 @@ fun NexplorerRoot(
     // העברה בין מכשירים (1.16): קוד לחיבור, קבלת קבצים, "שלח אל" — מעל כל מסך.
     PeerOverlays()
 
-    // Google TV: מסך שנפתח (הגדרות, חיבור, חיפוש…) מקבל את הפוקוס לפריט הראשון — אחרת הפוקוס נשאר על המסך
-    // שנסגר, ושום לחיצה בשלט לא מגיעה לרשימה. מסך הקבצים ונגן הווידאו מנהלים את הפוקוס בעצמם.
+    // Google TV: מסך שנפתח (הגדרות, חיפוש, מנתח…) מקבל את הפוקוס לפריט הראשון שלו ([screenEntry]) — אחרת הפוקוס
+    // נשאר על המסך שנסגר, ושום לחיצה בשלט לא מגיעה לרשימה. מסך הקבצים ונגן הווידאו מנהלים את הפוקוס בעצמם.
     val tvEntry = tv && screen != Screen.Browser && screen != Screen.Video && screen != Screen.Viewer
     val entryFocus = remember(screen) { FocusRequester() }
     if (tvEntry) {
         LaunchedEffect(screen) {
-            delay(TV_ENTRY_FOCUS_DELAY_MS)
-            runCatching { entryFocus.requestFocus() }
+            // המסך עוד מצטייר בפריים הראשון: כמה ניסיונות עד שהפריט קיים.
+            repeat(TV_ENTRY_FOCUS_TRIES) {
+                delay(TV_ENTRY_FOCUS_DELAY_MS)
+                if (runCatching { entryFocus.requestFocus() }.getOrDefault(false)) return@LaunchedEffect
+            }
         }
     }
-    Box(if (tvEntry) Modifier.fillMaxSize().focusRequester(entryFocus).focusGroup() else Modifier.fillMaxSize()) {
+    CompositionLocalProvider(LocalScreenEntry provides if (tvEntry) entryFocus else null) {
     when (screen) {
         Screen.Browser -> BoxWithConstraints(Modifier.fillMaxSize()) {
             val onOpenSearch: (String?) -> Unit = { root ->
@@ -541,4 +544,5 @@ private suspend fun connectAndSave(container: AppContainer, draft: NetConnection
 }
 
 /** אחרי שהמסך החדש מצויר — אז יש לו ילדים שאפשר להעביר אליהם פוקוס. */
-private const val TV_ENTRY_FOCUS_DELAY_MS = 150L
+private const val TV_ENTRY_FOCUS_DELAY_MS = 120L
+private const val TV_ENTRY_FOCUS_TRIES = 10

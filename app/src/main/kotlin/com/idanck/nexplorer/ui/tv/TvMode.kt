@@ -5,6 +5,10 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 
 /**
  * Google TV ו-Android TV (1.15): ממשק לשלט — מסך הקבצים של הטלוויזיה ([TvBrowserScreen]) וערכה כהה תמיד.
@@ -20,3 +24,15 @@ object TvMode {
 
 /** true בטלוויזיה — מסופק ב-MainActivity. */
 val LocalTvMode = staticCompositionLocalOf { false }
+
+/**
+ * Google TV: הפריט שמקבל את הפוקוס כשמסך נפתח (הגדרות, חיפוש, מנתח…) — בלי זה הפוקוס נשאר על המסך שנסגר, ושום
+ * לחיצה בשלט לא מגיעה למסך החדש. NexplorerRoot מספק אותו ומבקש עליו פוקוס; מחוץ לטלוויזיה — null.
+ */
+val LocalScreenEntry = staticCompositionLocalOf<FocusRequester?> { null }
+
+/** הפריט הראשון שהשלט מגיע אליו במסך (בדרך כלל "חזרה"). */
+fun Modifier.screenEntry(): Modifier = composed {
+    val entry = LocalScreenEntry.current
+    if (entry != null) focusRequester(entry) else this
+}

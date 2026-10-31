@@ -1,5 +1,6 @@
 package com.idanck.nexplorer.ui.player
 
+import com.idanck.nexplorer.ui.tv.screenEntry
 import android.graphics.BitmapFactory
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
@@ -122,7 +123,7 @@ fun AudioPlayerScreen(viewModel: AudioPlayerViewModel, path: String?, onBack: ()
                 Modifier.padding(start = NexplorerDimens.Space1, end = NexplorerDimens.Space1, top = NexplorerDimens.Space2, bottom = NexplorerDimens.Space1),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "חזרה") }
+                IconButton(onClick = onBack, modifier = Modifier.screenEntry()) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "חזרה") }
                 Column(Modifier.weight(1f).padding(horizontal = NexplorerDimens.Space2)) {
                     Text("נגן שמע", style = MaterialTheme.typography.titleLarge)
                     if (state.tracks.isNotEmpty() && state.index >= 0) {

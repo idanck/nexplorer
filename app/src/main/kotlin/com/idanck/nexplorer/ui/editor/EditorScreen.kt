@@ -1,5 +1,6 @@
 package com.idanck.nexplorer.ui.editor
 
+import com.idanck.nexplorer.ui.tv.screenEntry
 import android.app.Application
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
@@ -138,7 +139,7 @@ fun EditorScreen(viewModel: EditorViewModel, path: String, onBack: () -> Unit) {
                 Modifier.padding(start = NexplorerDimens.Space1, end = NexplorerDimens.Space2, top = NexplorerDimens.Space2, bottom = NexplorerDimens.Space1),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = { if (state.dirty) askLeave = true else onBack() }) {
+                IconButton(onClick = { if (state.dirty) askLeave = true else onBack() }, modifier = Modifier.screenEntry()) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "חזרה")
                 }
                 Column(Modifier.weight(1f)) {

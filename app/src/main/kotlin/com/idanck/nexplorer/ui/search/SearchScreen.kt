@@ -1,5 +1,6 @@
 package com.idanck.nexplorer.ui.search
 
+import com.idanck.nexplorer.ui.tv.screenEntry
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -140,7 +141,7 @@ private fun SearchField(text: String, onChange: (String) -> Unit, onBack: () -> 
         modifier = Modifier.padding(start = NexplorerDimens.Space1, end = NexplorerDimens.Space3, top = NexplorerDimens.Space3, bottom = NexplorerDimens.Space2),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "חזרה") }
+        IconButton(onClick = onBack, modifier = Modifier.screenEntry()) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "חזרה") }
         Row(
             modifier = Modifier
                 .weight(1f)

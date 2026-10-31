@@ -1,5 +1,6 @@
 package com.idanck.nexplorer.ui.settings
 
+import com.idanck.nexplorer.ui.tv.screenEntry
 import androidx.compose.foundation.background
 import com.idanck.nexplorer.ui.tv.tvFocusRing
 import com.idanck.nexplorer.ui.tv.LocalTvMode
@@ -110,7 +111,7 @@ fun SettingsScreen(model: SettingsModel) {
                 Modifier.padding(start = NexplorerDimens.Space1, end = NexplorerDimens.Space4, top = NexplorerDimens.Space3, bottom = NexplorerDimens.Space2),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = model.onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "חזרה") }
+                IconButton(onClick = model.onBack, modifier = Modifier.screenEntry()) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "חזרה") }
                 Text("הגדרות", style = MaterialTheme.typography.headlineLarge)
             }
             Column(
