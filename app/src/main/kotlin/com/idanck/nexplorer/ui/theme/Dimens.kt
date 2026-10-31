@@ -216,6 +216,16 @@ object NexplorerDimens {
     val TvActionRowFocused = 52.dp
     val TvToolbarButton = 48.dp
     val TvSelectionPill = 52.dp
+    /**
+     * העברה בין מכשירים (1.16, לוחות Peer-* ו-Tv-Pair/Tv-Receive): ספרת קוד 44×56 (בטלוויזיה 44×60, רווח 12 בין שתי
+     * השלשות), חלון קבלת קבצים 540, כרטיס הקוד בטלוויזיה 360.
+     */
+    val PeerCodeDigitWidth = 44.dp
+    val PeerCodeDigitHeight = 56.dp
+    val TvPeerCodeDigitHeight = 60.dp
+    val PeerCodeGroupGap = 12.dp
+    val PeerDialogWidth = 540.dp
+    val TvPairCardWidth = 360.dp
     const val TvGridColumns = 5
     const val TvFocusScale = 1.08f
     const val TvRowFocusScale = 1.03f

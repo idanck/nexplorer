@@ -111,6 +111,8 @@ class DrawerModel(
     val onTransfers: () -> Unit,
     val onSettings: () -> Unit,
     val onAnalyzer: () -> Unit,
+    /** "מכשירים קרובים" (העברה בין מכשירים, 1.16) — מתחת למקומות. */
+    val nearby: (@Composable () -> Unit)? = null,
 )
 
 /** מגירת המקומות (לוח "מגירת מקומות"): באנר, מקומות, מועדפים, אוספים, כלים. */
@@ -148,6 +150,7 @@ fun PlacesDrawer(model: DrawerModel) {
                 }
             }
             AddPlaceRow(model.onAddPlace)
+            model.nearby?.invoke()
 
             var managingFavorites by remember { mutableStateOf(false) }
             DrawerSection("מועדפים") {
@@ -195,7 +198,7 @@ fun PlacesDrawer(model: DrawerModel) {
 }
 
 @Composable
-private fun DrawerSection(title: String, action: (@Composable () -> Unit)? = null) {
+internal fun DrawerSection(title: String, action: (@Composable () -> Unit)? = null) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Text(
             title,

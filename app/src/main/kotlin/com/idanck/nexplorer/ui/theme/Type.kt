@@ -87,5 +87,9 @@ val BannerTitleTextStyle = NexplorerTypography.headlineLarge.copy(
  */
 val UsageFigureTextStyle = MonoTextStyle.copy(fontSize = 32.sp, lineHeight = 36.sp, fontWeight = FontWeight.Bold)
 
+/** ספרה בקוד החיבור (1.16): mono 26/32 בטלפון, 34/40 בטלוויזיה. */
+val PeerCodeTextStyle = MonoTextStyle.copy(fontSize = 26.sp, lineHeight = 32.sp, fontWeight = FontWeight.Medium)
+val TvPeerCodeTextStyle = MonoTextStyle.copy(fontSize = 34.sp, lineHeight = 40.sp, fontWeight = FontWeight.Medium)
+
 /** שם קובץ בשורת רשימה: פונט הממשק, כיוון LTR. */
 val FileNameTextStyle = NexplorerTypography.bodyLarge.copy(textDirection = TextDirection.Ltr)

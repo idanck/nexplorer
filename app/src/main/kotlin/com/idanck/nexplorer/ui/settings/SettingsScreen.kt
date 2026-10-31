@@ -46,6 +46,9 @@ import com.idanck.nexplorer.BuildConfig
 import com.idanck.nexplorer.core.HebrewDates
 import com.idanck.nexplorer.core.SizeFormat
 import com.idanck.nexplorer.core.isolated
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material3.OutlinedTextField
+import com.idanck.nexplorer.data.net.NetConnection
 import com.idanck.nexplorer.data.settings.AppSettings
 import com.idanck.nexplorer.data.settings.ThemeMode
 import com.idanck.nexplorer.ui.components.SegmentedGroup
@@ -78,6 +81,19 @@ class SettingsModel(
     val onWifiOnly: (Boolean) -> Unit,
     val updateActions: UpdateActions,
     val onBack: () -> Unit,
+    /** "העברה בין מכשירים" (1.16, לוח Peer-Settings). */
+    val peers: PeerSettings? = null,
+)
+
+/** המדור "העברה בין מכשירים": גלוי, שם, תיקיית קבלה, ומכשירים מחוברים עם "נתק". */
+class PeerSettings(
+    val name: String,
+    val visible: Boolean,
+    val receiveDir: String,
+    val devices: List<NetConnection>,
+    val onVisible: (Boolean) -> Unit,
+    val onRename: (String) -> Unit,
+    val onUnpair: (NetConnection) -> Unit,
 )
 
 /** מסך ההגדרות (לוח "הגדרות"): מראה · התנהגות · גישה לאחסון · עדכונים · אודות. */
@@ -134,6 +150,8 @@ fun SettingsScreen(model: SettingsModel) {
                         HiddenFoldersDialog(s.hiddenFolders, model.onUnhideFolder) { showHiddenFolders = false }
                     }
                 }
+
+                model.peers?.let { PeersGroup(it) }
 
                 Group("גישה לאחסון") {
                     Item("גישה לכל הקבצים", onClick = model.onStorageAccess) {
@@ -245,6 +263,57 @@ private fun HiddenFoldersDialog(hidden: Set<String>, onUnhide: (String) -> Unit,
 }
 
 /** מדור בהגדרות (1.9): כותרת, ומתחתיה כרטיסים צמודים — פריט לכל שורה, בלי קווים מפרידים. */
+@Composable
+private fun PeersGroup(p: PeerSettings) {
+    var renaming by remember { mutableStateOf(false) }
+    var unpairing by remember { mutableStateOf<NetConnection?>(null) }
+    Group("העברה בין מכשירים") {
+        SwitchItem("גלוי למכשירים ברשת", "רק כשהאפליקציה פתוחה. מכשירים מחוברים יכולים לשלוח אליו ולעיין בקבצים שלו", p.visible, onChange = p.onVisible)
+        Item("שם המכשיר", p.name, onClick = { renaming = true }) {
+            Icon(Icons.Outlined.Edit, contentDescription = "שנה שם", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Item("תיקיית קבלה") { Text(p.receiveDir, style = MonoTextStyle, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    }
+    if (p.devices.isNotEmpty()) {
+        Group("מכשירים מחוברים") {
+            p.devices.forEach { c ->
+                Item(c.label, if (c.autoAccept) "מקבל בלי לשאול" else "שואל לפני כל קבלה") {
+                    TextButton(onClick = { unpairing = c }) { Text("נתק", color = MaterialTheme.colorScheme.error) }
+                }
+            }
+        }
+    }
+    if (renaming) {
+        var value by remember { mutableStateOf(p.name) }
+        AlertDialog(
+            onDismissRequest = { renaming = false },
+            title = { Text("שם המכשיר") },
+            text = { OutlinedTextField(value = value, onValueChange = { value = it.take(60) }, singleLine = true) },
+            confirmButton = {
+                TextButton(onClick = {
+                    renaming = false
+                    p.onRename(value)
+                }) { Text("שמור") }
+            },
+            dismissButton = { TextButton(onClick = { renaming = false }) { Text("ביטול") } },
+        )
+    }
+    unpairing?.let { c ->
+        AlertDialog(
+            onDismissRequest = { unpairing = null },
+            title = { Text("לנתק את ${c.label}?") },
+            text = { Text("כדי לשלוח או לעיין שוב — חיבור מחדש בקוד.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    unpairing = null
+                    p.onUnpair(c)
+                }) { Text("נתק", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { unpairing = null }) { Text("ביטול") } },
+        )
+    }
+}
+
 @Composable
 private fun Group(title: String, content: @Composable ColumnScope.() -> Unit) {
     Text(

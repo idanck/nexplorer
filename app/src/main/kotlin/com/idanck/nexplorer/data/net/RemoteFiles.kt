@@ -22,6 +22,8 @@ class RemoteFiles(
     private val connectionOf: (String) -> NetConnection?,
     private val decrypt: (String) -> CharArray,
     private val cloudAuth: (NetConnection) -> CloudAuth = { throw IOException("אין התחברות לענן") },
+    /** מכשיר מחובר ("העברה בין מכשירים"): החיבור ומפתח החיבור (Base64, מפוענח מה-Keystore) ← [RemoteFs]. */
+    private val peer: (NetConnection, CharArray) -> RemoteFs = { _, _ -> throw IOException("העברה בין מכשירים לא זמינה כאן") },
 ) {
     private val open = HashMap<String, Pair<NetConnection, RemoteFs>>()
 
@@ -35,7 +37,11 @@ class RemoteFiles(
             val fs = try {
                 val key = connection.keySecret?.let(decrypt)
                 try {
-                    create(connection, password, key, if (connection.protocol.cloud) cloudAuth(connection) else null)
+                    if (connection.protocol == NetProtocol.Peer) {
+                        peer(connection, password ?: throw IOException("החיבור למכשיר הזה פגום — חבר אותו מחדש"))
+                    } else {
+                        create(connection, password, key, if (connection.protocol.cloud) cloudAuth(connection) else null)
+                    }
                 } finally {
                     key?.fill('\u0000')
                 }
@@ -238,6 +244,8 @@ class RemoteFiles(
             NetProtocol.Synology -> SynologyFs(connection, password)
             NetProtocol.GoogleDrive -> DriveFs(connection, auth ?: throw IOException("אין התחברות ל-Google Drive"))
             NetProtocol.OneDrive -> OneDriveFs(connection, auth ?: throw IOException("אין התחברות ל-OneDrive"))
+            // נפתח רק דרך fsFor (צריך את הכתובת מה-NSD ואת הזהות של המכשיר הזה).
+            NetProtocol.Peer -> throw IOException("מכשיר מחובר נפתח מ\"מכשירים קרובים\"")
         }
 
         /**

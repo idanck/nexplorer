@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.DriveFileMove
+import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.automirrored.outlined.NoteAdd
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.filled.Add
@@ -244,6 +245,8 @@ class ItemMenuModel(
     val onExtract: () -> Unit = {},
     val onEncrypt: () -> Unit = {},
     val onDecrypt: () -> Unit = {},
+    /** "שלח למכשיר" (העברה בין מכשירים, 1.16); null — לא זמין. */
+    val onSendToDevice: (() -> Unit)? = null,
 )
 
 @Composable
@@ -257,6 +260,7 @@ fun ItemMenu(expanded: Boolean, onDismiss: () -> Unit, model: ItemMenuModel) {
         if (model.canEncrypt) MenuRow("הצפן", Icons.Outlined.Security, act(model.onEncrypt))
         if (model.canDecrypt) MenuRow("פענח", Icons.Outlined.LockOpen, act(model.onDecrypt))
         MenuRow("העבר", Icons.AutoMirrored.Outlined.DriveFileMove, act(model.onMove))
+        model.onSendToDevice?.let { MenuRow("שלח למכשיר", Icons.AutoMirrored.Outlined.Send, act(it)) }
         if (model.single) MenuRow("העתק נתיב", Icons.Outlined.Link, act(model.onCopyPath))
         if (model.single && model.isFolder) {
             MenuRow(

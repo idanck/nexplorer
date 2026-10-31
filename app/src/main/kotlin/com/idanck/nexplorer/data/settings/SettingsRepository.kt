@@ -42,6 +42,10 @@ data class AppSettings(
     val updateLastManifest: String? = null,
     /** מקומות ברשת שנוספו ב"הוסף מקום" (D3), בסדר ההוספה. */
     val connections: List<NetConnection> = emptyList(),
+    /** "העברה בין מכשירים" (1.16): המזהה של המכשיר הזה (נוצר בפעם הראשונה), השם שמכשירים אחרים רואים (ריק — שם המכשיר), והאם הוא גלוי. */
+    val peerId: String = "",
+    val peerName: String = "",
+    val peerVisible: Boolean = true,
 ) {
     fun viewFor(path: String?): ViewOptions = path?.let { folderViews[it] } ?: defaultView
 }
@@ -108,6 +112,9 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
             prefs[UPDATE_SKIPPED] = next.updateSkippedVersionCode
             next.updateLastManifest?.let { prefs[UPDATE_MANIFEST] = it } ?: prefs.remove(UPDATE_MANIFEST)
             prefs[CONNECTIONS] = NetConnection.encode(next.connections)
+            prefs[PEER_ID] = next.peerId
+            prefs[PEER_NAME] = next.peerName
+            prefs[PEER_VISIBLE] = next.peerVisible
         }
     }
 
@@ -133,6 +140,9 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
             updateSkippedVersionCode = prefs[UPDATE_SKIPPED] ?: 0,
             updateLastManifest = prefs[UPDATE_MANIFEST],
             connections = NetConnection.decode(prefs[CONNECTIONS]),
+            peerId = prefs[PEER_ID].orEmpty(),
+            peerName = prefs[PEER_NAME].orEmpty(),
+            peerVisible = prefs[PEER_VISIBLE] ?: defaults.peerVisible,
         )
     }
 
@@ -151,5 +161,8 @@ class SettingsRepository(context: Context, scope: CoroutineScope) {
         val UPDATE_SKIPPED = intPreferencesKey("update_skipped_version_code")
         val UPDATE_MANIFEST = stringPreferencesKey("update_last_manifest")
         val CONNECTIONS = stringPreferencesKey("net_connections")
+        val PEER_ID = stringPreferencesKey("peer_id")
+        val PEER_NAME = stringPreferencesKey("peer_name")
+        val PEER_VISIBLE = booleanPreferencesKey("peer_visible")
     }
 }

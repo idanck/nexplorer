@@ -45,6 +45,8 @@ data class NetConnection(
      * ריק — רשת ביתית.
      */
     val quickConnect: String = "",
+    /** מכשיר מחובר ("העברה בין מכשירים"): קבצים ממנו מתקבלים בלי לשאול ("קבל מהמכשיר הזה בלי לשאול"). */
+    val autoAccept: Boolean = false,
 ) {
     val isQuickConnect: Boolean get() = protocol == NetProtocol.Synology && quickConnect.isNotBlank()
 
@@ -139,7 +141,8 @@ data class NetConnection(
                         .put("hostKey", c.hostKey ?: JSONObject.NULL)
                         .put("keySecret", c.keySecret ?: JSONObject.NULL)
                         .put("plainHttp", c.plainHttp)
-                        .put("quickConnect", c.quickConnect),
+                        .put("quickConnect", c.quickConnect)
+                        .put("autoAccept", c.autoAccept),
                 )
             }
         }.toString()
@@ -166,6 +169,7 @@ data class NetConnection(
                         keySecret = o.nullableString("keySecret"),
                         plainHttp = o.optBoolean("plainHttp", false),
                         quickConnect = o.optString("quickConnect"),
+                        autoAccept = o.optBoolean("autoAccept", false),
                     )
                 }.getOrNull()
             }.distinctBy { it.id }

@@ -54,7 +54,15 @@ import com.idanck.nexplorer.core.FileKind
 import com.idanck.nexplorer.core.MediaFormats
 import com.idanck.nexplorer.ui.browser.DualPaneScreen
 import com.idanck.nexplorer.ui.theme.NexplorerDimens
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Send
+import com.idanck.nexplorer.data.peer.PeerHost
+import com.idanck.nexplorer.ui.peer.LocalPeerUi
+import com.idanck.nexplorer.ui.peer.PeerOverlays
+import com.idanck.nexplorer.ui.peer.TvNearbyRail
+import com.idanck.nexplorer.ui.settings.PeerSettings
 import com.idanck.nexplorer.ui.tv.LocalTvMode
+import com.idanck.nexplorer.ui.tv.TvAction
 import com.idanck.nexplorer.ui.tv.TvBrowserScreen
 import com.idanck.nexplorer.ui.player.AudioPlayerScreen
 import com.idanck.nexplorer.ui.player.AudioPlayerViewModel
@@ -98,6 +106,9 @@ fun NexplorerRoot(
     }
 
     val browser: BrowserViewModel = viewModel()
+    val browserState by browser.state.collectAsStateWithLifecycle()
+    val peerUi = LocalPeerUi.current
+    val peerDevices by container.peers.devices.collectAsStateWithLifecycle()
     val search: SearchViewModel = viewModel()
     var screen by rememberSaveable { mutableStateOf(Screen.Browser) }
     var searchRoot by rememberSaveable { mutableStateOf<String?>(null) }
@@ -173,6 +184,9 @@ fun NexplorerRoot(
         container.scope.launch { container.settings.update(transform) }
     }
 
+    // העברה בין מכשירים (1.16): קוד לחיבור, קבלת קבצים, "שלח אל" — מעל כל מסך.
+    PeerOverlays()
+
     when (screen) {
         Screen.Browser -> BoxWithConstraints(Modifier.fillMaxSize()) {
             val onOpenSearch: (String?) -> Unit = { root ->
@@ -203,6 +217,19 @@ fun NexplorerRoot(
                     onEditText = onEditText,
                     onOpenMedia = ::openMedia,
                     onOpenConnect = onOpenConnect,
+                    nearbyContent = { expanded ->
+                        TvNearbyRail(expanded, activeConnectionId = browserState.folderPath?.let(NetPaths::connectionId)) { c ->
+                            browser.navigate(Location.Folder(c.root))
+                        }
+                    },
+                    extraActions = peerUi?.let { ui ->
+                        listOf(
+                            TvAction("שלח למכשיר", Icons.AutoMirrored.Outlined.Send) { entries ->
+                                ui.requestSend(entries.map { it.path })
+                                browser.clearSelection()
+                            },
+                        )
+                    }.orEmpty(),
                 )
             } else if (maxWidth >= NexplorerDimens.DualPaneMinWidth && maxHeight >= NexplorerDimens.DualPaneMinHeight) {
                 DualPaneScreen(
@@ -375,6 +402,25 @@ fun NexplorerRoot(
                     onCheckUpdates = { container.scope.launch { container.updates.check(force = true) } },
                     onAutoCheck = { v -> updateSettings { it.copy(updateAutoCheck = v) } },
                     onWifiOnly = { v -> updateSettings { it.copy(updateWifiOnly = v) } },
+                    peers = PeerSettings(
+                        name = settings.peerName.ifBlank { container.peers.defaultName },
+                        visible = settings.peerVisible,
+                        receiveDir = PeerHost.RECEIVE_DIR,
+                        devices = peerDevices,
+                        onVisible = { v ->
+                            container.scope.launch {
+                                container.settings.update { it.copy(peerVisible = v) }
+                                withContext(Dispatchers.Main) { container.peers.refresh() }
+                            }
+                        },
+                        onRename = { name ->
+                            container.scope.launch {
+                                container.settings.update { it.copy(peerName = name.trim()) }
+                                withContext(Dispatchers.Main) { container.peers.refresh() }
+                            }
+                        },
+                        onUnpair = { c -> container.scope.launch { container.peers.unpair(c) } },
+                    ),
                     updateActions = updateActions,
                     onBack = { screen = Screen.Browser },
                 ),

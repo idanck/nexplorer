@@ -14,6 +14,8 @@ enum class NetProtocol(val scheme: String, val label: String, val defaultPort: I
     Synology("syno", "Synology", 5001),
     GoogleDrive("gdrive", "Google Drive", 443, cloud = true),
     OneDrive("onedrive", "OneDrive", 443, cloud = true),
+    /** מכשיר עם nexplorer ברשת הביתית ("העברה בין מכשירים", 1.16) — הפורט מה-NSD, לא קבוע. */
+    Peer("peer", "מכשיר", 0),
     ;
 
     /** בשורש של החיבור — רשימת השיתופים (SMB, ‏Synology), לא תיקייה. */
@@ -133,6 +135,8 @@ object NetPaths {
             NetProtocol.Synology -> null
             // Drive מקבל כל שם (גם / — הוא מוצג כ-∕, ראה DriveNames).
             NetProtocol.GoogleDrive -> null
+            // אנדרואיד (ext4/F2FS באחסון הראשי, דרך FUSE): כמו במכשיר הזה.
+            NetProtocol.Peer -> null
             NetProtocol.OneDrive -> when {
                 name.any { it in SMB_FORBIDDEN } -> "ב-OneDrive השם לא יכול להכיל \\ : * ? \" < > |"
                 name.endsWith('.') || name.endsWith(' ') || name.startsWith(' ') -> "ב-OneDrive השם לא יכול להתחיל ברווח או להיגמר בנקודה או ברווח"

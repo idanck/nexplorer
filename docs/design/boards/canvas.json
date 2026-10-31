@@ -240,6 +240,48 @@
       "w": 960,
       "h": 540,
       "title": "T7 · באנר במסך הבית של הטלוויזיה"
+    },
+    "Peer-Drawer.dc.html": {
+      "x": 0,
+      "y": 9250,
+      "w": 390,
+      "h": 844,
+      "title": "P1 · מגירה — מכשירים קרובים"
+    },
+    "Peer-Pair.dc.html": {
+      "x": 470,
+      "y": 9250,
+      "w": 390,
+      "h": 844,
+      "title": "P2 · חיבור לטלוויזיה — הקלדת קוד"
+    },
+    "Peer-Send.dc.html": {
+      "x": 940,
+      "y": 9250,
+      "w": 390,
+      "h": 844,
+      "title": "P3 · שלח אל — בחירת מכשיר"
+    },
+    "Peer-Transfer.dc.html": {
+      "x": 1410,
+      "y": 9250,
+      "w": 390,
+      "h": 844,
+      "title": "P4 · מגש העברות — שליחה לטלוויזיה"
+    },
+    "Peer-Browse.dc.html": {
+      "x": 1880,
+      "y": 9250,
+      "w": 390,
+      "h": 844,
+      "title": "P5 · עיון בקבצי הטלוויזיה מהטלפון"
+    },
+    "Peer-Settings.dc.html": {
+      "x": 2350,
+      "y": 9250,
+      "w": 390,
+      "h": 844,
+      "title": "P6 · הגדרות — העברה בין מכשירים"
     }
   },
   "order": [
@@ -275,7 +317,13 @@
     "Tv-Select.dc.html",
     "Tv-Receive.dc.html",
     "Tv-Pair.dc.html",
-    "Tv-Launcher.dc.html"
+    "Tv-Launcher.dc.html",
+    "Peer-Drawer.dc.html",
+    "Peer-Pair.dc.html",
+    "Peer-Send.dc.html",
+    "Peer-Transfer.dc.html",
+    "Peer-Browse.dc.html",
+    "Peer-Settings.dc.html"
   ],
   "notes": {
     "t1": {
@@ -312,6 +360,13 @@
       "text": "Google TV (1.15)",
       "kind": "title1",
       "maxW": 7200
+    },
+    "peer": {
+      "x": 0,
+      "y": 8950,
+      "text": "העברה בין מכשירים (1.16)",
+      "kind": "title1",
+      "maxW": 2740
     }
   },
   "designSystems": []
