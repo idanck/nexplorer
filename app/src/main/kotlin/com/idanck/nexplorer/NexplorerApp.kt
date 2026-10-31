@@ -17,6 +17,7 @@ import com.idanck.nexplorer.data.net.CloudAuths
 import com.idanck.nexplorer.data.net.CloudTokens
 import com.idanck.nexplorer.data.net.ConnectionSecrets
 import com.idanck.nexplorer.data.net.RemoteFiles
+import com.idanck.nexplorer.data.peer.PeerNetwork
 import com.idanck.nexplorer.data.settings.SettingsRepository
 import com.idanck.nexplorer.data.transfer.TransferManager
 import com.idanck.nexplorer.ui.keys.KeyBus
@@ -38,12 +39,15 @@ class AppContainer(app: Application) {
     val vaults = VaultKeys()
     /** ענן (D4): ההרשאות של Google ב-Play services, וה-refresh tokens של OneDrive ב-Keystore. */
     val cloud = CloudAuths(app, CloudTokens(app))
+    /** העברה בין מכשירים (1.16): השרת, הפרסום והגילוי — רק כשהאפליקציה פתוחה (MainActivity.onStart/onStop). */
+    val peers = PeerNetwork(app, settings, scope)
     /** מקומות ברשת (D3) וענן: החיבורים מההעדפות, והסיסמאות מה-Keystore — רק כשמתחברים. */
     val remote = RemoteFiles(
         connectionOf = { id -> settings.state.value.connections.firstOrNull { it.id == id } },
         decrypt = ConnectionSecrets::decrypt,
         cloudAuth = cloud::forConnection,
-    )
+        peer = peers::fs,
+    ).also { peers.remote = it }
     val transfers = TransferManager(app, scope, vaults, remote)
     val updates = UpdateManager(app, settings, transfers)
     val keys = KeyBus()

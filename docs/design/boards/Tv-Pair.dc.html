@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>טלוויזיה — חיבור מכשיר</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#7FB0FF}a:hover{color:#D5E3FE}
+</style>
+</helmet>
+<div style="width: 960px; height: 540px; box-sizing: border-box; direction: rtl; font-family: 'Noto Sans Hebrew', system-ui, sans-serif; color: #E6ECF1; background: #0E1215; padding: 27px 48px; display: flex; gap: 48px; align-items: center; overflow: hidden">
+
+  <div style="flex: 1; display: flex; flex-direction: column; gap: 18px">
+    <div style="font-size: 14px; color: #A3AFBA">מכשירים קרובים</div>
+    <div style="font-size: 32px; font-weight: 600; line-height: 40px">חיבור מכשיר חדש</div>
+    <ol style="margin: 0; padding: 0 22px 0 0; display: flex; flex-direction: column; gap: 12px; font-size: 16px; line-height: 24px; color: #E6ECF1">
+      <li>פתח את nexplorer בטלפון, באותה רשת Wi-Fi.</li>
+      <li>במגירה, תחת "מכשירים קרובים", בחר <b>סלון · Google TV</b>.</li>
+      <li>הקלד את הקוד שמופיע כאן.</li>
+    </ol>
+    <div style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: #A3AFBA; margin-top: 6px">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+      <span>אחרי החיבור, ההעברות מוצפנות ועוברות רק ברשת הביתית — לא דרך האינטרנט.</span>
+    </div>
+    <button style="align-self: flex-start; height: 48px; padding: 0 24px; margin-top: 6px; border: 0; border-radius: 999px; background: #1F262D; color: #E6ECF1; font-family: inherit; font-size: 15px">ביטול</button>
+  </div>
+
+  <div style="width: 360px; flex-shrink: 0; background: #171D22; border-radius: 28px; padding: 32px 28px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 14px">
+    <div style="font-size: 14px; color: #A3AFBA">הקוד</div>
+    <div style="display: flex; gap: 8px; direction: ltr">
+      <span style="width: 44px; height: 60px; border-radius: 12px; background: #1F262D; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 34px; font-weight: 500">4</span>
+      <span style="width: 44px; height: 60px; border-radius: 12px; background: #1F262D; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 34px; font-weight: 500">8</span>
+      <span style="width: 44px; height: 60px; border-radius: 12px; background: #1F262D; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 34px; font-weight: 500">2</span>
+      <span style="width: 12px"></span>
+      <span style="width: 44px; height: 60px; border-radius: 12px; background: #1F262D; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 34px; font-weight: 500">9</span>
+      <span style="width: 44px; height: 60px; border-radius: 12px; background: #1F262D; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 34px; font-weight: 500">1</span>
+      <span style="width: 44px; height: 60px; border-radius: 12px; background: #1F262D; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 34px; font-weight: 500">3</span>
+    </div>
+    <div style="width: 100%; height: 6px; border-radius: 3px; background: #283039; margin-top: 6px"><div style="width: 62%; height: 6px; border-radius: 3px; background: #F2B35B"></div></div>
+    <div style="font-size: 13px; color: #A3AFBA">קוד חדש בעוד <span style="font-family: 'JetBrains Mono', monospace; direction: ltr; unicode-bidi: isolate">1:52</span></div>
+    <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #A3AFBA; margin-top: 6px"><span style="width: 8px; height: 8px; border-radius: 50%; background: #66BB6A"></span>ממתין לטלפון…</div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":960,"height":540}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

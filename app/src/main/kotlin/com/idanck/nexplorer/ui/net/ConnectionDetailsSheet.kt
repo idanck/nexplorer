@@ -116,8 +116,11 @@ fun ConnectionDetailsSheet(
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(NexplorerDimens.Space2 + NexplorerDimens.Space1 / 2)) {
-                Button(onClick = onEdit, shape = NexplorerShape.Pill, modifier = Modifier.weight(1f).height(NexplorerDimens.BottomBarButton)) {
-                    Text("ערוך", style = MaterialTheme.typography.labelLarge)
+                // מכשיר מחובר (1.16) לא נערך — רק "נתק" בהגדרות וחיבור מחדש בקוד.
+                if (connection.protocol != NetProtocol.Peer) {
+                    Button(onClick = onEdit, shape = NexplorerShape.Pill, modifier = Modifier.weight(1f).height(NexplorerDimens.BottomBarButton)) {
+                        Text("ערוך", style = MaterialTheme.typography.labelLarge)
+                    }
                 }
                 if (connection.isQuickConnect) {
                     OutlinedButton(onClick = onRecheck, enabled = !checking, shape = NexplorerShape.Pill, modifier = Modifier.height(NexplorerDimens.BottomBarButton)) {

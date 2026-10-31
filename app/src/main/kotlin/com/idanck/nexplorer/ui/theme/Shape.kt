@@ -60,6 +60,9 @@ object NexplorerShape {
     /** מגירה נפתחת מצד ההתחלה (ימין ב-RTL) — פינות מעוגלות בצד הסוף. */
     val Drawer = RoundedCornerShape(topEnd = 28.dp, bottomEnd = 28.dp)
 
+    /** Google TV (1.15): פאנל הפעולות נפתח מצד הסוף (שמאל ב-RTL) — פינות מעוגלות בצד ההתחלה. */
+    val TvPanel = RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp)
+
     /** תפריט צף (⋮ לפריט, תפריט overflow). */
     val Menu = RoundedCornerShape(20.dp)
 

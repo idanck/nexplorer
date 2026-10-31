@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Cloud
+import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.material.icons.outlined.Dns
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Terminal
@@ -32,6 +33,8 @@ val NetProtocol.icon: ImageVector
         NetProtocol.WebDav -> Icons.Outlined.Language
         NetProtocol.Synology -> NasIcon
         NetProtocol.GoogleDrive, NetProtocol.OneDrive -> Icons.Outlined.Cloud
+        // מכשיר מחובר (1.16): טלוויזיה או טלפון — הסוג לא ידוע מראש, ולכן מסך.
+        NetProtocol.Peer -> Icons.Outlined.Devices
     }
 
 /**

@@ -22,6 +22,7 @@
 | [שלב 4](plan/04-phase4.md) | 4א: הסתר תיקייה, גודל תיקיות, סידור מועדפים · 4ב: הצפנת קבצים (והפורמט) · 4ג: תיקייה מוצפנת (`data/crypto/Vaults`) |
 | [שלב 5](plan/05-phase5.md) | מקומות ברשת (D3): 5א SMB (`data/net/`, `data/transfer/TreeCopy`) · 5ב SFTP (`SftpFs`, `SshCrypto`) · 5ג WebDAV (`WebDavFs`, `core/DavAddress`) · 5ד פתיחה ישירה מהשרת (`media/RemoteDataSource`, `data/net/RemoteFilesProvider`) |
 | [שלב 6](plan/06-phase6.md) | ענן (D4): 6א Google Drive (`DriveFs`, `GoogleAuth`, `core/DriveNames`) · 6ב OneDrive (`OneDriveFs`, `MicrosoftAuth`) · מה עידן מגדיר אצל Google ו-Microsoft |
+| [העברה בין מכשירים](plan/08-peer.md) | טלפון ↔ טלוויזיה ברשת הביתית, כשהאפליקציה פתוחה: חיבור בקוד, הפרוטוקול וההצפנה (`data/peer/`, `ui/peer/`) |
 
 ## מחקר — Solid Explorer
 

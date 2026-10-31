@@ -191,6 +191,97 @@
       "w": 390,
       "h": 844,
       "title": "סטטוס חיבור · פרטי חיבור (1.14)"
+    },
+    "Tv-Main.dc.html": {
+      "x": 0,
+      "y": 8310,
+      "w": 960,
+      "h": 540,
+      "title": "T1 · טלוויזיה — מסך ראשי, פוקוס על אריח"
+    },
+    "Tv-Rail.dc.html": {
+      "x": 1040,
+      "y": 8310,
+      "w": 960,
+      "h": 540,
+      "title": "T2 · מסילת מקומות פתוחה + מכשירים קרובים"
+    },
+    "Tv-Actions.dc.html": {
+      "x": 2080,
+      "y": 8310,
+      "w": 960,
+      "h": 540,
+      "title": "T3 · פאנל פעולות (לחיצה ארוכה על OK)"
+    },
+    "Tv-Select.dc.html": {
+      "x": 3120,
+      "y": 8310,
+      "w": 960,
+      "h": 540,
+      "title": "T4 · בחירה מרובה וסרגל פעולות"
+    },
+    "Tv-Receive.dc.html": {
+      "x": 4160,
+      "y": 8310,
+      "w": 960,
+      "h": 540,
+      "title": "T5 · קבלת קבצים מהטלפון"
+    },
+    "Tv-Pair.dc.html": {
+      "x": 5200,
+      "y": 8310,
+      "w": 960,
+      "h": 540,
+      "title": "T6 · חיבור מכשיר — קוד על המסך"
+    },
+    "Tv-Launcher.dc.html": {
+      "x": 6240,
+      "y": 8310,
+      "w": 960,
+      "h": 540,
+      "title": "T7 · באנר במסך הבית של הטלוויזיה"
+    },
+    "Peer-Drawer.dc.html": {
+      "x": 0,
+      "y": 9250,
+      "w": 390,
+      "h": 844,
+      "title": "P1 · מגירה — מכשירים קרובים"
+    },
+    "Peer-Pair.dc.html": {
+      "x": 470,
+      "y": 9250,
+      "w": 390,
+      "h": 844,
+      "title": "P2 · חיבור לטלוויזיה — הקלדת קוד"
+    },
+    "Peer-Send.dc.html": {
+      "x": 940,
+      "y": 9250,
+      "w": 390,
+      "h": 844,
+      "title": "P3 · שלח אל — בחירת מכשיר"
+    },
+    "Peer-Transfer.dc.html": {
+      "x": 1410,
+      "y": 9250,
+      "w": 390,
+      "h": 844,
+      "title": "P4 · מגש העברות — שליחה לטלוויזיה"
+    },
+    "Peer-Browse.dc.html": {
+      "x": 1880,
+      "y": 9250,
+      "w": 390,
+      "h": 844,
+      "title": "P5 · עיון בקבצי הטלוויזיה מהטלפון"
+    },
+    "Peer-Settings.dc.html": {
+      "x": 2350,
+      "y": 9250,
+      "w": 390,
+      "h": 844,
+      "title": "P6 · הגדרות — העברה בין מכשירים"
     }
   },
   "order": [
@@ -219,7 +310,20 @@
     "ConnectionStatus-Relay.dc.html",
     "ConnectionStatus-Drawer.dc.html",
     "ConnectionStatus-Menu.dc.html",
-    "ConnectionStatus-Details.dc.html"
+    "ConnectionStatus-Details.dc.html",
+    "Tv-Main.dc.html",
+    "Tv-Rail.dc.html",
+    "Tv-Actions.dc.html",
+    "Tv-Select.dc.html",
+    "Tv-Receive.dc.html",
+    "Tv-Pair.dc.html",
+    "Tv-Launcher.dc.html",
+    "Peer-Drawer.dc.html",
+    "Peer-Pair.dc.html",
+    "Peer-Send.dc.html",
+    "Peer-Transfer.dc.html",
+    "Peer-Browse.dc.html",
+    "Peer-Settings.dc.html"
   ],
   "notes": {
     "t1": {
@@ -249,6 +353,20 @@
       "text": "4 · נגנים",
       "kind": "title1",
       "maxW": 2238
+    },
+    "tv": {
+      "x": 0,
+      "y": 8010,
+      "text": "Google TV (1.15)",
+      "kind": "title1",
+      "maxW": 7200
+    },
+    "peer": {
+      "x": 0,
+      "y": 8950,
+      "text": "העברה בין מכשירים (1.16)",
+      "kind": "title1",
+      "maxW": 2740
     }
   },
   "designSystems": []

@@ -56,6 +56,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -101,7 +107,16 @@ fun AudioPlayerScreen(viewModel: AudioPlayerViewModel, path: String?, onBack: ()
         }
     }
 
-    Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize()) {
+    // מקשי המדיה בשלט (Google TV, 1.15): נגן/השהה, הבא, הקודם — בכל מקום במסך; החצים ו-OK עוברים בין הכפתורים.
+    val onMediaKey: (KeyEvent) -> Boolean = { e ->
+        e.type == KeyEventType.KeyDown && when (e.key) {
+            Key.MediaPlayPause, Key.MediaPlay, Key.MediaPause -> true.also { viewModel.toggle() }
+            Key.MediaNext -> true.also { viewModel.next() }
+            Key.MediaPrevious -> true.also { viewModel.previous() }
+            else -> false
+        }
+    }
+    Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxSize().onPreviewKeyEvent(onMediaKey)) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             Row(
                 Modifier.padding(start = NexplorerDimens.Space1, end = NexplorerDimens.Space1, top = NexplorerDimens.Space2, bottom = NexplorerDimens.Space1),

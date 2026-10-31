@@ -22,6 +22,7 @@ object ConnectionFacts {
         add(Fact("סוג", if (c.protocol == NetProtocol.Synology) "Synology · ${kind(c)}" else c.protocol.label))
         when {
             c.protocol.cloud -> add(Fact("חשבון", c.user.ifBlank { "—" }, mono = true))
+            c.protocol == NetProtocol.Peer -> add(Fact("קבלת קבצים", if (c.autoAccept) "בלי לשאול" else "שואל לפני כל קבלה"))
             c.isQuickConnect -> add(Fact("מזהה", c.quickConnect, mono = true))
             c.protocol == NetProtocol.WebDav -> add(Fact("כתובת", c.displayUrl(c.root), mono = true))
             else -> add(Fact("שרת", c.host + if (c.port != null && c.port != c.defaultPort) ":${c.port}" else "", mono = true))
@@ -33,7 +34,7 @@ object ConnectionFacts {
             NetProtocol.Sftp -> add(Fact("תיקייה", "/" + c.share, mono = true))
             else -> Unit
         }
-        if (!c.protocol.cloud) add(Fact("משתמש", c.user.ifBlank { "אורח" }, mono = c.user.isNotBlank()))
+        if (!c.protocol.cloud && c.protocol != NetProtocol.Peer) add(Fact("משתמש", c.user.ifBlank { "אורח" }, mono = c.user.isNotBlank()))
         when {
             status != null -> add(Fact("כתובת בפועל", status.host + if (status.port != 443) ":${status.port}" else "", mono = true))
             c.protocol == NetProtocol.Synology && !c.isQuickConnect ->
@@ -45,6 +46,7 @@ object ConnectionFacts {
 
     private fun security(c: NetConnection): String? = when (c.protocol) {
         NetProtocol.Smb -> null
+        NetProtocol.Peer -> "מוצפן · חובר בקוד"
         NetProtocol.Sftp -> if (c.hostKey != null) "SSH · מפתח השרת אושר" else "SSH"
         NetProtocol.GoogleDrive, NetProtocol.OneDrive -> "https · התחברות בדף של השירות"
         NetProtocol.WebDav, NetProtocol.Synology -> when {

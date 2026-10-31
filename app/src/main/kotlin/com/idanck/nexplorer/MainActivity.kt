@@ -17,6 +17,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
@@ -27,6 +28,10 @@ import com.idanck.nexplorer.media.PlaybackService
 import com.idanck.nexplorer.ui.NexplorerRoot
 import com.idanck.nexplorer.ui.keys.KeyShortcuts
 import com.idanck.nexplorer.ui.theme.NexplorerTheme
+import com.idanck.nexplorer.ui.peer.LocalPeerUi
+import com.idanck.nexplorer.ui.peer.PeerUi
+import com.idanck.nexplorer.ui.tv.LocalTvMode
+import com.idanck.nexplorer.ui.tv.TvMode
 
 class MainActivity : ComponentActivity() {
 
@@ -41,9 +46,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         if (savedInstanceState == null) readIntent(intent)
         val container = (application as NexplorerApp).container
+        // Google TV (1.15): מסך לשלט, וערכה כהה תמיד (מסך גדול בחדר — בלי משטחים לבנים).
+        val tv = TvMode.isTv(this)
         setContent {
             val settings by container.settings.state.collectAsStateWithLifecycle()
-            val dark = when (settings.theme) {
+            val dark = if (tv) true else when (settings.theme) {
                 ThemeMode.System -> isSystemInDarkTheme()
                 ThemeMode.Light -> false
                 ThemeMode.Dark -> true
@@ -58,7 +65,9 @@ class MainActivity : ComponentActivity() {
             }
             NexplorerTheme(darkTheme = dark) {
                 // הממשק כתוב בעברית בלבד בשלב הזה, ולכן תמיד מימין לשמאל — גם במכשיר באנגלית (D7).
-                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                // העברה בין מכשירים (1.16): מה שפתוח ("שלח אל", קוד) — משותף לכל המסכים.
+                val peerUi = remember { PeerUi(container.peers, container.transfers, container.scope) }
+                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl, LocalTvMode provides tv, LocalPeerUi provides peerUi) {
                     NexplorerRoot(
                         container = container,
                         pendingPath = pendingPath.value,
@@ -100,10 +109,23 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** יציאה מהאפליקציה (לא סיבוב) נועלת את התיקיות המוצפנות — המפתח לא נשאר בזיכרון ברקע. */
+    /** העברה בין מכשירים (1.16): גלויים ומחפשים רק כשהאפליקציה פתוחה — ההחלטה של עידן, בלי שירות ברקע. */
+    override fun onStart() {
+        super.onStart()
+        (application as NexplorerApp).container.peers.start()
+    }
+
+    /**
+     * יציאה מהאפליקציה (לא סיבוב) נועלת את התיקיות המוצפנות — המפתח לא נשאר בזיכרון ברקע — ומפסיקה את העברה בין
+     * מכשירים (העברות שכבר באמצע ממשיכות).
+     */
     override fun onStop() {
         super.onStop()
-        if (!isChangingConfigurations) (application as NexplorerApp).container.vaults.lockAll()
+        if (!isChangingConfigurations) {
+            val container = (application as NexplorerApp).container
+            container.vaults.lockAll()
+            container.peers.stop()
+        }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
