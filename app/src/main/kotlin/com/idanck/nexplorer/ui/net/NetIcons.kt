@@ -35,7 +35,7 @@ val NetProtocol.icon: ImageVector
     }
 
 /**
- * ל-Google Drive יש אייקון בצבעים משלו (`R.drawable.ic_google_drive`, 1.10) — מוצג בלי צביעה, ולכן תמיד על
+ * ל-Google Drive יש אייקון בצבעים משלו (`R.drawable.ic_google_drive` — הלוגו, PNG ב-xxxhdpi) — מוצג בלי צביעה, ולכן תמיד על
  * אריח בהיר-ניטרלי ולא על primary.
  */
 val NetProtocol.hasOwnIcon: Boolean get() = this == NetProtocol.GoogleDrive
