@@ -1,0 +1,8 @@
+
+com.idanck.nexplorer.qa.BrowserFlowTest:...........
+
+Time: 77.235
+
+OK (11 tests)
+
+

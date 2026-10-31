@@ -1,0 +1,4 @@
+14:14:44  mCurrentFocus=Window{1923b26 u0 com.idanck.nexplorer.debug/com.idanck.nexplorer.MainActivity}  mFocusedApp=ActivityRecord{3fa869 u0 com.idanck.nexplorer.debug/com.idanck.nexplorer.MainActivity t139} 
+14:14:59  mCurrentFocus=Window{2b55dcf u0 Pop-Up Window}  mFocusedApp=ActivityRecord{3fa869 u0 com.idanck.nexplorer.debug/com.idanck.nexplorer.MainActivity t139} 
+14:15:14  mCurrentFocus=Window{1923b26 u0 com.idanck.nexplorer.debug/com.idanck.nexplorer.MainActivity}  mFocusedApp=ActivityRecord{3fa869 u0 com.idanck.nexplorer.debug/com.idanck.nexplorer.MainActivity t139} 
+14:15:30  mCurrentFocus=Window{1923b26 u0 com.idanck.nexplorer.debug/com.idanck.nexplorer.MainActivity}  mFocusedApp=ActivityRecord{3fa869 u0 com.idanck.nexplorer.debug/com.idanck.nexplorer.MainActivity t139} 
